@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import pty from '@lydell/node-pty';
-import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, realPath } from './util.js';
+import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, realPath, trace } from './util.js';
 import * as G from './git.js';
 import { AGENTS, lastAssistantText, summarize } from './agents.js';
 import { httpError, addProject } from './projects.js';
@@ -1227,10 +1227,14 @@ export class Tasks {
     clearInterval(this.changesTimer);
     clearInterval(this.codexTimer);
     clearInterval(this.watchTimer);
-    for (const [, r] of this.rt) {
+    for (const [id, r] of this.rt) {
       try {
+        trace(`task kill ${id} pid=${r.proc.pid}`);
         r.proc.kill();
-      } catch {}
+        trace(`task killed ${id}`);
+      } catch (e) {
+        trace(`task kill error ${id} ${e.message}`);
+      }
     }
   }
 }

@@ -1,0 +1,26 @@
+# Temporary: where the Windows test teardown hangs.
+name: debug-shutdown
+on:
+  push:
+    branches: [desktop]
+    paths: ['.github/workflows/debug-shutdown.yml', 'server/**', 'test/security.test.js']
+jobs:
+  trace:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: security tests with a shutdown trace
+        shell: bash
+        run: AGENTDESK_TRACE_FILE="$RUNNER_TEMP/trace.log" node --test --test-timeout=90000 --test-force-exit test/security.test.js | grep -E "^(not )?ok|^# (pass|fail|cancelled)" || true
+      - if: always()
+        shell: bash
+        run: cat "$RUNNER_TEMP/trace.log" || echo "no trace"

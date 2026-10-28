@@ -12,7 +12,7 @@ import { availability, configureHooks } from './agents.js';
 import { listSessions } from './sessions.js';
 import { Shells, isShellId, needShellTask } from './shells.js';
 import { startHookServer } from './hookserver.js';
-import { VERSION, tilde } from './util.js';
+import { VERSION, tilde, trace } from './util.js';
 
 const BODY_LIMIT = 1_000_000;
 const IMAGE_TYPES = { '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon' };
@@ -239,13 +239,17 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
   function shutdown() {
     if (closed) return;
     closed = true;
+    trace('core shutdown: tasks');
     tasks.shutdown();
+    trace('core shutdown: shells');
     shells.shutdown();
+    trace('core shutdown: rest');
     clearTimeout(warmTimer);
     clearInterval(warmEvery);
     clearTimeout(broadcastTimer);
     store.flush();
     hooks.close();
+    trace('core shutdown: done');
   }
 
   if (!quiet) console.log(`Agent Desk ${VERSION} core ready · hooks at ${hooks.path}`);

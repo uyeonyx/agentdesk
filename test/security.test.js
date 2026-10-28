@@ -10,7 +10,11 @@ let ctx;
 before(async () => {
   ctx = await boot();
 });
-after(() => ctx.s.shutdown());
+after(() => {
+  ctx.s.shutdown();
+  process.env.AGENTDESK_TRACE_FILE && fs.appendFileSync(process.env.AGENTDESK_TRACE_FILE, `${new Date().toISOString()} after hook done; handles: ${process._getActiveHandles().map((h) => h.constructor.name).join(',')}\n`);
+  process.on('exit', () => process.env.AGENTDESK_TRACE_FILE && fs.appendFileSync(process.env.AGENTDESK_TRACE_FILE, `${new Date().toISOString()} process exit\n`));
+});
 
 const posix = process.platform !== 'win32';
 

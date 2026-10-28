@@ -80,6 +80,9 @@ export function errText(e) {
 
 const WIN = process.platform === 'win32';
 
+/** Temporary: shutdown trace for the Windows teardown hang (AGENTDESK_TRACE_FILE). */
+export const trace = (msg) => process.env.AGENTDESK_TRACE_FILE && fs.appendFileSync(process.env.AGENTDESK_TRACE_FILE, `${new Date().toISOString()} ${process.pid} ${msg}\n`);
+
 /**
  * The one spelling of a path used for storing and comparing. On Windows the same folder can come as
  * C:\Users\RUNNER~1\… (8.3 short name), C:/Users/runneradmin/… (git) or with other letter case;
