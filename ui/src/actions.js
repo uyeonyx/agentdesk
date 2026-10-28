@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { get, set, toast, projectOf, taskOf, setView, openModal } from './store.js';
-import { buildMessage, laneOf, LANES, isLive } from './util.js';
+import { buildMessage, laneOf, LANES, isLive, isBusy } from './util.js';
 
 const BANNER_MS = 4500;
 let bannerTimer;
@@ -180,11 +180,11 @@ export async function archive(taskId) {
   }
 }
 
-/** A working agent gets asked first: putting it away stops it mid-turn. */
+/** A working agent gets asked first: putting it away stops it mid-turn (or its background work). */
 export function archiveAsk(taskId) {
   const t = taskOf(get(), taskId);
   if (!t || t.archived) return;
-  if (t.running && (t.state === 'working' || t.state === 'starting')) openModal('archive', { taskId });
+  if (t.running && isBusy(t)) openModal('archive', { taskId });
   else archive(taskId);
 }
 

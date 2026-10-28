@@ -40,18 +40,21 @@ export function roomVars(color = '#7D8FA3') {
 export const LANES = [
   { key: 'needs', title: '답할 것', states: ['needs_input'] },
   { key: 'review', title: '검토할 것', states: ['review'] },
-  { key: 'working', title: '작업 중', states: ['working', 'starting'] },
+  { key: 'working', title: '작업 중', states: ['working', 'starting', 'waiting'] },
   { key: 'paused', title: '멈춤', states: ['exited'] },
   { key: 'done', title: '끝남', states: ['merged', 'discarded'] },
 ];
 export const laneOf = (t) => LANES.find((l) => l.states.includes(t.state))?.key || 'paused';
-export const isLive = (t) => ['starting', 'working', 'needs_input', 'review', 'exited'].includes(t.state);
+export const isLive = (t) => ['starting', 'working', 'waiting', 'needs_input', 'review', 'exited'].includes(t.state);
+/** The agent is busy, or will pick up again by itself once its background work is done. */
+export const isBusy = (t) => ['working', 'starting', 'waiting'].includes(t.state);
 
 export const STATE_ICON = {
   needs_input: 'message-question',
   review: 'eye-check',
   working: null, // spinner
   starting: null,
+  waiting: 'hourglass',
   exited: 'player-pause',
   merged: 'git-merge',
   discarded: 'trash',

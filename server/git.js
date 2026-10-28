@@ -76,6 +76,46 @@ export async function removeWorktree(repo, wtPath, branch, { force = true, delet
   }
 }
 
+const stdoutOf = (cwd, args) => git(cwd, args).then((r) => r.stdout.trim(), () => '');
+
+export async function isAncestor(dir, a, b) {
+  try {
+    await git(dir, ['merge-base', '--is-ancestor', a, b]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The branches a task's work would land in: what the main checkout has out (with its upstream) and
+ * the default branch. A session working straight in the person's checkout can only land in the
+ * default, so its own branch never counts.
+ */
+export async function landingRefs(repo, worktree) {
+  const main = await stdoutOf(repo, ['symbolic-ref', '-q', 'HEAD']);
+  const own = await stdoutOf(worktree, ['symbolic-ref', '-q', 'HEAD']);
+  const refs = main && main !== own ? [main, await stdoutOf(repo, ['for-each-ref', '--format=%(upstream)', main])] : [];
+  refs.push(await stdoutOf(repo, ['symbolic-ref', '-q', 'refs/remotes/origin/HEAD']), 'refs/remotes/origin/main', 'refs/remotes/origin/master', 'refs/heads/main', 'refs/heads/master');
+  return [...new Set(refs.filter((r) => r && r !== own))];
+}
+
+/**
+ * Where a branch's own work starts: where it was made, until the agent merges or rebases a newer
+ * main into it. From then on it's the newest point the branch shares with a landing branch, or
+ * main's changes would count as its own. If the agent moved the branch off its start altogether
+ * (checked out main, reset elsewhere), the start means nothing and the landing branches decide.
+ */
+export async function forkPoint(dir, base, refs) {
+  let best = base && (await isAncestor(dir, base, 'HEAD')) ? base : '';
+  for (const ref of refs) {
+    const mb = await stdoutOf(dir, ['merge-base', 'HEAD', ref]);
+    if (!mb || mb === best) continue;
+    if (!best || (await isAncestor(dir, best, mb))) best = mb;
+  }
+  return best || base;
+}
+
 /** Files that differ from `base`, including untracked ones. */
 export async function changes(dir, base) {
   const out = new Map();

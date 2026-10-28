@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execSync } from 'node:child_process';
 import { boot, makeRepo } from './helpers.js';
+import { pendingOf } from '../server/tasks.js';
 
 let ctx;
 let proj;
@@ -51,6 +52,30 @@ test('send + undo: files go back to exactly before the message, agent is told to
   assert.ok(fs.existsSync(path.join(x.worktreeAbs, 'docs/rotation.md')), 'earlier work kept');
   const after = await ctx.waitTask(id, (x) => x.messages.find((mm) => mm.id === m.id)?.undone && x.state !== 'working');
   assert.equal(after.messages.find((mm) => mm.id === m.id).canUndo, false);
+});
+
+test('a turn that leaves background work running waits for it instead of asking for review', async () => {
+  const t = (await ctx.api('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'create notes/build.md 백그라운드로 빌드 돌려 둬' })).json;
+  const w = await ctx.waitTask(t.id, (x) => x.state === 'waiting');
+  assert.match(w.reason, /백그라운드 작업이 끝나면 이어서 해요 · 셸: npm run build/);
+  assert.ok(w.changes.files >= 1, 'changes are already there, and still not up for review');
+  // The build finishing wakes the agent; this time the turn really ends.
+  const x = await ctx.waitTask(t.id, (x) => x.state === 'review');
+  assert.match(x.summary, /빌드가 끝났어요/);
+  await ctx.api('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('what a stopped turn still waits on, in words', () => {
+  assert.equal(pendingOf({}), '');
+  assert.equal(pendingOf({ background_tasks: [], session_crons: [] }), '');
+  assert.equal(pendingOf({ background_tasks: [{ type: 'shell', status: 'completed', command: 'ls' }] }), '');
+  assert.equal(pendingOf({ background_tasks: [{ type: 'subagent', status: 'running', description: '테스트 작성', agent_type: 'general-purpose' }] }), '백그라운드 작업이 끝나면 이어서 해요 · 서브에이전트: 테스트 작성');
+  assert.equal(
+    pendingOf({ background_tasks: [{ type: 'shell', status: 'running' }, { type: 'shell', status: 'running' }, { type: 'monitor', status: 'running' }], session_crons: [{ id: 'c', schedule: '*/5 * * * *', recurring: true }] }),
+    '백그라운드 작업이 끝나면 이어서 해요 · 셸 2개, 모니터 1개, 예약 1개',
+  );
+  assert.equal(pendingOf({ session_crons: [{ id: 'c', schedule: '30 14 28 10 *', recurring: false }] }), '예약한 때가 되면 이어서 해요 · 예약 1개');
+  assert.match(pendingOf({ background_tasks: [{ type: 'shell', status: 'running', command: 'x'.repeat(300) }] }), /…$/);
 });
 
 test('codex task: notify hook ends the turn; a no-change answer lands in "needs input"', async () => {
@@ -104,6 +129,65 @@ test('archive puts even a running task away without deleting anything; taking it
   let screen;
   while (Date.now() < end && !(screen = (await ctx.api('GET', `/api/tasks/${t.id}/screen?lines=20`)).json.lines.join('\n')).includes('resumed')) await new Promise((r) => setTimeout(r, 100));
   assert.match(screen, new RegExp(`resumed ${x.sessionId}`), 'same conversation');
+  await ctx.api('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test("pulling main into the task's branch doesn't make main's changes its own", async () => {
+  const dir = makeRepo(path.join(ctx.tmp, 'pulls-main'), { 'README.md': '# app\n', 'src/app.js': 'export const v = 1;\n' });
+  const p = (await ctx.api('POST', '/api/projects', { path: dir })).json;
+  const t = (await ctx.api('POST', '/api/tasks', { projectId: p.id, agent: 'claude', prompt: 'create notes/own.md 이 작업의 변경' })).json;
+  const x = await ctx.waitTask(t.id, (x) => x.state === 'review');
+  await ctx.api('POST', `/api/tasks/${t.id}/stop`);
+  const g = (cmd, cwd) => sh(`git -c user.name=t -c user.email=t@t ${cmd}`, cwd);
+  const paths = async () => (await ctx.api('GET', `/api/tasks/${t.id}/changes`)).json.files.map((f) => f.path).sort();
+  const own = ['README.md', 'notes/own.md'];
+  assert.deepEqual(await paths(), own);
+
+  // Main moves on; the agent commits and merges it in.
+  for (let i = 0; i < 5; i++) fs.writeFileSync(path.join(dir, `m${i}.txt`), `${i}\n`);
+  fs.writeFileSync(path.join(dir, 'src/app.js'), 'export const v = 2;\n');
+  g('add -A', dir);
+  g('commit -qm main-moves', dir);
+  g('add -A', x.worktreeAbs);
+  g('commit -qm own-work', x.worktreeAbs);
+  g('merge -q --no-edit main', x.worktreeAbs);
+  assert.deepEqual(await paths(), own, 'merged-in main stays out');
+  // `git checkout -b x origin/main` makes main the branch's upstream; main still counts as where it lands.
+  g(`branch -q --set-upstream-to=main ${x.branch}`, x.worktreeAbs);
+  assert.deepEqual(await paths(), own);
+  const task = async () => (await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id);
+  assert.equal((await task()).changes.files, 2);
+  // The diff's left side is main as the branch took it, not where the task began.
+  const base = (await ctx.api('GET', `/api/tasks/${t.id}/file?path=src/app.js&ref=base`)).json;
+  assert.equal(base.content, 'export const v = 2;\n');
+
+  // Rebasing onto a newer main is the same story.
+  fs.writeFileSync(path.join(dir, 'm9.txt'), '9\n');
+  g('add -A', dir);
+  g('commit -qm main-again', dir);
+  g('rebase -q main', x.worktreeAbs);
+  assert.deepEqual(await paths(), own, 'rebased-onto main stays out');
+
+  // Once main has all of it, nothing is left that main lacks; new work shows up again.
+  g('merge -q --no-edit ' + x.branch, dir);
+  assert.deepEqual(await paths(), []);
+  fs.writeFileSync(path.join(x.worktreeAbs, 'after.md'), 'more\n');
+  assert.deepEqual(await paths(), ['after.md']);
+  await ctx.api('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('an agent that moves its worktree onto main has nothing of its own, wherever the task began', async () => {
+  const dir = makeRepo(path.join(ctx.tmp, 'side-branch'), { 'README.md': '# app\n' });
+  const g = (cmd, cwd = dir) => sh(`git -c user.name=t -c user.email=t@t ${cmd}`, cwd);
+  g('checkout -q -b carton');
+  fs.writeFileSync(path.join(dir, 'carton.md'), 'only on carton\n');
+  g('add -A');
+  g('commit -qm carton');
+  const p = (await ctx.api('POST', '/api/projects', { path: dir })).json;
+  const t = (await ctx.api('POST', '/api/tasks', { projectId: p.id, agent: 'claude', prompt: 'just answer: 어디서 시작했어?' })).json;
+  const x = await ctx.waitTask(t.id, (x) => x.state === 'needs_input');
+  g('checkout -q --detach main', x.worktreeAbs);
+  assert.deepEqual((await ctx.api('GET', `/api/tasks/${t.id}/changes`)).json.files, []);
   await ctx.api('POST', `/api/tasks/${t.id}/discard`);
 });
 

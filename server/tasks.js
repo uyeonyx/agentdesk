@@ -23,7 +23,7 @@ const { SerializeAddon } = require('@xterm/addon-serialize');
  */
 export const PTY_WIN = process.platform === 'win32' ? { useConptyDll: true } : {};
 
-const LIVE = new Set(['starting', 'working', 'needs_input', 'review', 'exited']);
+const LIVE = new Set(['starting', 'working', 'waiting', 'needs_input', 'review', 'exited']);
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
@@ -46,7 +46,7 @@ export class Tasks {
     for (const t of store.tasks) {
       migrate(t);
       if (t.watch) continue; // followed again by the watch poll
-      if (['starting', 'working', 'needs_input', 'review'].includes(t.state)) {
+      if (['starting', 'working', 'waiting', 'needs_input', 'review'].includes(t.state)) {
         t.state = 'exited';
         t.reason = 'Desk가 다시 시작됐어요 · 재개할 수 있어요';
       }
@@ -55,6 +55,8 @@ export class Tasks {
     this.changesTimer = setInterval(() => this.pollChanges(), 6000);
     this.codexTimer = setInterval(() => this.pollCodex(), 2000);
     this.watchTimer = setInterval(() => this.pollWatch(), 1200);
+    // Main may have moved while Desk was closed (and older versions counted what came with it): recount once.
+    this.recountTimer = setTimeout(() => this.recount(), 2000);
   }
 
   // ------------------------------------------------------------ watching sessions that run elsewhere
@@ -416,12 +418,16 @@ export class Tasks {
     await this.settle(task, this.menuOf(r) ? '선택을 기다려요' : '입력을 기다리는 것 같아요');
   }
 
-  /** Decide between "needs you" and "ready for review" once the agent stops. */
-  async settle(task, reason, summary) {
+  /**
+   * Decide between "needs you" and "ready for review" once the agent stops, unless background work
+   * (`pending`, in words) will wake it again: then it's neither done nor asking, just waiting.
+   */
+  async settle(task, reason, summary, pending) {
     const files = await this.refreshChanges(task);
     const hasChanges = files && files.length > 0;
     const r = this.rt.get(task.id);
     const waitingOnMenu = r && this.menuOf(r);
+    if (pending && !waitingOnMenu) return this.setState(task, 'waiting', pending, { summary: summarize(summary) });
     this.setState(task, hasChanges && !waitingOnMenu ? 'review' : 'needs_input', reason, { summary: summarize(summary) });
   }
 
@@ -463,13 +469,15 @@ export class Tasks {
         const msg = String(p.message || '입력이 필요해요');
         const type = String(p.notification_type || '');
         if (/permission/i.test(type) || /permission|권한/i.test(msg)) return this.setState(task, 'needs_input', msg);
+        // "You haven't typed in a while" means nothing while background work is still due to wake it.
+        if (type === 'idle_prompt' && task.state === 'waiting') return;
         return this.settle(task, msg);
       }
       if (ev === 'Stop') {
         this.tracker(task).turnEnded();
         const text = lastAssistantText(p.transcript_path) || p.last_assistant_message;
         task.lastReply = typeof text === 'string' ? text.slice(-6000) : '';
-        return this.settle(task, '응답을 마쳤어요', text);
+        return this.settle(task, '응답을 마쳤어요', text, pendingOf(p));
       }
     } else if (body.agent === 'codex') {
       if (p.type === 'approval-requested' || p.type === 'async-question') {
@@ -1075,7 +1083,7 @@ export class Tasks {
     try {
       for (const x of task.repos) {
         await G.commitAll(x.worktree, task.title);
-        if (!(await G.isDirty(x.worktree)) && (await run('git', ['-C', x.worktree, 'rev-list', '--count', `${x.baseRef}..HEAD`])).stdout.trim() === '0') continue;
+        if (!(await G.isDirty(x.worktree)) && (await run('git', ['-C', x.worktree, 'rev-list', '--count', `${await this.since(x)}..HEAD`])).stdout.trim() === '0') continue;
         await G.push(x.worktree, x.branch);
         // `--flag=value` so a title starting with "-" can't be read as another flag.
         const { stdout } = await run('gh', ['pr', 'create', `--head=${x.branch}`, `--title=${task.title}`, `--body=${body(urls)}`], { cwd: x.worktree, timeout: 120000 });
@@ -1168,7 +1176,7 @@ export class Tasks {
       const all = [];
       for (const x of task.repos) {
         if (!fs.existsSync(x.worktree)) continue;
-        for (const f of await G.changes(x.worktree, x.baseRef)) all.push({ ...f, path: x.prefix + f.path, repo: x.name });
+        for (const f of await G.changes(x.worktree, await this.since(x))) all.push({ ...f, path: x.prefix + f.path, repo: x.name });
       }
       const c = { files: all.length, adds: all.reduce((a, f) => a + f.adds, 0), dels: all.reduce((a, f) => a + f.dels, 0) };
       const prev = task.changes;
@@ -1183,8 +1191,18 @@ export class Tasks {
     }
   }
 
+  /** Where this repo's own changes start (it moves once the agent pulls main in); kept for the diff view. */
+  async since(x) {
+    x.since = await G.forkPoint(x.worktree, x.baseRef, await G.landingRefs(x.repo, x.worktree));
+    return x.since;
+  }
+
+  async recount() {
+    for (const t of this.store.tasks) if (!t.archived && LIVE.has(t.state) && t.repos.length) await this.refreshChanges(t);
+  }
+
   async pollChanges() {
-    for (const t of this.store.tasks) if (t.state === 'working' && this.rt.get(t.id)) await this.refreshChanges(t);
+    for (const t of this.store.tasks) if ((t.state === 'working' || t.state === 'waiting') && this.rt.get(t.id)) await this.refreshChanges(t);
   }
 
   async changesOf(id) {
@@ -1210,7 +1228,7 @@ export class Tasks {
     return { repo: null, rest: rel };
   }
 
-  /** ref: "work" (this task), "base" (where it started), "main" (project checkout), "task:<id>" */
+  /** ref: "work" (this task), "base" (where its own work starts), "main" (project checkout), "task:<id>" */
   async file(id, rel, ref = 'work') {
     const task = this.need(id);
     if (typeof rel !== 'string' || !rel) throw httpError(400, 'bad path');
@@ -1221,7 +1239,7 @@ export class Tasks {
     } else if (!repo) {
       throw httpError(400, 'bad path');
     } else if (ref === 'base') {
-      const content = await G.showAt(repo.worktree, repo.baseRef, rest);
+      const content = await G.showAt(repo.worktree, await this.since(repo), rest);
       return { content, binary: content != null && isBinary(Buffer.from(content)) };
     } else if (ref === 'main') root = repo.repo;
     else if (ref === 'work') root = repo.worktree;
@@ -1259,6 +1277,7 @@ export class Tasks {
 
   /** Stops every agent; resolves once their terminals have closed (Windows needs a moment for ConPTY). */
   shutdown() {
+    clearTimeout(this.recountTimer);
     clearInterval(this.changesTimer);
     clearInterval(this.codexTimer);
     clearInterval(this.watchTimer);
@@ -1277,6 +1296,30 @@ export class Tasks {
  * A session id reported by an agent's hook is only adopted if Claude Code keeps that conversation
  * for this task's folder; an agent can't attach one of the person's other sessions to its task.
  */
+const BG_KIND = { shell: '셸', subagent: '서브에이전트', monitor: '모니터', workflow: '워크플로', teammate: '팀원', 'cloud session': '클라우드 세션', 'MCP task': 'MCP 작업' };
+
+/**
+ * What a finished Claude turn still waits on, in words, or '' when nothing will wake it: its Stop
+ * hook lists the background work in flight (shells, subagents, monitors…) and scheduled wakeups.
+ */
+export function pendingOf(p) {
+  const list = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === 'object') : []);
+  const tasks = list(p.background_tasks).filter((b) => !/^(completed|failed|killed|stopped|cancell?ed|done|error)$/i.test(String(b.status || '')));
+  const crons = list(p.session_crons);
+  if (!tasks.length && !crons.length) return '';
+  const head = tasks.length ? '백그라운드 작업이 끝나면 이어서 해요' : '예약한 때가 되면 이어서 해요';
+  const kind = (b) => BG_KIND[b.type] || '작업';
+  if (tasks.length === 1 && !crons.length) {
+    const b = tasks[0];
+    const what = String(b.description || b.command || b.agent_type || b.name || '').replace(/\s+/g, ' ').trim();
+    return `${head} · ${kind(b)}${what ? `: ${what.length > 80 ? what.slice(0, 79) + '…' : what}` : ''}`;
+  }
+  const n = new Map();
+  for (const b of tasks) n.set(kind(b), (n.get(kind(b)) || 0) + 1);
+  if (crons.length) n.set('예약', crons.length);
+  return `${head} · ${[...n].map(([k, c]) => `${k} ${c}개`).join(', ')}`;
+}
+
 function transcriptBelongs(sessionId, cwd) {
   const f = claudeTranscriptOf(sessionId);
   if (!f) return false;

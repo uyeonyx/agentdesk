@@ -31,6 +31,7 @@ test.beforeAll(async () => {
     AGENTDESK_CLAUDE_BIN: path.join(root, 'test', win ? 'mock-claude.cmd' : 'mock-claude'),
     AGENTDESK_CODEX_BIN: path.join(root, 'test', win ? 'mock-codex.cmd' : 'mock-codex'),
     MOCK_WORK_MS: '300',
+    MOCK_BG_MS: '4000',
     MOCK_TRANSCRIPT_DIR: path.join(tmp, 'transcripts'),
     AGENTDESK_TRANSCRIPT_ROOTS: path.join(tmp, 'transcripts'),
     CODEX_HOME: path.join(tmp, 'codex-home'),
@@ -166,6 +167,26 @@ test('보관하기 takes a task off the list without stopping its story; 보관�
   await expect(row).toBeVisible();
   await expect.poll(async () => (await task(t.id))?.running, { timeout: 10_000 }).toBe(true);
   expect((await task(t.id)).archived).toBe(false);
+  await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('a turn that leaves a build running in the background waits in 작업 중, then comes up for review', async () => {
+  const repo = makeRepo(path.join(tmp, 'repo-bg'));
+  const call = (method, p, body) =>
+    page.evaluate(async ([m, p, b]) => JSON.parse((await window.desk.api(m, p, b === undefined ? undefined : JSON.stringify(b))).body || '{}'), [method, p, body]);
+  const state = async (id) => (await call('GET', '/api/state')).tasks.find((x) => x.id === id)?.state;
+  const proj = await call('POST', '/api/projects', { path: repo });
+  const t = await call('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'create notes/bg.md 백그라운드로 빌드' });
+  await expect.poll(() => state(t.id), { timeout: 20_000 }).toBe('waiting');
+  const row = page.locator('button.row', { hasText: t.title }).first();
+  if (!(await row.isVisible())) await page.keyboard.press('b');
+  const lane = page.locator('section[aria-label="작업 중"]');
+  await expect(lane.locator('button.row', { hasText: t.title })).toBeVisible();
+  await expect(row).toContainText('백그라운드 작업이 끝나면 이어서 해요 · 셸: npm run build');
+  await expect(row.locator('.ti-hourglass')).toBeVisible();
+  await page.screenshot({ path: path.join(tmp, 'waiting.png'), animations: 'disabled' });
+  await expect.poll(() => state(t.id), { timeout: 20_000 }).toBe('review');
+  await expect(page.locator('section[aria-label="검토할 것"] button.row', { hasText: t.title })).toBeVisible();
   await call('POST', `/api/tasks/${t.id}/discard`);
 });
 

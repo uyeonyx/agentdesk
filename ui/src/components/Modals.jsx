@@ -746,7 +746,9 @@ function ConfirmArchive({ taskId }) {
       label="멈추고 보관"
       icon="archive"
     >
-      <p style="margin:0;color:var(--muted)">에이전트가 아직 작업 중이에요. 보관하면 지금 하던 일을 멈춰요. worktree·브랜치·대화는 그대로라 보관함에서 꺼내면 같은 대화로 이어서 시킬 수 있어요.</p>
+      <p style="margin:0;color:var(--muted)">
+        {t.state === 'waiting' ? '에이전트가 백그라운드 작업을 기다리고 있어요. 보관하면 그 작업도 함께 멈춰요.' : '에이전트가 아직 작업 중이에요. 보관하면 지금 하던 일을 멈춰요.'} worktree·브랜치·대화는 그대로라 보관함에서 꺼내면 같은 대화로 이어서 시킬 수 있어요.
+      </p>
     </Confirm>
   );
 }

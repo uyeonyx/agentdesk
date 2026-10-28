@@ -154,6 +154,19 @@ function finish(text) {
   }
   fs.appendFileSync(transcriptPath(), JSON.stringify({ type: 'assistant', cwd: process.cwd(), sessionId: sid, message: { content: [{ type: 'text', text: reply }] } }) + '\n');
   W(`\r\x1b[2K\x1b[32m⏺\x1b[0m ${reply}\r\n\r\n> `);
+  if (/background|백그라운드/i.test(text) && kind === 'claude') {
+    // Like a build left running with run_in_background: the turn ends, then its finish wakes Claude.
+    hook('Stop', { last_assistant_message: reply, background_tasks: [{ id: 'bg-1', type: 'shell', status: 'running', description: 'npm run build', command: 'npm run build' }], session_crons: [] });
+    setTimeout(() => {
+      tool('Bash', { command: 'tail build.log' })({ stdout: 'built' });
+      setTimeout(() => {
+        fs.appendFileSync(transcriptPath(), JSON.stringify({ type: 'assistant', cwd: process.cwd(), sessionId: sid, message: { content: [{ type: 'text', text: '빌드가 끝났어요' }] } }) + '\n');
+        W(`\r\x1b[2K\x1b[32m⏺\x1b[0m 빌드가 끝났어요\r\n\r\n> `);
+        hook('Stop', { last_assistant_message: '빌드가 끝났어요', background_tasks: [], session_crons: [] });
+      }, 400);
+    }, +(process.env.MOCK_BG_MS || 1500));
+    return;
+  }
   hook('Stop', { last_assistant_message: reply });
   notifyCodex({ type: 'agent-turn-complete', 'last-assistant-message': reply });
 }

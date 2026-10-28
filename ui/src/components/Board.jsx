@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api.js';
 import { useStore, set, openModal, projectOf } from '../store.js';
-import { roomVars, ago, mod, laneOf, LANES, progressOf } from '../util.js';
+import { roomVars, ago, mod, laneOf, LANES, progressOf, isBusy } from '../util.js';
 import { choose, quickSend, openTask, resume, stop, setWidget, newTask, visibleTasks, archiveAsk, shelved } from '../actions.js';
 import { Glyph, I, Spinner } from './bits.jsx';
 import { PlanBar, SubChip, FEED_ICON } from './Progress.jsx';
@@ -12,6 +12,7 @@ const STATE = {
   review: { label: '검토할 것', icon: 'eye-check', cls: 'review' },
   working: { label: '작업 중', icon: null, cls: 'working' },
   starting: { label: '시작 중', icon: null, cls: 'working' },
+  waiting: { label: '대기 중', icon: 'hourglass', cls: 'working' },
   exited: { label: '멈춤', icon: 'player-pause', cls: 'paused' },
   merged: { label: '머지됨', icon: 'git-merge', cls: 'done' },
   discarded: { label: '버림', icon: 'trash', cls: 'done' },
@@ -154,7 +155,7 @@ function Card({ t, p, w }) {
               <I n="git-merge" /> 머지
             </button>
           )}
-          {t.running && (t.state === 'working' || t.state === 'starting') && (
+          {t.running && isBusy(t) && (
             <button class="btn ghost sm icon" onClick={() => stop(t.id)} title="세션 중지" aria-label="세션 중지">
               <I n="player-stop" />
             </button>

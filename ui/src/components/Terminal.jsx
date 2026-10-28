@@ -162,7 +162,7 @@ export function TerminalView({ task, project, visible }) {
       });
   }, [visible]);
 
-  const stopped = task && !task.running && ['exited', 'needs_input', 'review', 'working', 'starting'].includes(task.state);
+  const stopped = task && !task.running && ['exited', 'needs_input', 'review', 'working', 'starting', 'waiting'].includes(task.state);
   const resumeCmd = task?.agent === 'codex' ? 'codex resume --last' : 'claude --continue';
   return (
     <div class="room-body" style={{ display: visible ? 'block' : 'none' }}>
