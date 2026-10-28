@@ -1,6 +1,9 @@
 # Temporary: how Windows runners spell temp paths (8.3 names, case) for session matching.
 name: debug-paths
-on: workflow_dispatch
+on:
+  push:
+    branches: [desktop]
+    paths: ['test/debug-paths.mjs', '.github/workflows/debug-paths.yml']
 jobs:
   paths:
     runs-on: windows-latest
