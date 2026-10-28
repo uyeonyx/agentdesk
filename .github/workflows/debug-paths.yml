@@ -1,0 +1,18 @@
+# Temporary: how Windows runners spell temp paths (8.3 names, case) for session matching.
+name: debug-paths
+on: workflow_dispatch
+jobs:
+  paths:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: paths and one session listing
+        run: node --input-type=module -e "import('./test/debug-paths.mjs')"
