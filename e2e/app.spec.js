@@ -1,7 +1,7 @@
 // The real app end to end: Electron window → core process → mock agents → hooks over the socket.
 // AGENTDESK_E2E_EXE runs a packaged build instead of this checkout.
-import { test, expect, _electron as electron } from '@playwright/test';
-import { execSync } from 'node:child_process';
+import { test, expect, _electron as electron, chromium } from '@playwright/test';
+import { execSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -17,7 +17,8 @@ function makeRepo(dir) {
   return dir;
 }
 
-let app;
+let app; // dev checkout: Playwright's Electron handle
+let packaged; // packaged build: the process, driven over the renderer's DevTools port
 let page;
 let tmp;
 const problems = [];
@@ -37,8 +38,23 @@ test.beforeAll(async () => {
   };
   fs.mkdirSync(env.MOCK_TRANSCRIPT_DIR, { recursive: true });
   const exe = process.env.AGENTDESK_E2E_EXE;
-  app = await electron.launch(exe ? { executablePath: exe, env } : { args: [root], env });
-  page = await app.firstWindow();
+  if (exe) {
+    // The release build turns off --inspect (a fuse), so Playwright can't attach to its main
+    // process; the window is reachable over Chromium's DevTools port instead.
+    const port = 9300 + Math.floor(Math.random() * 600);
+    packaged = spawn(exe, [`--remote-debugging-port=${port}`], { env, stdio: 'ignore' });
+    let browser;
+    for (let i = 0; i < 150 && !browser; i++) {
+      browser = await chromium.connectOverCDP(`http://127.0.0.1:${port}`).catch(() => null);
+      if (!browser) await new Promise((r) => setTimeout(r, 200));
+    }
+    if (!browser) throw new Error(`the packaged app never opened its DevTools port (exit ${packaged.exitCode})`);
+    const context = browser.contexts()[0];
+    page = context.pages().find((p) => p.url().startsWith('app://')) || (await context.waitForEvent('page'));
+  } else {
+    app = await electron.launch({ args: [root], env });
+    page = await app.firstWindow();
+  }
   // Anything the page logs as an error (CSP refusals included) fails the run at the end.
   page.on('console', (m) => m.type() === 'error' && problems.push(m.text()));
   page.on('pageerror', (e) => problems.push(String(e)));
@@ -46,10 +62,12 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   await app?.evaluate(({ app }) => app.exit(0)).catch(() => {});
+  // Not a polite quit: with agents alive the app would ask first and stay open.
+  packaged?.kill('SIGKILL');
 });
 
 test('the window loads the UI from app:// and the core pushes state', async () => {
-  expect(page.url()).toBe('app://desk/');
+  await expect.poll(() => page.url()).toBe('app://desk/');
   await expect.poll(() => page.evaluate(() => typeof window.desk?.api)).toBe('function');
   // No Node in the page, and nothing but the bridge.
   expect(await page.evaluate(() => typeof require)).toBe('undefined');
@@ -88,8 +106,10 @@ test('a task room: the agent terminal, then the Monaco diff of its changes', asy
   const proj = await call('POST', '/api/projects', { path: repo });
   const t = await call('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'create notes/e2e.md 키 로테이션 정책' });
   await expect.poll(async () => (await call('GET', '/api/state')).tasks.find((x) => x.id === t.id)?.state, { timeout: 20_000 }).toBe('review');
-  await page.keyboard.press('b');
-  await page.locator('button.row', { hasText: t.title }).first().click();
+  // The list view (not the board) shows rows; `b` switches between them.
+  const row = page.locator('button.row', { hasText: t.title }).first();
+  if (!(await row.isVisible())) await page.keyboard.press('b');
+  await row.click();
   const term = page.locator('.xterm-rows').first();
   await expect(term).toContainText('반영 완료', { timeout: 10_000 });
   await page.keyboard.press('Alt+Digit2');

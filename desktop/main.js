@@ -10,6 +10,9 @@ protocol.registerSchemesAsPrivileged([{ scheme: 'app', privileges: { standard: t
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const hookAt = process.argv.indexOf('--desk-hook');
+// Another data dir (dev, tests) is another Desk: its own browser profile and single-instance lock,
+// so it never collides with the installed app the person is using.
+if (process.env.AGENTDESK_HOME) app.setPath('userData', path.join(process.env.AGENTDESK_HOME, 'electron'));
 
 if (hookAt !== -1) {
   // Hook client mode: an agent's hook ran this binary. Forward the event and leave, no window.

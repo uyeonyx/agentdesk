@@ -18,7 +18,6 @@
     "@xterm/headless": "^6.0.0"
   },
   "devDependencies": {
-    "@electron/fuses": "^2.1.3",
     "@playwright/test": "^1.64.1",
     "@tabler/icons-webfont": "^3.49.0",
     "@xterm/addon-fit": "^0.11.0",
@@ -39,5 +38,56 @@
       "esbuild"
     ]
   },
-  "productName": "Agent Desk"
+  "productName": "Agent Desk",
+  "build": {
+    "appId": "dev.uyeon.agentdesk",
+    "productName": "Agent Desk",
+    "artifactName": "AgentDesk-${version}-${os}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "desktop/**/*",
+      "server/**/*",
+      "ui/dist/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/@lydell/node-pty-*/**"
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "onlyLoadAppFromAsar": true,
+      "enableCookieEncryption": true,
+      "grantFileProtocolExtraPrivileges": false
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.developer-tools",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "extendInfo": {
+        "NSDocumentsFolderUsageDescription": "Agent Desk는 문서 폴더 안의 저장소에서 에이전트를 실행하고 변경 사항을 보여 줘요.",
+        "NSDesktopFolderUsageDescription": "Agent Desk는 데스크탑 폴더 안의 저장소에서 에이전트를 실행하고 변경 사항을 보여 줘요.",
+        "NSDownloadsFolderUsageDescription": "Agent Desk는 다운로드 폴더 안의 저장소에서 에이전트를 실행하고 변경 사항을 보여 줘요.",
+        "NSRemovableVolumesUsageDescription": "Agent Desk는 외장 디스크에 있는 저장소에서 에이전트를 실행해요.",
+        "NSNetworkVolumesUsageDescription": "Agent Desk는 네트워크 드라이브에 있는 저장소에서 에이전트를 실행해요."
+      }
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "runAfterFinish": true
+    }
+  }
 }

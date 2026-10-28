@@ -4,3 +4,4 @@ ui/dist/
 preview/
 .DS_Store
 test-results/
+release/
