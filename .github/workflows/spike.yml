@@ -1,0 +1,59 @@
+# M0 spike for the Electron migration: checks that need a real Windows machine.
+# Temporary: removed once the desktop app lands.
+name: spike
+on:
+  push:
+    branches: [desktop]
+    paths: ['spike/**', '.github/workflows/spike.yml']
+  workflow_dispatch:
+
+jobs:
+  electron:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: utilityProcess + node-pty + hook channel
+        run: npx electron spike/main.mjs
+
+  agent-cli-shapes:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: npm installs of claude and codex
+        shell: pwsh
+        run: |
+          npm i -g @anthropic-ai/claude-code @openai/codex
+          $prefix = npm prefix -g
+          Write-Host "npm prefix: $prefix"
+          Get-ChildItem $prefix -Filter 'claude*' | Format-Table Name, Length
+          Get-ChildItem $prefix -Filter 'codex*' | Format-Table Name, Length
+          Write-Host '--- where'
+          where.exe claude
+          where.exe codex
+          Write-Host '--- claude.cmd'
+          Get-Content (Join-Path $prefix 'claude.cmd') -ErrorAction SilentlyContinue
+          Write-Host '--- codex.cmd'
+          Get-Content (Join-Path $prefix 'codex.cmd') -ErrorAction SilentlyContinue
+          Write-Host '--- versions'
+          claude --version
+          codex --version
+      - name: native installer of claude
+        shell: pwsh
+        run: |
+          irm https://claude.ai/install.ps1 | iex
+          Get-ChildItem "$env:USERPROFILE\.local\bin" -ErrorAction SilentlyContinue | Format-Table Name, Length
+          & "$env:USERPROFILE\.local\bin\claude.exe" --version
