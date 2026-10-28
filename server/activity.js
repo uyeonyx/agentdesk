@@ -8,6 +8,9 @@ import { realPath } from './util.js';
 
 const FEED_MAX = 120;
 const SUB_FEED_MAX = 30;
+const SUBS_MAX = 50;
+const PENDING_MAX = 10;
+const PENDING_MS = 60_000;
 const clip = (s, n = 140) => {
   const t = String(s ?? '').replace(/\s+/g, ' ').trim();
   return t.length > n ? t.slice(0, n - 1) + '…' : t;
@@ -106,6 +109,35 @@ export class ActivityTracker {
     return this.a.subagents.find((s) => s.id === id);
   }
 
+  /**
+   * The subagent with this id, made on first sight: its hooks run in separate processes, so its
+   * first tool call can arrive before SubagentStart, and that one before the parent's Agent call.
+   */
+  ensureSub(agentId, agentType) {
+    let s = this.sub(agentId);
+    if (!s) {
+      s = { id: agentId, type: '', desc: '', status: 'running', startedAt: Date.now(), endedAt: 0, last: '', tools: 0, feed: [], plan: [] };
+      this.a.subagents.push(s);
+      while (this.a.subagents.length > SUBS_MAX) {
+        const done = this.a.subagents.findIndex((x) => x.status === 'done');
+        this.a.subagents.splice(done >= 0 ? done : 0, 1);
+      }
+    }
+    if (!s.type && agentType) s.type = clip(agentType, 40);
+    if (!s.desc) {
+      // The description came with the parent's Agent call, if that has arrived yet.
+      const now = Date.now();
+      this.a.pending = this.a.pending.filter((x) => !x.at || now - x.at < PENDING_MS);
+      const idx = this.a.pending.findIndex((x) => !s.type || !x.type || x.type === s.type);
+      if (idx >= 0) {
+        const pend = this.a.pending.splice(idx, 1)[0];
+        s.desc = clip(pend.desc || '', 120);
+        if (!s.type && pend.type) s.type = clip(pend.type, 40);
+      }
+    }
+    return s;
+  }
+
   // ---------------------------------------------------------------- Claude Code hooks
 
   claude(p) {
@@ -113,31 +145,24 @@ export class ActivityTracker {
     const agentId = typeof p.agent_id === 'string' && p.agent_id ? p.agent_id : null;
     const cwd = this.task.cwd;
     if (ev === 'SubagentStart' && agentId) {
-      // The description came from the parent's Agent tool call just before.
-      const idx = this.a.pending.findIndex((x) => !p.agent_type || x.type === p.agent_type || !x.type);
-      const pend = idx >= 0 ? this.a.pending.splice(idx, 1)[0] : null;
-      if (!this.sub(agentId)) {
-        this.a.subagents.push({ id: agentId, type: clip(p.agent_type || pend?.type || 'agent', 40), desc: clip(pend?.desc || '', 120), status: 'running', startedAt: Date.now(), endedAt: 0, last: '', tools: 0, feed: [], plan: [] });
-      }
+      this.ensureSub(agentId, p.agent_type);
       return this.changed();
     }
     if (ev === 'SubagentStop' && agentId) {
-      const s = this.sub(agentId);
-      if (s) {
-        s.status = 'done';
-        s.endedAt = Date.now();
-        if (p.last_assistant_message) s.result = clip(p.last_assistant_message, 200);
-        s.last = s.result || s.last;
-      }
+      const s = this.ensureSub(agentId, p.agent_type);
+      s.status = 'done';
+      s.endedAt = Date.now();
+      if (p.last_assistant_message) s.result = clip(p.last_assistant_message, 200);
+      s.last = s.result || s.last;
       return this.changed();
     }
     if (ev === 'PreToolUse' || ev === 'PostToolUse' || ev === 'PostToolUseFailure') {
       const name = p.tool_name;
       const input = p.tool_input || {};
       const d = describeTool(name, input, cwd);
-      const owner = agentId ? this.sub(agentId) : null;
+      const owner = agentId ? this.ensureSub(agentId, p.agent_type) : null;
       if (ev === 'PreToolUse') {
-        if ((name === 'Agent' || name === 'Task') && !agentId) this.a.pending.push({ type: input.subagent_type || '', desc: input.description || clip(input.prompt, 80) });
+        if ((name === 'Agent' || name === 'Task') && !agentId) this.describe({ type: input.subagent_type || '', desc: input.description || clip(input.prompt, 80) });
         const item = { id: String(p.tool_use_id || Math.random()), at: Date.now(), kind: d.kind, text: d.text, by: agentId || '', st: this.finished.get(String(p.tool_use_id)) || 'run' };
         if (d.kind !== 'plan') {
           if (owner) {
@@ -166,6 +191,18 @@ export class ActivityTracker {
       }
       return this.changed();
     }
+  }
+
+  /** A parent's Agent call: describe the subagent it started if that one showed up first, else keep it for it. */
+  describe(pend) {
+    const s = this.a.subagents.findLast((x) => !x.desc && (!pend.type || !x.type || x.type === pend.type));
+    if (s) {
+      s.desc = clip(pend.desc || '', 120);
+      if (!s.type && pend.type) s.type = clip(pend.type, 40);
+      return;
+    }
+    this.a.pending.push({ ...pend, at: Date.now() });
+    if (this.a.pending.length > PENDING_MAX) this.a.pending.shift();
   }
 
   /** Plans come from TodoWrite (whole list) or TaskCreate/TaskUpdate (one item at a time). */
@@ -355,7 +392,7 @@ export function activityView(a) {
   if (!a) return { plan: [], subagents: [], current: '', feedTail: [] };
   return {
     plan: a.plan.slice(0, 30),
-    subagents: a.subagents.slice(-12).map((s) => ({ id: s.id, type: s.type, desc: s.desc, status: s.status, last: s.last, tools: s.tools, startedAt: s.startedAt, endedAt: s.endedAt, plan: s.plan.slice(0, 12) })),
+    subagents: a.subagents.slice(-12).map((s) => ({ id: s.id, type: s.type || 'agent', desc: s.desc, status: s.status, last: s.last, tools: s.tools, startedAt: s.startedAt, endedAt: s.endedAt, plan: s.plan.slice(0, 12) })),
     current: a.current,
     feedTail: a.feed.slice(-5),
   };
