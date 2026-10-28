@@ -13,9 +13,12 @@ if (hookAt !== -1) {
 } else {
   app.whenReady().then(() => {
     const child = utilityProcess.fork(path.join(here, 'child.mjs'), [], {
-      stdio: 'inherit',
+      stdio: 'pipe',
       env: { ...process.env, SPIKE_MAIN_EXEC: process.execPath, SPIKE_APP: path.join(here, 'main.mjs') },
     });
+    // Windows GUI binaries don't hand an inherited console to utility processes: relay their output.
+    child.stdout.on('data', (d) => process.stdout.write(d));
+    child.stderr.on('data', (d) => process.stderr.write(d));
     child.on('exit', (code) => {
       console.log(JSON.stringify({ check: 'utility-exit', code }));
       app.exit(code);
