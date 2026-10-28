@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { api } from '../api.js';
+import { api, updateAction } from '../api.js';
 import { useStore, get, set, closeModal, openModal, toast, projectOf, taskOf, setView } from '../store.js';
 import { roomVars, mod, fuzzyFilter, isLive, ago } from '../util.js';
 import { createTask, merge, pr, discard, newTask, visibleTasks, select, openFileInTask, importSession, setRemote } from '../actions.js';
@@ -784,6 +784,7 @@ function Palette() {
     }
     if ('Notification' in window && Notification.permission !== 'granted')
       cmd('bell', '알림 켜기 · 에이전트가 기다릴 때 알려줘요', () => Notification.requestPermission().then((r) => toast(r === 'granted' ? '알림을 켰어요' : '시스템 설정에서 Agent Desk 알림이 꺼져 있어요')));
+    cmd('download', '업데이트 확인', () => updateAction('check').then(() => get().update?.state === 'none' && toast('최신 버전이에요')));
     for (const p of s.projects) out.push({ kind: 'proj', p, label: `${p.name}에 새 작업`, run: () => newTask(p.id) });
     for (const t of s.tasks.filter((t) => !t.archived)) {
       const p = projectOf(s, t.projectId);

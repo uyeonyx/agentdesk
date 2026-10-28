@@ -7,9 +7,27 @@ let seq = 0;
 const waiting = new Map(); // request id -> resolve
 const pushListeners = new Set();
 const connListeners = new Set();
+const updateListeners = new Set();
+ipcRenderer.on('desk:update-state', (_e, s) => {
+  for (const fn of updateListeners) fn(s);
+});
+
+let portWaiters = []; // requests made before the core is connected (app start, core restart)
 
 function setConnected(up) {
+  if (up) {
+    for (const go of portWaiters) go();
+    portWaiters = [];
+  }
   for (const fn of connListeners) fn(up);
+}
+
+function whenConnected(ms = 15000) {
+  if (port) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error('not connected')), ms);
+    portWaiters.push(() => (clearTimeout(t), resolve()));
+  });
 }
 
 ipcRenderer.on('desk:port', (event) => {
@@ -39,8 +57,8 @@ ipcRenderer.on('desk:core-down', () => {
 contextBridge.exposeInMainWorld('desk', {
   platform: process.platform,
   /** @returns {Promise<{status:number, body?:string, type?:string, data?:Uint8Array}>} */
-  api(method, path, bodyText) {
-    if (!port) return Promise.reject(new Error('not connected'));
+  async api(method, path, bodyText) {
+    await whenConnected();
     const id = ++seq;
     return new Promise((resolve) => {
       waiting.set(id, resolve);
@@ -61,5 +79,13 @@ contextBridge.exposeInMainWorld('desk', {
   },
   focus() {
     ipcRenderer.send('desk:focus');
+  },
+  /** 'state' | 'check' | 'download' | 'apply' | 'page' → the update state (see desktop/updater.js). */
+  update(action) {
+    return ipcRenderer.invoke('desk:update', String(action));
+  },
+  onUpdate(fn) {
+    updateListeners.add(fn);
+    return () => updateListeners.delete(fn);
   },
 });

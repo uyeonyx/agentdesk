@@ -88,3 +88,71 @@ test('0.2.x leftovers: nothing running → its files are removed, state.json sta
   assert.equal(await retireDaemon(dir), 'none');
   assert.deepEqual(fs.readdirSync(dir), ['state.json']);
 });
+
+// ------------------------------------------------------------ updates
+
+import crypto from 'node:crypto';
+import { compareVersions, assetName, pickUpdate, verifyDownload, bundleInfo, replaceableApp } from '../desktop/update.js';
+
+test('versions compare numerically; a pre-release comes before its release', () => {
+  assert.equal(compareVersions('0.3.10', '0.3.9'), 1);
+  assert.equal(compareVersions('v0.3.0', '0.3.0'), 0);
+  assert.equal(compareVersions('0.3.0-beta.1', '0.3.0'), -1);
+  assert.equal(compareVersions('0.3.0', '0.2.99'), 1);
+  assert.equal(compareVersions('1.0.0', '1.0.1'), -1);
+});
+
+const release = (tag, names, extra = {}) => ({
+  tag_name: tag,
+  html_url: `https://github.com/uyeonyx/agentdesk/releases/tag/${tag}`,
+  body: 'notes',
+  assets: names.map((name) => ({ name, size: 10, browser_download_url: `https://example.test/${name}` })),
+  ...extra,
+});
+
+test('an update is offered only when newer, complete, and built for this OS and CPU', () => {
+  const all = ['AgentDesk-0.4.0-mac-arm64.zip', 'AgentDesk-0.4.0-mac-x64.zip', 'AgentDesk-0.4.0-win-x64.exe', 'SHA256SUMS', 'SHA256SUMS.sig'];
+  const u = pickUpdate(release('v0.4.0', all), '0.3.0', 'darwin', 'arm64');
+  assert.equal(u.version, '0.4.0');
+  assert.equal(u.asset.name, 'AgentDesk-0.4.0-mac-arm64.zip');
+  assert.equal(pickUpdate(release('v0.4.0', all), '0.3.0', 'win32', 'x64').asset.name, 'AgentDesk-0.4.0-win-x64.exe');
+  assert.equal(pickUpdate(release('v0.4.0', all), '0.4.0', 'darwin', 'arm64'), null, 'same version');
+  assert.equal(pickUpdate(release('v0.4.0', all), '0.3.0', 'win32', 'arm64'), null, 'no build for this CPU');
+  assert.equal(pickUpdate(release('v0.4.0', all.filter((n) => n !== 'SHA256SUMS.sig')), '0.3.0', 'darwin', 'arm64'), null, 'unsigned release');
+  assert.equal(pickUpdate(release('v0.4.0', all, { prerelease: true }), '0.3.0', 'darwin', 'arm64'), null);
+  assert.equal(assetName('0.4.0', 'linux', 'x64'), null);
+});
+
+test('a download is accepted only with our signature over its checksum', () => {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+  const pem = publicKey.export({ type: 'spki', format: 'pem' });
+  const other = crypto.generateKeyPairSync('ed25519').privateKey;
+  const file = 'AgentDesk-0.4.0-mac-arm64.zip';
+  const sha = 'a'.repeat(64);
+  const sums = `${sha}  ${file}\n${'b'.repeat(64)}  AgentDesk-0.4.0-win-x64.exe\n`;
+  const sign = (text, key = privateKey) => crypto.sign(null, Buffer.from(text), key).toString('base64');
+  assert.ok(verifyDownload({ sumsText: sums, sigBase64: sign(sums), publicKeyPem: pem, fileName: file, fileSha256: sha }));
+  assert.ok(!verifyDownload({ sumsText: sums, sigBase64: sign(sums), publicKeyPem: pem, fileName: file, fileSha256: 'c'.repeat(64) }), 'file changed');
+  assert.ok(!verifyDownload({ sumsText: sums, sigBase64: sign(sums, other), publicKeyPem: pem, fileName: file, fileSha256: sha }), 'someone else signed');
+  const forged = sums.replace(sha, 'c'.repeat(64));
+  assert.ok(!verifyDownload({ sumsText: forged, sigBase64: sign(sums), publicKeyPem: pem, fileName: file, fileSha256: 'c'.repeat(64) }), 'checksums edited after signing');
+  assert.ok(!verifyDownload({ sumsText: sums, sigBase64: sign(sums), publicKeyPem: pem, fileName: 'Other.zip', fileSha256: sha }), 'file not listed');
+  assert.ok(!verifyDownload({ sumsText: sums, sigBase64: 'garbage', publicKeyPem: pem, fileName: file, fileSha256: sha }));
+});
+
+test('the shipped public key is a valid Ed25519 key', async () => {
+  const { PUBLIC_KEY } = await import('../desktop/update-key.js');
+  assert.equal(crypto.createPublicKey(PUBLIC_KEY).asymmetricKeyType, 'ed25519');
+});
+
+test('a downloaded .app is checked by bundle id and version; only a writable, installed copy swaps itself', () => {
+  const appDir = path.join(tmp, 'Apps', 'Agent Desk.app');
+  fs.mkdirSync(path.join(appDir, 'Contents', 'MacOS'), { recursive: true });
+  fs.writeFileSync(path.join(appDir, 'Contents', 'Info.plist'), '<plist><dict><key>CFBundleIdentifier</key>\n<string>dev.uyeon.agentdesk</string><key>CFBundleShortVersionString</key><string>0.4.0</string></dict></plist>');
+  assert.deepEqual(bundleInfo(appDir), { id: 'dev.uyeon.agentdesk', version: '0.4.0' });
+  assert.deepEqual(bundleInfo(path.join(tmp, 'missing.app')), {});
+  const exe = path.join(appDir, 'Contents', 'MacOS', 'Agent Desk');
+  if (process.platform !== 'win32') assert.equal(replaceableApp(exe), appDir);
+  assert.equal(replaceableApp('/private/var/folders/x/AppTranslocation/ABC/d/Agent Desk.app/Contents/MacOS/Agent Desk'), null);
+  assert.equal(replaceableApp('/Volumes/Agent Desk/Agent Desk.app/Contents/MacOS/Agent Desk'), null);
+});

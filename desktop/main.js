@@ -1,6 +1,6 @@
 // Agent Desk's main process: the window, the app:// page, menus and lifecycle. The Desk itself
 // runs in a separate core process (core-host.js); this process only connects windows to it.
-import { app, BrowserWindow, Menu, MessageChannelMain, dialog, ipcMain, protocol, session, shell, utilityProcess } from 'electron';
+import { app, BrowserWindow, Menu, MessageChannelMain, dialog, ipcMain, net, protocol, session, shell, utilityProcess } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -34,6 +34,7 @@ async function runApp() {
   const { serve, isTrustedFrame, isExternalAllowed, ORIGIN } = await import('./protocol.js');
   const { loginShellEnv, mergeEnv } = await import('./env.js');
   const { retireDaemon } = await import('./legacy.js');
+  const { createUpdater } = await import('./updater.js');
   const { dataDir } = await import('../server/util.js');
 
   const DIST = path.join(app.getAppPath(), 'ui', 'dist');
@@ -193,6 +194,45 @@ async function runApp() {
     if (isTrustedFrame(e.senderFrame)) showWindow();
   });
 
+  // ------------------------------------------------------------ updates (see updater.js)
+
+  const updater = createUpdater({ app, net, shell, send: (s) => win?.webContents.send('desk:update-state', s) });
+
+  /** "Restart to update": agents that are still running decide whether it happens now or at quit. */
+  async function applyUpdateNow() {
+    const { running = 0 } = await ask('status');
+    if (running > 0) {
+      const { response } = await dialog.showMessageBox(win, {
+        type: 'question',
+        buttons: ['종료할 때 적용', '지금 재시작'],
+        defaultId: 0,
+        cancelId: 0,
+        message: `에이전트 ${running}개가 실행 중이에요`,
+        detail: '지금 재시작하면 에이전트가 멈춰요. 종료할 때 적용하면 작업이 끝난 뒤 다음에 열 때 새 버전이 떠요.',
+      });
+      if (response === 0) return updater.defer();
+    }
+    updater.defer();
+    requestQuit({ confirmed: true });
+    return updater.state;
+  }
+
+  async function checkFromMenu() {
+    const s = await updater.check();
+    if (s.state === 'none') dialog.showMessageBox(win, { type: 'info', message: '최신 버전이에요', detail: `Agent Desk ${app.getVersion()}` });
+    else showWindow();
+  }
+
+  ipcMain.handle('desk:update', (e, action) => {
+    if (!isTrustedFrame(e.senderFrame)) return null;
+    if (action === 'state') return updater.state;
+    if (action === 'check') return updater.check();
+    if (action === 'download') return updater.download();
+    if (action === 'apply') return applyUpdateNow();
+    if (action === 'page') return updater.openPage();
+    return null;
+  });
+
   // ------------------------------------------------------------ menus
 
   function editMenu(params) {
@@ -212,7 +252,21 @@ async function runApp() {
   Menu.setApplicationMenu(
     mac
       ? Menu.buildFromTemplate([
-          { role: 'appMenu' },
+          {
+            label: app.name,
+            submenu: [
+              { role: 'about', label: `${app.name} 정보` },
+              { label: '업데이트 확인…', click: () => checkFromMenu() },
+              { type: 'separator' },
+              { role: 'services' },
+              { type: 'separator' },
+              { role: 'hide' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { role: 'quit' },
+            ],
+          },
           { role: 'editMenu' },
           {
             label: '보기',
@@ -233,12 +287,12 @@ async function runApp() {
   // ------------------------------------------------------------ quitting
 
   let asking = false;
-  async function requestQuit() {
+  async function requestQuit({ confirmed = false } = {}) {
     if (asking || quitting) return;
     asking = true;
     try {
       const { running = 0 } = await ask('status');
-      if (running > 0) {
+      if (running > 0 && !confirmed) {
         if (mac) showWindow();
         const { response } = await dialog.showMessageBox(win && !win.isDestroyed() ? win : undefined, {
           type: 'warning',
@@ -252,6 +306,8 @@ async function runApp() {
       }
       quitting = true;
       await Promise.race([ask('shutdown'), new Promise((r) => setTimeout(r, 3000))]);
+      // A downloaded, verified update swaps in once this process has exited.
+      updater.applyOnExit();
       app.quit();
     } finally {
       asking = false;
@@ -267,5 +323,6 @@ async function runApp() {
 
   startCore();
   createWindow();
+  updater.start();
   if (!(await coreReady)) return;
 }

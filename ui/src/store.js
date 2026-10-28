@@ -4,6 +4,7 @@ import { useLayoutEffect, useReducer, useRef } from 'preact/hooks';
 const listeners = new Set();
 let state = {
   connected: false,
+  update: null,
   loaded: false,
   version: '',
   home: '',

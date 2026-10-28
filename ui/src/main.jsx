@@ -1,7 +1,7 @@
 import './styles.css';
 import { render } from 'preact';
 import { useEffect } from 'preact/hooks';
-import { connect, onState, focusWindow } from './api.js';
+import { connect, onState, focusWindow, watchUpdates } from './api.js';
 import { useStore, get, set, openModal, projectOf, taskOf, setView, toast } from './store.js';
 import { roomVars, isTyping, setFavicon, laneOf } from './util.js';
 import { undoBanner, select, visibleTasks, newTask, undoMessage } from './actions.js';
@@ -207,4 +207,5 @@ onState((prev, next) => {
 });
 
 connect();
+watchUpdates();
 render(<App />, document.getElementById('app'));

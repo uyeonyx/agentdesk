@@ -1,6 +1,6 @@
 {
   "name": "agentdesk",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "description": "One inbox for all your coding agents (Claude Code, Codex) across projects. Desktop app for macOS and Windows: real terminals, git worktrees.",
   "main": "desktop/main.js",
   "scripts": {
@@ -36,7 +36,16 @@
     "onlyBuiltDependencies": [
       "electron",
       "esbuild"
-    ]
+    ],
+    "supportedArchitectures": {
+      "os": [
+        "current"
+      ],
+      "cpu": [
+        "x64",
+        "arm64"
+      ]
+    }
   },
   "productName": "Agent Desk",
   "build": {
@@ -89,5 +98,11 @@
       "perMachine": false,
       "runAfterFinish": true
     }
+  },
+  "optionalDependencies": {
+    "@lydell/node-pty-darwin-arm64": "1.2.0-beta.15",
+    "@lydell/node-pty-darwin-x64": "1.2.0-beta.15",
+    "@lydell/node-pty-win32-arm64": "1.2.0-beta.15",
+    "@lydell/node-pty-win32-x64": "1.2.0-beta.15"
   }
 }

@@ -1,0 +1,76 @@
+# Push a tag vX.Y.Z (matching package.json) → installers for macOS and Windows, x64 and arm64,
+# tested, checksummed, signed with the update key, and attached to a draft release.
+# Publishing the draft is what makes installed apps offer the update (see docs/release.md).
+name: release
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - os: macos-latest
+            builds: '--mac --arm64|--mac --x64'
+            app: 'release/mac-arm64/Agent Desk.app/Contents/MacOS/Agent Desk'
+          - os: windows-latest
+            builds: '--win --x64|--win --arm64'
+            app: 'release/win-unpacked/Agent Desk.exe'
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: tag matches package.json
+        shell: bash
+        run: test "v$(node -p "require('./package.json').version")" = "$GITHUB_REF_NAME"
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - name: package
+        shell: bash
+        run: |
+          pnpm build
+          IFS='|' read -ra BUILDS <<< "${{ matrix.builds }}"
+          for b in "${BUILDS[@]}"; do pnpm exec electron-builder $b --publish never; done
+      - name: end to end on the packaged app
+        shell: bash
+        run: AGENTDESK_E2E_EXE="$PWD/${{ matrix.app }}" pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: |
+            release/AgentDesk-*.zip
+            release/AgentDesk-*.dmg
+            release/AgentDesk-*.exe
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+      - name: checksums, signed with the update key
+        env:
+          UPDATE_SIGNING_KEY: ${{ secrets.UPDATE_SIGNING_KEY }}
+        run: node scripts/sign-release.mjs files
+      - name: draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" files/* --draft --title "Agent Desk ${GITHUB_REF_NAME#v}" --generate-notes

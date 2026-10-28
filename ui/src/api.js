@@ -107,6 +107,16 @@ export function connect() {
   });
 }
 
+/** App updates: the state lives in the store as `update`; actions go to the app (desktop/updater.js). */
+export function watchUpdates() {
+  desk().onUpdate((u) => set({ update: u }));
+  desk()
+    .update('state')
+    .then((u) => u && set({ update: u }))
+    .catch(() => {});
+}
+export const updateAction = (action) => desk().update(action).then((u) => u && set({ update: u }));
+
 /** Bring this window to the front (after a notification click, even when it was closed to the Dock). */
 export function focusWindow() {
   desk().focus();

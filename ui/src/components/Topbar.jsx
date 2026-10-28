@@ -1,6 +1,7 @@
 import { useStore, set, openModal } from '../store.js';
 import { roomVars, mod } from '../util.js';
 import { newTask } from '../actions.js';
+import { updateAction } from '../api.js';
 import { Glyph, I } from './bits.jsx';
 
 export function Topbar() {
@@ -53,6 +54,7 @@ export function Topbar() {
         </button>
       </div>
       <div class="right">
+        <UpdatePill />
         {!s.connected && <span style="font-size:12px;color:var(--muted)">다시 연결하는 중…</span>}
         <span class={`conn ${s.connected ? '' : 'off'}`} title={s.connected ? '연결됨' : '연결 끊김'} />
         <button class="btn ghost sm kbd-hint" onClick={() => openModal('palette')} title="명령">
@@ -67,5 +69,44 @@ export function Topbar() {
         </button>
       </div>
     </header>
+  );
+}
+
+/** A newer Agent Desk: one click downloads it, one more restarts into it (or it swaps in at quit). */
+function UpdatePill() {
+  const u = useStore((s) => s.update);
+  if (!u || u.state === 'none') return null;
+  if (u.state === 'available')
+    return (
+      <button class="btn sm upd" onClick={() => updateAction('download')} title={u.notes || '새 버전을 받아요'}>
+        <I n="download" /> 새 버전 {u.version}
+      </button>
+    );
+  if (u.state === 'downloading')
+    return (
+      <span class="upd-note" role="status">
+        <I n="download" /> 받는 중 {u.progress}%
+      </span>
+    );
+  if (u.state === 'ready')
+    return u.pending ? (
+      <span class="upd-note" title="Agent Desk를 종료하면 새 버전으로 바뀌고, 다음에 열 때 새 버전이 떠요">
+        <I n="clock" /> 종료할 때 {u.version} 적용
+      </span>
+    ) : (
+      <button class="btn sm upd" onClick={() => updateAction('apply')} title="종료할 때도 자동으로 적용돼요">
+        <I n="refresh" /> 재시작해서 {u.version} 적용
+      </button>
+    );
+  if (u.state === 'manual')
+    return (
+      <button class="btn ghost sm" onClick={() => updateAction('page')} title="이 위치에서는 앱이 스스로 바꿀 수 없어요. Applications 폴더로 옮기면 다음부터는 버튼 한 번으로 돼요">
+        <I n="external-link" /> 새 버전 {u.version} 받기
+      </button>
+    );
+  return (
+    <button class="btn ghost sm" onClick={() => updateAction('check')} title={u.message}>
+      <I n="alert-triangle" /> 업데이트 다시 시도
+    </button>
   );
 }
