@@ -241,3 +241,19 @@ test('a plain shell in the task folder: runs commands, takes pasted agent comman
   await ctx.api('POST', `/api/tasks/${t.id}/discard`);
   assert.equal(ctx.s.shells.forTask(t.id), null, 'shell closed with the task');
 });
+
+test('tool hooks out of order (Post before Pre) never leave a finished tool "running"', async () => {
+  const { ActivityTracker } = await import('../server/activity.js');
+  const task = { cwd: '/repo', agent: 'claude' };
+  const tr = new ActivityTracker(task, () => {});
+  const input = { file_path: '/repo/notes/a.md', content: 'x' };
+  tr.claude({ hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: input, tool_use_id: 'tu_1', tool_response: {} });
+  tr.claude({ hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: input, tool_use_id: 'tu_1' });
+  assert.equal(task.activity.current, '');
+  assert.equal(task.activity.feed.at(-1).st, 'ok');
+  // In order it still shows as running until it finishes.
+  tr.claude({ hook_event_name: 'PreToolUse', tool_name: 'Write', tool_input: input, tool_use_id: 'tu_2' });
+  assert.match(task.activity.current, /notes\/a\.md/);
+  tr.claude({ hook_event_name: 'PostToolUse', tool_name: 'Write', tool_input: input, tool_use_id: 'tu_2', tool_response: {} });
+  assert.equal(task.activity.current, '');
+});

@@ -97,6 +97,9 @@ export class ActivityTracker {
     this.a = task.activity;
     this.a.pending ||= [];
     this.codex = null; // { file, offset, startedAt }
+    // Tool hooks are async: each runs in its own process, so a PostToolUse can arrive before its
+    // PreToolUse (easily on Windows, where starting the hook client takes ~100 ms). id -> 'ok'|'err'.
+    this.finished = new Map();
   }
 
   sub(id) {
@@ -135,18 +138,22 @@ export class ActivityTracker {
       const owner = agentId ? this.sub(agentId) : null;
       if (ev === 'PreToolUse') {
         if ((name === 'Agent' || name === 'Task') && !agentId) this.a.pending.push({ type: input.subagent_type || '', desc: input.description || clip(input.prompt, 80) });
-        const item = { id: String(p.tool_use_id || Math.random()), at: Date.now(), kind: d.kind, text: d.text, by: agentId || '', st: 'run' };
+        const item = { id: String(p.tool_use_id || Math.random()), at: Date.now(), kind: d.kind, text: d.text, by: agentId || '', st: this.finished.get(String(p.tool_use_id)) || 'run' };
         if (d.kind !== 'plan') {
           if (owner) {
             push(owner.feed, item, SUB_FEED_MAX);
             owner.last = d.text;
             owner.tools++;
-          } else this.a.current = d.text;
+          } else if (item.st === 'run') this.a.current = d.text;
           push(this.a.feed, item, FEED_MAX);
         }
       } else {
         const failed = ev === 'PostToolUseFailure' || p.tool_response?.is_error === true || (typeof p.tool_response?.exit_code === 'number' && p.tool_response.exit_code !== 0);
         const id = String(p.tool_use_id || '');
+        if (id) {
+          this.finished.set(id, failed ? 'err' : 'ok');
+          if (this.finished.size > 300) this.finished.delete(this.finished.keys().next().value);
+        }
         for (const list of [this.a.feed, owner?.feed || []]) {
           const it = list.find((x) => x.id === id);
           if (it) {
