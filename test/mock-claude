@@ -1,2 +1,2 @@
 #!/bin/sh
-MOCK_KIND=claude exec node "/home/claude/agentdesk/test/mock-agent.js" "$@"
+MOCK_KIND=claude exec node "$(dirname "$0")/mock-agent.js" "$@"
