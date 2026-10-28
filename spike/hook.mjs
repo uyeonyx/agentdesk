@@ -1,5 +1,6 @@
 // Spike copy of the planned hook client: POST {task, agent, payload} over AGENTDESK_SOCK.
 // Runs either as plain Node (`node hook.mjs claude`, ELECTRON_RUN_AS_NODE) or imported by the app's main (`--desk-hook`).
+import fs from 'node:fs';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 
@@ -21,7 +22,19 @@ export async function runHook(argv) {
   const task = process.env.AGENTDESK_TASK;
   const mode = argv[0] === 'codex' ? 'codex' : 'claude';
   if (!sock || !token || !task) return;
-  const raw = mode === 'codex' ? argv.at(-1) : await readStdin(1500);
+  // --stdin-fs: read the inherited stdin handle directly (process.stdin isn't wired up in a Windows GUI binary).
+  const viaFs = argv.includes('--stdin-fs');
+  argv = argv.filter((a) => a !== '--stdin-fs');
+  let raw;
+  if (mode === 'codex') raw = argv.at(-1);
+  else if (viaFs) {
+    try {
+      raw = fs.readFileSync(0, 'utf8');
+    } catch (e) {
+      raw = '';
+      console.error('stdin-fs failed: ' + e.message);
+    }
+  } else raw = await readStdin(1500);
   let payload = {};
   try {
     payload = JSON.parse(raw || '{}');

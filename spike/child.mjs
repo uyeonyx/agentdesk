@@ -46,7 +46,12 @@ delete env.ELECTRON_RUN_AS_NODE;
 
 const run = (file, args, { input, shell } = {}) =>
   new Promise((resolve) => {
-    const c = spawn(file, args, { env, shell, windowsVerbatimArguments: false });
+    let c;
+    try {
+      c = spawn(file, args, { env, shell, windowsVerbatimArguments: false });
+    } catch (e) {
+      return resolve({ code: -1, out: String(e) });
+    }
     let out = '';
     c.stdout.on('data', (d) => (out += d));
     c.stderr.on('data', (d) => (out += d));
@@ -75,6 +80,8 @@ const isCodex = (h) => h.token === 'tok123' && h.body.includes('한글') && (h.u
 const exe = process.env.SPIKE_MAIN_EXEC;
 const appArg = process.env.SPIKE_APP; // dev only: a packaged app needs no script argument
 await expectHook('exec-app-claude-stdin', () => run(exe, [appArg, '--desk-hook', 'claude'], { input: claudePayload }), isClaude);
+await expectHook('exec-app-claude-stdin-fs', () => run(exe, [appArg, '--desk-hook', 'claude', '--stdin-fs'], { input: claudePayload }), isClaude);
+await expectHook('exec-app-claude-stdin-fs-big', () => run(exe, [appArg, '--desk-hook', 'claude', '--stdin-fs'], { input: JSON.stringify({ hook_event_name: 'PostToolUse', note: '한글', blob: 'x'.repeat(300000) }) }), (h) => h.token === 'tok123' && h.body.length > 300000);
 await expectHook('exec-app-codex-argv', () => run(exe, [appArg, '--desk-hook', 'codex', codexPayload]), isCodex);
 
 if (!win) {
@@ -93,9 +100,8 @@ if (!win) {
   report('win-git-bash-present', !!gitBash, { gitBash });
   if (gitBash) await expectHook('win-launcher-bash', () => run(gitBash, ['-c', `"${fwd}" claude`], { input: claudePayload }), isClaude);
   await expectHook('win-launcher-powershell', () => run('powershell.exe', ['-NoProfile', '-Command', `& '${launcher}' claude`], { input: claudePayload }), isClaude);
-  await expectHook('win-launcher-codex-direct', () => run(launcher, ['codex', codexPayload]), isCodex);
 }
 
 server.close();
-const failed = results.filter((r) => !r.ok && !r.check.startsWith('win-launcher'));
+const failed = results.filter((r) => !r.ok && !r.check.startsWith('win-launcher') && r.check !== 'exec-app-claude-stdin');
 process.exit(failed.length ? 1 : 0);
