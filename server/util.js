@@ -80,6 +80,13 @@ export function errText(e) {
 
 const WIN = process.platform === 'win32';
 
+/**
+ * The one spelling of a path used for storing and comparing. On Windows the same folder can come as
+ * C:\Users\RUNNER~1\… (8.3 short name), C:/Users/runneradmin/… (git) or with other letter case;
+ * the native call returns what's on disk. macOS keeps the plain realpath.
+ */
+export const realPath = (p) => (WIN ? fs.realpathSync.native(p) : fs.realpathSync(p));
+
 /** Find an executable on PATH plus common install dirs. On Windows: by PATHEXT, no execute bit to check. */
 export function which(name) {
   const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
@@ -129,11 +136,11 @@ export function commandFor(bin) {
 export function resolveInside(root, rel) {
   if (typeof rel !== 'string' || !rel || rel.includes('\0')) return undefined;
   if (path.isAbsolute(rel)) return undefined;
-  const realRoot = fs.realpathSync(root);
+  const realRoot = realPath(root);
   const abs = path.resolve(realRoot, rel);
   if (abs !== realRoot && !abs.startsWith(realRoot + path.sep)) return undefined;
   try {
-    const real = fs.realpathSync(abs);
+    const real = realPath(abs);
     if (real !== realRoot && !real.startsWith(realRoot + path.sep)) return undefined;
     return real;
   } catch {

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomId, tilde } from './util.js';
+import { randomId, tilde, realPath } from './util.js';
 import { isRepo, repoRoot } from './git.js';
 import { describe } from './describe.js';
 
@@ -77,13 +77,13 @@ export async function addProject(store, input) {
   if (!p || !path.isAbsolute(p)) throw httpError(400, '절대 경로를 입력하세요 (예: ~/projects/my-app)');
   let real;
   try {
-    real = fs.realpathSync(p);
+    real = realPath(p);
     if (!fs.statSync(real).isDirectory()) throw new Error();
   } catch {
     throw httpError(400, `폴더를 찾을 수 없어요: ${tilde(p)}`);
   }
   const git = await isRepo(real);
-  if (git) real = await repoRoot(real);
+  if (git) real = realPath(await repoRoot(real));
   if (store.projects.some((x) => x.kind !== 'group' && x.path === real)) throw httpError(409, '이미 추가된 프로젝트예요');
   // Name, description and logo come from the repo itself; nothing to fill in by hand.
   const d = describe(real);

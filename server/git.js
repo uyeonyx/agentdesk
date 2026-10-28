@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { run, randomHex } from './util.js';
+import { run, randomHex, realPath } from './util.js';
 
 const git = (cwd, args, opts = {}) => run('git', ['-C', cwd, ...args], { timeout: 60000, ...opts });
 
@@ -179,7 +179,7 @@ export async function restore(dir, snap) {
   const keep = new Set(inSnap.split('\0').filter(Boolean));
   if (keep.size) await git(dir, ['checkout', snap.commit, '--', '.']);
   const { stdout: now } = await git(dir, ['ls-files', '--cached', '--others', '--exclude-standard', '-z']);
-  const realDir = fs.realpathSync(dir);
+  const realDir = realPath(dir);
   for (const p of now.split('\0')) {
     if (p && !keep.has(p)) safeUnlink(realDir, p);
   }
@@ -194,7 +194,7 @@ export async function restore(dir, snap) {
 export function safeUnlink(realRoot, rel) {
   try {
     const abs = path.join(realRoot, rel);
-    const parent = fs.realpathSync(path.dirname(abs));
+    const parent = realPath(path.dirname(abs));
     if (parent !== realRoot && !parent.startsWith(realRoot + path.sep)) return false;
     const target = path.join(parent, path.basename(abs));
     const st = fs.lstatSync(target);

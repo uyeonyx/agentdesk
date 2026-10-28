@@ -2,6 +2,7 @@
 // its real logo if it has one. No network, no model: just files that are already there.
 import fs from 'node:fs';
 import path from 'node:path';
+import { realPath } from './util.js';
 
 const LOGO_EXT = new Set(['.png', '.svg', '.jpg', '.jpeg', '.webp', '.ico']);
 const LOGO_MAX = 512 * 1024;
@@ -144,8 +145,8 @@ export function safeLogo(dir, rel) {
   if (typeof rel !== 'string' || !rel || path.isAbsolute(rel) || rel.split(/[\\/]/).includes('..')) return null;
   if (!LOGO_EXT.has(path.extname(rel).toLowerCase())) return null;
   try {
-    const root = fs.realpathSync(dir);
-    const abs = fs.realpathSync(path.join(root, rel));
+    const root = realPath(dir);
+    const abs = realPath(path.join(root, rel));
     if (!abs.startsWith(root + path.sep)) return null;
     const st = fs.statSync(abs);
     if (!st.isFile() || st.size === 0 || st.size > LOGO_MAX) return null;

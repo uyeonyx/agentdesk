@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { realPath } from './util.js';
 
 const FEED_MAX = 120;
 const SUB_FEED_MAX = 30;
@@ -290,8 +291,8 @@ function findRollout(cwd, since) {
   let realRoot;
   let realCwd;
   try {
-    realRoot = fs.realpathSync(root);
-    realCwd = fs.realpathSync(cwd);
+    realRoot = realPath(root);
+    realCwd = realPath(cwd);
   } catch {
     return null;
   }
@@ -319,7 +320,7 @@ function findRollout(cwd, since) {
   candidates.sort((a, b) => b[0] - a[0]);
   for (const [, p] of candidates.slice(0, 20)) {
     try {
-      const real = fs.realpathSync(p);
+      const real = realPath(p);
       if (!real.startsWith(realRoot + path.sep)) continue;
       const fd = fs.openSync(real, 'r');
       const b = Buffer.alloc(16384);
@@ -332,7 +333,7 @@ function findRollout(cwd, since) {
       if (typeof c === 'string') {
         let rc = c;
         try {
-          rc = fs.realpathSync(c);
+          rc = realPath(c);
         } catch {}
         if (rc === realCwd) return real;
       }

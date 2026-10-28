@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import pty from '@lydell/node-pty';
-import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor } from './util.js';
+import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, realPath } from './util.js';
 import * as G from './git.js';
 import { AGENTS, lastAssistantText, summarize } from './agents.js';
 import { httpError, addProject } from './projects.js';
@@ -946,7 +946,7 @@ export class Tasks {
     }
     let cwd;
     try {
-      cwd = fs.realpathSync(s.cwd);
+      cwd = realPath(s.cwd);
       if (!fs.statSync(cwd).isDirectory()) throw new Error();
     } catch {
       throw httpError(409, `그 세션의 폴더가 없어요: ${tilde(s.cwd)}`);
@@ -954,7 +954,7 @@ export class Tasks {
     let project = s.projectId && this.store.project(s.projectId);
     if (!project && projectId) {
       const p = this.store.project(String(projectId));
-      if (p && p.kind !== 'group' && (cwd === fs.realpathSync(p.path) || cwd.startsWith(fs.realpathSync(p.path) + path.sep))) project = p;
+      if (p && p.kind !== 'group' && (cwd === realPath(p.path) || cwd.startsWith(realPath(p.path) + path.sep))) project = p;
     }
     if (!project) project = await addProject(this.store, { path: cwd });
 
@@ -1237,7 +1237,7 @@ function transcriptBelongs(sessionId, cwd) {
   if (!f) return false;
   let real = cwd;
   try {
-    real = fs.realpathSync(cwd);
+    real = realPath(cwd);
   } catch {}
   return path.basename(path.dirname(f)) === real.replace(/[^a-zA-Z0-9]/g, '-');
 }

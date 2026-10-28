@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { which } from './util.js';
+import { which, realPath } from './util.js';
 
 const HOOK = path.join(path.dirname(fileURLToPath(import.meta.url)), 'hook.mjs');
 const q = (s) => `"${String(s).replace(/(["\\$`])/g, '\\$1')}"`;
@@ -122,10 +122,10 @@ export function lastAssistantText(transcriptPath) {
   try {
     if (typeof transcriptPath !== 'string' || !transcriptPath.endsWith('.jsonl')) return undefined;
     // Only read real Claude Code transcripts, never an arbitrary path an agent reports.
-    const real = fs.realpathSync(transcriptPath);
+    const real = realPath(transcriptPath);
     const ok = transcriptRoots().some((r) => {
       try {
-        const rr = fs.realpathSync(r);
+        const rr = realPath(r);
         return real.startsWith(rr + path.sep);
       } catch {
         return false;

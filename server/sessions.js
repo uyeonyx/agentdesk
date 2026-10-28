@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { AGENTS } from './agents.js';
-import { commandFor } from './util.js';
+import { commandFor, realPath } from './util.js';
 
 /** execFile arguments for an agent CLI, never through a shell (see commandFor). */
 const cmd = (bin, args) => {
@@ -22,7 +22,7 @@ const codexHome = () => process.env.CODEX_HOME || path.join(os.homedir(), '.code
 
 const real = (p) => {
   try {
-    return fs.realpathSync(p);
+    return realPath(p);
   } catch {
     return path.resolve(p);
   }
