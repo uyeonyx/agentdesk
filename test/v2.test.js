@@ -228,9 +228,11 @@ test('a plain shell in the task folder: runs commands, takes pasted agent comman
   const sh = ctx.s.shells.byId.get(r.json.id);
   assert.equal(sh.cwd, t.worktreeAbs);
   const seen = () => sh.ser.serialize();
-  sh.proc.write('echo "cwd=$(pwd) tok=${AGENTDESK_HOOK_TOKEN:-none}"\r');
-  await (async () => { for (let i = 0; i < 50 && !/tok=none/.test(seen()); i++) await sleep(100); })();
-  assert.match(seen(), new RegExp(`cwd=${t.worktreeAbs}`));
+  // PowerShell on Windows, the login shell elsewhere.
+  if (process.platform === 'win32') sh.proc.write('Write-Output ("cwd=" + (Get-Location).Path + " tok=" + $(if ($env:AGENTDESK_HOOK_TOKEN) { $env:AGENTDESK_HOOK_TOKEN } else { "none" }))\r');
+  else sh.proc.write('echo "cwd=$(pwd) tok=${AGENTDESK_HOOK_TOKEN:-none}"\r');
+  await (async () => { for (let i = 0; i < 80 && !/tok=none/.test(seen()); i++) await sleep(100); })();
+  assert.match(seen(), new RegExp(`cwd=${t.worktreeAbs.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}`));
   assert.match(seen(), /tok=none/, 'the hook token never reaches the shell');
   // A pasted command sits on the line until Enter.
   assert.equal((await ctx.api('POST', `/api/tasks/${t.id}/shell`, { paste: 'echo pasted-not-run\x1b[201~; rm -rf /tmp/nope\r' })).json.id, r.json.id);

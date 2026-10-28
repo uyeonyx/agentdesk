@@ -56,3 +56,10 @@ test('the core refuses a state change whose body is not JSON text', async () => 
   await assert.rejects(ctx.s.dispatch('PATCH', '/api/prefs', '{bad'), (e) => e.status === 400);
   await assert.rejects(ctx.s.dispatch('PATCH', '/api/prefs', JSON.stringify({ x: 'a'.repeat(1_100_000) })), (e) => e.status === 413);
 });
+
+test('VS Code links: encoded segments, Windows drive paths with forward slashes', async () => {
+  const { vscodeLink } = await import('../ui/src/util.js');
+  assert.equal(vscodeLink('/Users/me/my repo/a#b.js', 3), 'vscode://file/Users/me/my%20repo/a%23b.js:3');
+  assert.equal(vscodeLink('C:\\Users\\me\\repo' + '/' + 'src/a.js', 1), 'vscode://file/C:/Users/me/repo/src/a.js:1');
+  assert.equal(vscodeLink('C:\\Users\\me\\repo'), 'vscode://file/C:/Users/me/repo');
+});

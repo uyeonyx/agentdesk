@@ -168,9 +168,15 @@ export function setFavicon(color, badge) {
   if (link) link.href = c.toDataURL('image/png');
 }
 
-/** vscode://file/<abs path>[:line], each path segment encoded so ? # % in names can't change the URL. */
+/**
+ * vscode://file/<abs path>[:line], each path segment encoded so ? # % in names can't change the URL.
+ * Windows paths come out as vscode://file/C:/Users/… (forward slashes, drive letter kept).
+ */
 export function vscodeLink(abs, line) {
-  const p = String(abs).split('/').map(encodeURIComponent).join('/');
+  const p = String(abs)
+    .split(/[\\/]/)
+    .map((seg, i) => (i === 0 && /^[A-Za-z]:$/.test(seg) ? seg : encodeURIComponent(seg)))
+    .join('/');
   return `vscode://file${p.startsWith('/') ? '' : '/'}${p}${line ? ':' + (line | 0) : ''}`;
 }
 

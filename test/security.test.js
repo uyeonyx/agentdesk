@@ -119,7 +119,7 @@ test('[review 6] undo never deletes outside the worktree through a planted symli
   assert.equal(fs.readFileSync(path.join(outside, 'b.js'), 'utf8'), 'victim', 'file outside the worktree survives');
 });
 
-test('[review 7] an untracked symlink to /dev/zero does not hang the daemon', async () => {
+test('[review 7] an untracked symlink to /dev/zero does not hang the daemon', { skip: process.platform === 'win32' && 'no /dev/zero' }, async () => {
   const repo = makeRepo(path.join(ctx.tmp, 'zero'), { 'README.md': 'x\n' });
   const proj = (await ctx.api('POST', '/api/projects', { path: repo })).json;
   const t = (await ctx.api('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'just answer: hi' })).json;

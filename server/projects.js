@@ -73,7 +73,7 @@ export function addGroup(store, input) {
 
 export async function addProject(store, input) {
   if (input.kind === 'group') return addGroup(store, input);
-  let p = String(input.path || '').trim().replace(/^~(?=$|\/)/, os.homedir());
+  let p = String(input.path || '').trim().replace(/^~(?=$|[\\/])/, os.homedir());
   if (!p || !path.isAbsolute(p)) throw httpError(400, '절대 경로를 입력하세요 (예: ~/projects/my-app)');
   let real;
   try {
@@ -254,10 +254,12 @@ export function discoverRepos(existing) {
 /** Folder autocomplete for the add-project field. */
 export function listDirs(input) {
   const home = os.homedir();
-  let q = String(input || '').replace(/^~(?=$|\/)/, home) || home + '/';
+  // "/" works as a separator on every OS; Windows also takes "\".
+  const endsWithSep = (s) => /[\\/]$/.test(s);
+  let q = String(input || '').replace(/^~(?=$|[\\/])/, home) || home + path.sep;
   if (!path.isAbsolute(q)) q = path.join(home, q);
-  const base = q.endsWith('/') ? q : path.dirname(q);
-  const prefix = q.endsWith('/') ? '' : path.basename(q).toLowerCase();
+  const base = endsWithSep(q) ? q : path.dirname(q);
+  const prefix = endsWithSep(q) ? '' : path.basename(q).toLowerCase();
   let entries = [];
   try {
     entries = fs.readdirSync(base, { withFileTypes: true });
@@ -269,6 +271,6 @@ export function listDirs(input) {
     .slice(0, 40)
     .map((e) => {
       const full = path.join(base, e.name);
-      return { path: full, display: tilde(full) + '/', git: fs.existsSync(path.join(full, '.git')) };
+      return { path: full, display: tilde(full) + path.sep, git: fs.existsSync(path.join(full, '.git')) };
     });
 }

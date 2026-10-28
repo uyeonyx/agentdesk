@@ -4,10 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { createRequire } from 'node:module';
 import pty from '@lydell/node-pty';
-import { randomId } from './util.js';
+import { randomId, which } from './util.js';
 import { httpError } from './projects.js';
 
 const require = createRequire(import.meta.url);
+const WIN = process.platform === 'win32';
 const { Terminal } = require('@xterm/headless');
 const { SerializeAddon } = require('@xterm/addon-serialize');
 
@@ -33,7 +34,8 @@ export class Shells {
     if (s && !s.exited) return s;
     if (s) this.byId.delete(s.id);
     const cwd = fs.existsSync(task.cwd) ? task.cwd : os.homedir();
-    const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash');
+    // Windows: PowerShell 7 if installed, else Windows PowerShell. A POSIX $SHELL (Git Bash, MSYS) isn't a Windows program path.
+    const shell = WIN ? which('pwsh') || 'powershell.exe' : process.env.SHELL || '/bin/bash';
     // The agents' hook token and Desk's own variables never reach a shell the person types into.
     const env = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' };
     for (const k of Object.keys(env)) if (/^(AGENTDESK_|CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_SANDBOX|CODEX_THREAD|ELECTRON_|CHROME_)/.test(k)) delete env[k];
@@ -75,8 +77,10 @@ export class Shells {
       .replace(/\n+$/, '')
       .slice(0, 4000);
     if (!clean) return s;
-    // Ctrl+U first: the command replaces whatever half-typed line is there instead of joining it.
-    s.proc.write('\x15\x1b[200~' + clean.replace(/\n/g, '\r') + '\x1b[201~');
+    // First clear the half-typed line (Ctrl+U; Esc in PowerShell), so the command replaces it instead of joining it.
+    // PowerShell gets one line: without bracketed paste a newline would run it.
+    if (WIN) s.proc.write('\x1b' + clean.replace(/\n/g, '; '));
+    else s.proc.write('\x15\x1b[200~' + clean.replace(/\n/g, '\r') + '\x1b[201~');
     return s;
   }
 

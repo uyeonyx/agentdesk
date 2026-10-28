@@ -6,6 +6,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFile } from 'node:child_process';
 import { AGENTS } from './agents.js';
+import { commandFor } from './util.js';
+
+/** execFile arguments for an agent CLI, never through a shell (see commandFor). */
+const cmd = (bin, args) => {
+  const [file, ...pre] = commandFor(bin);
+  return [file, [...pre, ...args]];
+};
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isSessionId = (s) => typeof s === 'string' && UUID.test(s);
@@ -80,7 +87,7 @@ function refreshCli() {
   const bin = AGENTS.claude.bin();
   if (!bin) return Promise.resolve(null);
   cli.running = new Promise((resolve) => {
-    execFile(bin, ['agents', '--json'], { timeout: 8000, maxBuffer: 4 * 1024 * 1024, env: cleanEnv() }, (err, stdout) => {
+    execFile(...cmd(bin, ['agents', '--json']), { timeout: 8000, maxBuffer: 4 * 1024 * 1024, env: cleanEnv() }, (err, stdout) => {
       let list = null;
       if (!err) {
         try {
@@ -214,7 +221,7 @@ export function queueCodex(sessionId, text) {
   const bin = AGENTS.codex.bin();
   if (!bin || !isSessionId(sessionId)) return Promise.reject(new Error('codex를 찾을 수 없어요'));
   return new Promise((resolve, reject) =>
-    execFile(bin, ['queue', `--thread=${sessionId}`, `--message=${text}`], { timeout: 15000, env: cleanEnv() }, (err, _o, stderr) => (err ? reject(new Error(String(stderr || err.message).trim().slice(0, 300))) : resolve()))
+    execFile(...cmd(bin, ['queue', `--thread=${sessionId}`, `--message=${text}`]), { timeout: 15000, env: cleanEnv() }, (err, _o, stderr) => (err ? reject(new Error(String(stderr || err.message).trim().slice(0, 300))) : resolve()))
   );
 }
 
@@ -222,7 +229,7 @@ export function queueCodex(sessionId, text) {
 export function stopClaude(id) {
   const bin = AGENTS.claude.bin();
   if (!bin || !/^\w[\w-]{0,63}$/.test(id)) return Promise.resolve(false);
-  return new Promise((resolve) => execFile(bin, ['stop', id], { timeout: 10000, env: cleanEnv() }, (err) => resolve(!err)));
+  return new Promise((resolve) => execFile(...cmd(bin, ['stop', id]), { timeout: 10000, env: cleanEnv() }, (err) => resolve(!err)));
 }
 
 // ---------------------------------------------------------------- Claude: past conversations

@@ -10,8 +10,10 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export async function boot() {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'agentdesk-test-'));
   process.env.AGENTDESK_HOME = path.join(tmp, 'home');
-  process.env.AGENTDESK_CLAUDE_BIN = path.join(here, 'mock-claude');
-  process.env.AGENTDESK_CODEX_BIN = path.join(here, 'mock-codex');
+  // Windows gets npm-style .cmd shims, the way claude and codex are installed there.
+  const ext = process.platform === 'win32' ? '.cmd' : '';
+  process.env.AGENTDESK_CLAUDE_BIN = path.join(here, 'mock-claude' + ext);
+  process.env.AGENTDESK_CODEX_BIN = path.join(here, 'mock-codex' + ext);
   process.env.MOCK_WORK_MS = '300';
   process.env.MOCK_TRANSCRIPT_DIR = path.join(tmp, 'transcripts');
   fs.mkdirSync(process.env.MOCK_TRANSCRIPT_DIR, { recursive: true });

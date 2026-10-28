@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import pty from '@lydell/node-pty';
-import { randomId, run, errText, resolveInside, tilde, dataDir } from './util.js';
+import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor } from './util.js';
 import * as G from './git.js';
 import { AGENTS, lastAssistantText, summarize } from './agents.js';
 import { httpError, addProject } from './projects.js';
@@ -323,7 +323,8 @@ export class Tasks {
       name: task.agent === 'claude' ? task.title : undefined,
     });
     if (task.remote) task.remoteUrl = '';
-    const proc = pty.spawn(bin, args, { name: 'xterm-256color', cols, rows, cwd: fs.existsSync(task.cwd) ? task.cwd : undefined, env });
+    const [file, ...pre] = commandFor(bin);
+    const proc = pty.spawn(file, [...pre, ...args], { name: 'xterm-256color', cols, rows, cwd: fs.existsSync(task.cwd) ? task.cwd : undefined, env });
     const term = new Terminal({ cols, rows, scrollback: 4000, allowProposedApi: true });
     const ser = new SerializeAddon();
     term.loadAddon(ser);

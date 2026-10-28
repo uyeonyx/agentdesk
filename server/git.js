@@ -64,7 +64,8 @@ export async function removeWorktree(repo, wtPath, branch, { force = true, delet
     await git(repo, ['worktree', 'remove', ...(force ? ['--force'] : []), wtPath]);
   } catch {
     try {
-      fs.rmSync(wtPath, { recursive: true, force: true });
+      // Windows keeps a just-stopped agent's files locked for a moment.
+      fs.rmSync(wtPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
       await git(repo, ['worktree', 'prune']);
     } catch {}
   }
