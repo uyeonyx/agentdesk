@@ -186,7 +186,7 @@ function alive(pid) {
 
 export function cleanEnv() {
   const env = { ...process.env };
-  for (const k of Object.keys(env)) if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_SANDBOX|CODEX_THREAD|AGENTDESK_)/.test(k)) delete env[k];
+  for (const k of Object.keys(env)) if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_SANDBOX|CODEX_THREAD|AGENTDESK_|ELECTRON_|CHROME_)/.test(k)) delete env[k];
   return env;
 }
 

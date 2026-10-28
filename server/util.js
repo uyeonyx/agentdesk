@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-export const VERSION = '0.2.6';
+export const VERSION = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
 
 export function dataDir() {
   const d = process.env.AGENTDESK_HOME || path.join(os.homedir(), '.agentdesk');

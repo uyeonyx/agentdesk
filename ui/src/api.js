@@ -1,47 +1,23 @@
 import { set, get } from './store.js';
 
-// Page key: arrives once in the URL fragment after login, then lives in this origin's storage.
-// Other localhost ports receive our cookie but can never read this.
-let KEY = '';
-export function bootKey() {
-  const m = location.hash.match(/(?:^#|&)k=([0-9a-f]{64})/);
-  if (m) {
-    KEY = m[1];
-    try {
-      localStorage.setItem('desk.key', KEY);
-    } catch {}
-    history.replaceState(null, '', location.pathname + location.search);
-  } else {
-    try {
-      KEY = localStorage.getItem('desk.key') || '';
-    } catch {}
-  }
-  return !!KEY;
-}
+// The app's preload hands this window a private channel to the core (window.desk). There is no
+// URL to call and no key to keep: nothing else on the machine can reach the core this way.
+const desk = () => window.desk;
 
 export async function api(method, path, body) {
-  let r;
-  // Every state-changing request carries a JSON body: the daemon accepts nothing else (a form
-  // post from another site can't send application/json), so "no body" must still be "{}".
+  // Every state-changing request carries a JSON body, so "no body" is still "{}".
   if (body === undefined && method !== 'GET' && method !== 'HEAD') body = {};
+  let r;
   try {
-    r = await fetch(path, {
-      method,
-      headers: { 'x-desk-key': KEY, ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-      credentials: 'same-origin',
-    });
+    r = await desk().api(method, path, body !== undefined ? JSON.stringify(body) : undefined);
   } catch {
-    throw new Error('Desk 서비스에 연결할 수 없어요. 터미널에서 agentdesk 를 실행하세요.');
-  }
-  if (r.status === 401) {
-    throw new Error('로그인이 풀렸어요. 터미널에서 agentdesk 를 실행하면 새 링크가 열려요.');
+    throw new Error('Desk 코어에 연결할 수 없어요. 잠시 후 다시 시도해 주세요.');
   }
   let j = {};
   try {
-    j = await r.json();
+    j = JSON.parse(r.body || '{}');
   } catch {}
-  if (!r.ok) {
+  if (r.status < 200 || r.status >= 300) {
     const e = new Error(j.error || `요청이 실패했어요 (${r.status})`);
     e.status = r.status;
     throw e;
@@ -49,18 +25,20 @@ export async function api(method, path, body) {
   return j;
 }
 
-/** An image the API serves (project logos): fetched with the page key, handed out as a blob URL. */
+/** An image the core serves (project logos): bytes and a type, handed out as a blob URL. */
 export async function apiBlobUrl(path) {
-  const r = await fetch(path, { headers: { 'x-desk-key': KEY }, credentials: 'same-origin' });
-  if (!r.ok) return null;
-  return URL.createObjectURL(await r.blob());
+  let r;
+  try {
+    r = await desk().api('GET', path);
+  } catch {
+    return null;
+  }
+  if (r.status !== 200 || !r.data) return null;
+  return URL.createObjectURL(new Blob([r.data], { type: r.type }));
 }
 
-// ------------------------------------------------------------ websocket
+// ------------------------------------------------------------ live channel
 
-let ws;
-let backoff = 400;
-let failures = 0;
 const termListeners = new Set();
 
 export function onTerm(fn) {
@@ -70,11 +48,11 @@ export function onTerm(fn) {
 
 let pending = [];
 export function wsSend(msg) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+  if (get().connected) desk().send(JSON.stringify(msg));
   else pending.push(msg);
 }
 
-// One agent terminal and one shell can be attached at a time; both come back after a reconnect.
+// One agent terminal and one shell can be attached at a time; both come back after the core restarts.
 const lastAttach = {};
 export function attachTerm(task, cols, rows) {
   const kind = String(task).startsWith('sh_') ? 'shell' : 'agent';
@@ -94,24 +72,19 @@ export function onState(fn) {
 }
 
 export function connect() {
-  ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`, ['desk', 'k.' + KEY]);
-  let opened = false;
-  ws.onopen = () => {
-    opened = true;
-    failures = 0;
-    set({ authFailed: false });
-    backoff = 400;
-    set({ connected: true });
-    // Re-attach the terminal after a reconnect; drop queued attaches (they're stale).
+  desk().onConnection((up) => {
+    set({ connected: up });
+    if (!up) return;
+    // Re-attach the terminals after a (re)connect; drop queued attaches (they're stale).
     pending = pending.filter((m) => m.t !== 'attach');
-    for (const a of Object.values(lastAttach)) ws.send(JSON.stringify(a));
-    for (const m of pending) ws.send(JSON.stringify(m));
+    for (const a of Object.values(lastAttach)) desk().send(JSON.stringify(a));
+    for (const m of pending) desk().send(JSON.stringify(m));
     pending = [];
-  };
-  ws.onmessage = (ev) => {
+  });
+  desk().onPush((data) => {
     let m;
     try {
-      m = JSON.parse(ev.data);
+      m = JSON.parse(data);
     } catch {
       return;
     }
@@ -122,6 +95,7 @@ export function connect() {
         loaded: true,
         version: m.version,
         home: m.home,
+        platform: m.platform,
         agents: m.agents,
         palette: m.palette,
         icons: m.icons,
@@ -130,13 +104,10 @@ export function connect() {
         tasks: m.tasks,
       });
     } else for (const l of termListeners) l(m);
-  };
-  ws.onclose = (ev) => {
-    set({ connected: false });
-    if (!opened) failures++;
-    if (failures >= 3) set({ authFailed: true });
-    if (ev.code === 1008 || ev.code === 4401) return;
-    setTimeout(connect, backoff);
-    backoff = Math.min(backoff * 1.7, 5000);
-  };
+  });
+}
+
+/** Bring this window to the front (after a notification click, even when it was closed to the Dock). */
+export function focusWindow() {
+  desk().focus();
 }

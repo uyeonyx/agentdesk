@@ -60,7 +60,7 @@ for (let i = 0; i < argv.length; i++) {
     resumeId = argv[++i];
   } else if (a === '--settings') {
     const s = JSON.parse(argv[++i]);
-    for (const [ev, list] of Object.entries(s.hooks || {})) hooks[ev] = list?.[0]?.hooks?.[0]?.command;
+    for (const [ev, list] of Object.entries(s.hooks || {})) hooks[ev] = list?.[0]?.hooks?.[0];
   } else if (a === '-c') {
     const v = argv[++i];
     if (v.startsWith('notify=')) notify = JSON.parse(v.slice(7));
@@ -88,9 +88,11 @@ let tid = 0;
 
 function hook(event, extra = {}) {
   if (kind !== 'claude') return;
-  const cmd = hooks[event];
-  if (!cmd) return;
-  const p = spawn('sh', ['-c', cmd], { stdio: ['pipe', 'ignore', 'ignore'] });
+  const h = hooks[event];
+  if (!h?.command) return;
+  // Like Claude Code: exec form (`args` present) runs the program directly, shell form goes through sh.
+  const p = Array.isArray(h.args) ? spawn(h.command, h.args, { stdio: ['pipe', 'ignore', 'ignore'] }) : spawn('sh', ['-c', h.command], { stdio: ['pipe', 'ignore', 'ignore'] });
+  p.on('error', () => {});
   p.stdin.end(JSON.stringify({ hook_event_name: event, session_id: sid, transcript_path: transcriptPath(), cwd: process.cwd(), ...extra }));
 }
 const tool = (name, input, extra = {}) => {

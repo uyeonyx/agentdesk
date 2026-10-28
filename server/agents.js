@@ -5,8 +5,36 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { which } from './util.js';
 
-const HOOK = path.join(path.dirname(fileURLToPath(import.meta.url)), 'hook.js');
+const HOOK = path.join(path.dirname(fileURLToPath(import.meta.url)), 'hook.mjs');
 const q = (s) => `"${String(s).replace(/(["\\$`])/g, '\\$1')}"`;
+
+/** argv that runs the hook client; the app sets its own binary (`--desk-hook`), tests and dev use node. */
+let hookClient = [process.execPath, HOOK];
+export function configureHooks({ client }) {
+  hookClient = client;
+}
+
+// curl is ~5 ms to start (the hook client ~100 ms); it reaches the Unix socket directly.
+// Windows has no Unix socket for curl to use, so it always takes the hook client.
+const curlBin = () => (process.platform === 'win32' ? null : which('curl'));
+const curlTo = (curl, agent) =>
+  `${q(curl)} -s -m 4 --unix-socket "$AGENTDESK_SOCK" -X POST -H "x-agentdesk-hook: $AGENTDESK_HOOK_TOKEN" -H "content-type: application/json" --data-binary @- "http://desk/hook?task=$AGENTDESK_TASK&agent=${agent}" >/dev/null 2>&1 || true`;
+
+/** One Claude Code hook entry. The token comes from the environment, never the command line. */
+function claudeHook() {
+  const curl = curlBin();
+  if (curl) return { type: 'command', command: curlTo(curl, 'claude') };
+  const [exe, ...rest] = hookClient;
+  // Exec form: no shell on any platform, so Git Bash, PowerShell or sh all run it the same way.
+  return { type: 'command', command: exe, args: [...rest, 'claude'] };
+}
+
+/** Codex runs notify as a program and appends its JSON as the last argument. */
+function codexNotify() {
+  const curl = curlBin();
+  if (curl) return ['/bin/sh', '-c', `printf %s "$1" | ${curlTo(curl, 'codex')}`, 'desk'];
+  return [...hookClient, 'codex'];
+}
 
 export const AGENTS = {
   claude: {
@@ -18,15 +46,11 @@ export const AGENTS = {
      * @param {{prompt?:string, resume?:boolean, sessionId?:string, fork?:boolean, newSessionId?:string, remote?:string|false, name?:string}} o
      */
     args({ prompt, resume, sessionId, fork, newSessionId, remote, name }) {
-      // curl is ~5 ms to start (node ~60 ms); the token comes from the environment, never the command line.
-      const curl = which('curl');
-      const cmd = curl
-        ? `${q(curl)} -s -m 3 -X POST -H "x-agentdesk-hook: $AGENTDESK_HOOK_TOKEN" -H "content-type: application/json" --data-binary @- "$AGENTDESK_URL/hook?task=$AGENTDESK_TASK&agent=claude" >/dev/null 2>&1 || true`
-        : `${q(process.execPath)} ${q(HOOK)} claude`;
-      const sync = [{ hooks: [{ type: 'command', command: cmd, timeout: 5 }] }];
+      const hook = claudeHook();
+      const sync = [{ hooks: [{ ...hook, timeout: 5 }] }];
       // Tool and subagent events only feed the progress view, so they never block the agent.
-      const bg = [{ matcher: '*', hooks: [{ type: 'command', command: cmd, timeout: 5, async: true }] }];
-      const bgNoMatcher = [{ hooks: [{ type: 'command', command: cmd, timeout: 5, async: true }] }];
+      const bg = [{ matcher: '*', hooks: [{ ...hook, timeout: 5, async: true }] }];
+      const bgNoMatcher = [{ hooks: [{ ...hook, timeout: 5, async: true }] }];
       const settings = JSON.stringify({
         hooks: {
           UserPromptSubmit: sync,
@@ -60,7 +84,7 @@ export const AGENTS = {
     idleMs: 5000,
     remote: false,
     args({ prompt, resume, sessionId, fork }) {
-      const notify = `notify=[${[process.execPath, HOOK, 'codex'].map((s) => JSON.stringify(s)).join(',')}]`;
+      const notify = `notify=[${codexNotify().map((s) => JSON.stringify(s)).join(',')}]`;
       const args = ['-c', notify];
       if (resume && sessionId) args.push(fork ? 'fork' : 'resume', sessionId);
       else if (resume) args.push('resume', '--last');

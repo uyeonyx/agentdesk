@@ -3,3 +3,4 @@ ui/dist/
 *.tgz
 preview/
 .DS_Store
+test-results/

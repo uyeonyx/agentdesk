@@ -18,7 +18,7 @@ export class Shells {
     this.store = store;
     /** shellId -> { id, taskId, proc, term, ser, cwd, exited } */
     this.byId = new Map();
-    /** ws -> shellId */
+    /** peer (a window's connection) -> shellId */
     this.viewers = new Map();
   }
 
@@ -36,7 +36,7 @@ export class Shells {
     const shell = process.env.SHELL || (process.platform === 'win32' ? 'powershell.exe' : '/bin/bash');
     // The agents' hook token and Desk's own variables never reach a shell the person types into.
     const env = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' };
-    for (const k of Object.keys(env)) if (/^(AGENTDESK_|CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_SANDBOX|CODEX_THREAD)/.test(k)) delete env[k];
+    for (const k of Object.keys(env)) if (/^(AGENTDESK_|CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_SANDBOX|CODEX_THREAD|ELECTRON_|CHROME_)/.test(k)) delete env[k];
     const cols = 120;
     const rows = 14;
     const proc = pty.spawn(shell, process.platform === 'win32' ? [] : ['-l'], { name: 'xterm-256color', cols, rows, cwd, env });

@@ -3,7 +3,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { boot, makeRepo, raw } from './helpers.js';
+import { boot, makeRepo } from './helpers.js';
 import { describe, safeLogo } from '../server/describe.js';
 
 let ctx;
@@ -60,13 +60,11 @@ test('adding a project fills name, description, icon and logo; the logo is serve
   assert.equal(p.desc, 'Next.js · 쇼핑몰 프론트엔드');
   assert.equal(p.icon, 'world');
   assert.equal(p.logo, 'public/favicon.png');
-  const r = await fetch(`${ctx.base}/api/projects/${p.id}/logo`, { headers: { cookie: ctx.cookie, 'x-desk-key': ctx.key } });
+  // The logo comes back as bytes plus an image type; the window shows it as a blob in an <img>.
+  const r = await ctx.api('GET', `/api/projects/${p.id}/logo`);
   assert.equal(r.status, 200);
-  assert.equal(r.headers.get('content-type'), 'image/png');
-  assert.match(r.headers.get('content-security-policy'), /sandbox/);
-  assert.equal(Buffer.compare(Buffer.from(await r.arrayBuffer()), PNG), 0);
-  const noKey = await raw(ctx.port, { path: `/api/projects/${p.id}/logo`, headers: { host: `127.0.0.1:${ctx.port}`, cookie: ctx.cookie } });
-  assert.equal(noKey.status, 401);
+  assert.equal(r.binary.type, 'image/png');
+  assert.equal(Buffer.compare(Buffer.from(r.binary.data), PNG), 0);
 
   // A description typed in settings is kept; automatic refills leave it alone.
   await ctx.api('PATCH', `/api/projects/${p.id}`, { desc: '내가 쓴 설명', manual: true });

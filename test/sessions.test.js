@@ -154,15 +154,12 @@ test('past Codex sessions are found from their rollout logs and resumed by id', 
   await ctx.api('POST', `/api/tasks/${t.id}/discard`);
 });
 
-test('import rejects unknown ids, missing folders, and needs the page key', async () => {
+test('import rejects unknown ids and missing folders', async () => {
   assert.equal((await ctx.api('POST', '/api/tasks', { import: { agent: 'claude', sessionId: randomUUID() } })).status, 404);
   assert.equal((await ctx.api('POST', '/api/tasks', { import: { agent: 'claude', sessionId: '../../etc/passwd' } })).status, 404);
   const gone = randomUUID();
   claudeTranscript(path.join(ctx.tmp, 'deleted-folder'), gone);
   assert.equal((await ctx.api('POST', '/api/tasks', { import: { agent: 'claude', sessionId: gone } })).status, 409);
-  const noKey = { ...ctx.H };
-  delete noKey['x-desk-key'];
-  assert.equal((await ctx.api('GET', '/api/sessions', undefined, noKey)).status, 401);
 });
 
 test('new Claude tasks pin their session id; resume reopens exactly that one (falls back if never saved)', async () => {
@@ -322,10 +319,10 @@ test("an agent's hook can't attach one of the person's other sessions to its tas
   claudeTranscript(path.join(ctx.tmp, 'some-other-folder'), other);
   const t = (await ctx.api('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'just answer: hi' })).json;
   await ctx.waitTask(t.id, (x) => x.state === 'needs_input');
-  const res = await fetch(`${ctx.base}/hook?task=${t.id}&agent=claude`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-agentdesk-hook': ctx.s.auth.hookTokenFor(t.id) },
-    body: JSON.stringify({ hook_event_name: 'Stop', session_id: other }),
+  const res = await ctx.hook({
+    path: `/hook?task=${t.id}&agent=claude`,
+    headers: { 'x-agentdesk-hook': ctx.s.auth.hookTokenFor(t.id) },
+    body: { hook_event_name: 'Stop', session_id: other },
   });
   assert.equal(res.status, 200);
   await sleep(300);

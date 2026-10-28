@@ -23,23 +23,17 @@ export async function boot() {
   process.env.MOCK_QUEUE_LOG = path.join(tmp, 'queue.log');
   process.env.MOCK_REMOTE_DIR = path.join(tmp, 'phone');
   fs.mkdirSync(process.env.MOCK_REMOTE_DIR, { recursive: true });
-  const { startServer } = await import('../server/main.js');
-  const s = await startServer({ quiet: true });
-  const base = `http://127.0.0.1:${s.port}`;
-  const r = await fetch(s.issueLoginUrl(), { redirect: 'manual' });
-  const setCookie = r.headers.get('set-cookie');
-  const cookie = setCookie.split(';')[0];
-  const html = await r.text();
-  const location = (html.match(/url=([^"]+)"/) || [])[1];
-  const key = (location.match(/#k=([0-9a-f]{64})/) || [])[1];
-  const H = { cookie, origin: base, 'x-desk-key': key, 'content-type': 'application/json' };
-  const api = async (method, p, body, headers = H) => {
-    const res = await fetch(base + p, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
-    let json = {};
+  const { startCore, Binary } = await import('../server/core.js');
+  const s = await startCore({ quiet: true });
+  // What the window gets: a JSON round trip, or an error with the status the core threw.
+  const api = async (method, p, body) => {
     try {
-      json = await res.json();
-    } catch {}
-    return { status: res.status, json };
+      const r = await s.dispatch(method, p, body !== undefined ? JSON.stringify(body) : undefined);
+      if (r instanceof Binary) return { status: 200, binary: r };
+      return { status: 200, json: JSON.parse(JSON.stringify(r)) };
+    } catch (e) {
+      return { status: e.status || 500, json: { error: e.message } };
+    }
   };
   const waitTask = async (id, pred, ms = 10000) => {
     const end = Date.now() + ms;
@@ -52,7 +46,22 @@ export async function boot() {
     }
     throw new Error(`timeout waiting for task ${id}; last=${JSON.stringify(last && { state: last.state, reason: last.reason, changes: last.changes })}`);
   };
-  return { s, tmp, base, cookie, setCookie, location, key, H, api, waitTask, port: s.port };
+  const hook = (opts) => hookPost(s.hookPath, opts);
+  return { s, tmp, api, waitTask, hook };
+}
+
+/** POST to the hook socket the way curl and hook.mjs do. Resolves with {status, body}; status 'reset' if the server hung up mid-request. */
+export function hookPost(sock, { path: p = '/hook', method = 'POST', headers = {}, body = '' } = {}) {
+  return new Promise((resolve, reject) => {
+    // One connection per request, like each curl / hook.mjs process.
+    const req = http.request({ socketPath: sock, method, path: p, agent: false, headers: { 'content-type': 'application/json', ...headers } }, (res) => {
+      let data = '';
+      res.on('data', (c) => (data += c));
+      res.on('end', () => resolve({ status: res.statusCode, body: data }));
+    });
+    req.on('error', (e) => (['EPIPE', 'ECONNRESET'].includes(e.code) ? resolve({ status: 'reset', body: '' }) : reject(e)));
+    req.end(typeof body === 'string' ? body : JSON.stringify(body));
+  });
 }
 
 export function makeRepo(dir, files = { 'README.md': '# repo\n' }) {
@@ -63,37 +72,4 @@ export function makeRepo(dir, files = { 'README.md': '# repo\n' }) {
   }
   execSync('git init -q -b main && git add . && git -c user.name=t -c user.email=t@t commit -qm init', { cwd: dir });
   return dir;
-}
-
-/** Raw HTTP so tests can forge Host / Origin headers like an attacker would. */
-export function raw(port, { method = 'GET', path: p = '/', headers = {}, body } = {}) {
-  return new Promise((resolve, reject) => {
-    const req = http.request({ host: '127.0.0.1', port, method, path: p, headers }, (res) => {
-      let data = '';
-      res.on('data', (c) => (data += c));
-      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
-    });
-    req.on('error', reject);
-    if (body) req.write(body);
-    req.end();
-  });
-}
-
-/** Attempt a WebSocket upgrade with arbitrary headers; resolves with the HTTP status line. */
-export function wsTry(port, headers) {
-  return new Promise((resolve) => {
-    const req = http.request({
-      host: '127.0.0.1',
-      port,
-      path: '/ws',
-      headers: { Connection: 'Upgrade', Upgrade: 'websocket', 'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==', ...headers },
-    });
-    req.on('upgrade', (res, socket) => {
-      socket.destroy();
-      resolve(101);
-    });
-    req.on('response', (res) => resolve(res.statusCode));
-    req.on('error', () => resolve('error'));
-    req.end();
-  });
 }

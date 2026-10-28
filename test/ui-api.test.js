@@ -1,5 +1,6 @@
-// The browser client (ui/src/api.js) against the real daemon: every action the UI sends without
-// a payload (stop, resume, discard, archive, merge, delete…) must still pass the JSON-only rule.
+// The window's client (ui/src/api.js) against the real core, through the same bridge shape the
+// preload exposes: every action the UI sends without a payload (stop, resume, discard, archive,
+// delete…) must still arrive as a JSON body.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -9,18 +10,23 @@ let ctx;
 let api;
 before(async () => {
   ctx = await boot();
-  const store = new Map([['desk.key', ctx.key]]);
-  globalThis.localStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)) };
-  globalThis.location = { hash: '', pathname: '/', search: '', protocol: 'http:', host: `127.0.0.1:${ctx.port}` };
-  globalThis.history = { replaceState() {} };
-  const realFetch = globalThis.fetch;
-  // What a browser adds by itself on a same-origin request.
-  globalThis.fetch = (p, opts = {}) => realFetch(String(p).startsWith('/') ? ctx.base + p : p, { ...opts, headers: { ...opts.headers, cookie: ctx.cookie, origin: ctx.base, 'sec-fetch-site': 'same-origin' } });
-  const mod = await import('../ui/src/api.js');
-  assert.ok(mod.bootKey());
-  api = mod.api;
+  // desktop/preload.cjs: desk.api(method, path, bodyText) resolves with {status, body} or {status, type, data}.
+  globalThis.window = globalThis;
+  globalThis.desk = {
+    async api(method, p, bodyText) {
+      const { Binary } = await import('../server/core.js');
+      try {
+        const r = await ctx.s.dispatch(method, p, bodyText);
+        if (r instanceof Binary) return { status: 200, type: r.type, data: new Uint8Array(r.data) };
+        return { status: 200, body: JSON.stringify(r) };
+      } catch (e) {
+        return { status: e.status || 500, body: JSON.stringify({ error: e.status ? e.message : 'server error' }) };
+      }
+    },
+  };
+  api = (await import('../ui/src/api.js')).api;
 });
-after(() => ctx.s.shutdown(null));
+after(() => ctx.s.shutdown());
 
 test('body-less UI actions are accepted (stop, resume, discard, archive, project delete)', async () => {
   const repo = makeRepo(path.join(ctx.tmp, 'ui-client'));
@@ -39,7 +45,14 @@ test('body-less UI actions are accepted (stop, resume, discard, archive, project
   assert.deepEqual(await api('DELETE', `/api/projects/${proj.id}`), { ok: true });
 });
 
-test('the daemon still refuses a state change that is not JSON', async () => {
-  const res = await fetch(`/api/prefs`, { method: 'PATCH', headers: { 'x-desk-key': ctx.key, 'content-type': 'text/plain' }, body: 'x' });
-  assert.equal(res.status, 415);
+test('errors keep their status and message', async () => {
+  await assert.rejects(api('POST', '/api/tasks/nope/send', { text: 'x' }), (e) => e.status === 404 && /작업을 찾을 수 없어요/.test(e.message));
+  await assert.rejects(api('POST', '/api/projects', { path: '/nope/nope' }), (e) => e.status === 400);
+  await assert.rejects(api('GET', '/api/nothing-here'), (e) => e.status === 404);
+});
+
+test('the core refuses a state change whose body is not JSON text', async () => {
+  await assert.rejects(ctx.s.dispatch('PATCH', '/api/prefs', { not: 'text' }), (e) => e.status === 415);
+  await assert.rejects(ctx.s.dispatch('PATCH', '/api/prefs', '{bad'), (e) => e.status === 400);
+  await assert.rejects(ctx.s.dispatch('PATCH', '/api/prefs', JSON.stringify({ x: 'a'.repeat(1_100_000) })), (e) => e.status === 413);
 });

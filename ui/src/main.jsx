@@ -1,7 +1,7 @@
 import './styles.css';
 import { render } from 'preact';
 import { useEffect } from 'preact/hooks';
-import { connect, onState, bootKey } from './api.js';
+import { connect, onState, focusWindow } from './api.js';
 import { useStore, get, set, openModal, projectOf, taskOf, setView, toast } from './store.js';
 import { roomVars, isTyping, setFavicon, laneOf } from './util.js';
 import { undoBanner, select, visibleTasks, newTask, undoMessage } from './actions.js';
@@ -191,41 +191,20 @@ onState((prev, next) => {
 });
 
 onState((prev, next) => {
-  if (!prev.loaded || !('Notification' in window) || Notification.permission !== 'granted' || !document.hidden) return;
+  // A desktop window can sit unfocused behind other apps, or be closed to the Dock, without being "hidden".
+  if (!prev.loaded || !('Notification' in window) || Notification.permission !== 'granted' || document.hasFocus()) return;
   const before = Object.fromEntries(prev.tasks.map((t) => [t.id, t.state]));
   for (const t of next.tasks) {
     if (before[t.id] === t.state || !['needs_input', 'review'].includes(t.state)) continue;
     const p = next.projects.find((x) => x.id === t.projectId);
     const n = new Notification(`${p?.name || ''} · ${t.title}`, { body: t.state === 'review' ? `검토할 것 · ${t.summary || t.reason}` : `답할 것 · ${t.reason}`, tag: t.id });
     n.onclick = () => {
-      window.focus();
+      focusWindow();
       select(t.id);
       n.close();
     };
   }
 });
 
-function LoginNeeded() {
-  return (
-    <div style="height:100%;display:grid;place-items:center;text-align:center;padding:24px">
-      <div style="max-width:420px">
-        <h2 style="margin:0 0 8px;letter-spacing:-.02em">로그인이 필요해요</h2>
-        <p style="color:var(--muted);margin:0">
-          터미널에서 <kbd>agentdesk</kbd> 를 실행하면 이 브라우저에 새 로그인 링크가 열려요. 링크는 한 번만, 2분 동안 쓸 수 있어요.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function Root() {
-  const failed = useStore((s) => s.authFailed && !s.loaded);
-  return failed ? <LoginNeeded /> : <App />;
-}
-
-if (bootKey()) {
-  connect();
-  render(<Root />, document.getElementById('app'));
-} else {
-  render(<LoginNeeded />, document.getElementById('app'));
-}
+connect();
+render(<App />, document.getElementById('app'));

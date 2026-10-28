@@ -25,15 +25,15 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
  * each at `<prefix>`). File paths the UI sees are prefixed the same way.
  */
 export class Tasks {
-  constructor(store, auth, port, changed) {
+  constructor(store, auth, sock, changed) {
     this.store = store;
     this.auth = auth;
-    this.port = port;
+    this.sock = sock; // () => where the hook server listens
     this.changed = changed;
     /** id -> runtime { proc, term, ser, lastOut, lastIn, idleTimer, burst, burstAt, byHook, startedAt } */
     this.rt = new Map();
     this.trackers = new Map();
-    /** ws -> taskId */
+    /** peer (a window's connection) -> taskId */
     this.viewers = new Map();
     this.watchers = new Map();
     for (const t of store.tasks) {
@@ -301,12 +301,12 @@ export class Tasks {
     const bin = ad.bin();
     if (!bin) throw httpError(400, `${ad.label} CLI를 찾을 수 없어요`);
     const env = { ...process.env };
-    // Don't let a parent agent session leak into the child.
-    for (const k of Object.keys(env)) if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_SANDBOX|CODEX_THREAD)/.test(k)) delete env[k];
+    // Don't let a parent agent session or the app's own runtime leak into the child.
+    for (const k of Object.keys(env)) if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_SANDBOX|CODEX_THREAD|ELECTRON_|CHROME_)/.test(k)) delete env[k];
     Object.assign(env, {
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',
-      AGENTDESK_URL: `http://127.0.0.1:${this.port()}`,
+      AGENTDESK_SOCK: this.sock(),
       AGENTDESK_HOOK_TOKEN: this.auth.hookTokenFor(task.id),
       AGENTDESK_TASK: task.id,
     });

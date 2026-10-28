@@ -783,7 +783,7 @@ function Palette() {
       if (cur.agent === 'claude' && isLive(cur)) cmd('device-mobile', cur.remote ? `${curP?.name} · 폰 연결 끄기` : `${curP?.name} · 폰(Claude 앱)에서 이어하기`, () => setRemote(cur.id, !cur.remote));
     }
     if ('Notification' in window && Notification.permission !== 'granted')
-      cmd('bell', '알림 켜기 · 에이전트가 기다릴 때 알려줘요', () => Notification.requestPermission().then((r) => toast(r === 'granted' ? '알림을 켰어요' : '브라우저에서 알림이 막혀 있어요')));
+      cmd('bell', '알림 켜기 · 에이전트가 기다릴 때 알려줘요', () => Notification.requestPermission().then((r) => toast(r === 'granted' ? '알림을 켰어요' : '시스템 설정에서 Agent Desk 알림이 꺼져 있어요')));
     for (const p of s.projects) out.push({ kind: 'proj', p, label: `${p.name}에 새 작업`, run: () => newTask(p.id) });
     for (const t of s.tasks.filter((t) => !t.archived)) {
       const p = projectOf(s, t.projectId);
