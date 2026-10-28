@@ -1,6 +1,6 @@
 // Agent Desk's main process: the window, the app:// page, menus and lifecycle. The Desk itself
 // runs in a separate core process (core-host.js); this process only connects windows to it.
-import { app, BrowserWindow, Menu, MessageChannelMain, dialog, ipcMain, nativeTheme, net, protocol, session, shell, utilityProcess } from 'electron';
+import { app, BrowserWindow, Menu, MessageChannelMain, clipboard, dialog, ipcMain, nativeTheme, net, protocol, session, shell, utilityProcess } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -211,7 +211,8 @@ async function runApp() {
       if (isExternalAllowed(url)) shell.openExternal(url);
     });
     wc.on('did-finish-load', () => connectWindow(win));
-    wc.on('context-menu', (_e, params) => editMenu(params).popup({ window: win }));
+    // The page shows its own menus for tasks and terminals; this one is for text, links and images.
+    wc.on('context-menu', (_e, params) => contextMenu(params, wc)?.popup({ window: win }));
     win.once('ready-to-show', () => win.show());
     // Full screen hides the traffic lights: the top bar can use that space again.
     win.on('enter-full-screen', () => wc.send('desk:fullscreen', true));
@@ -246,6 +247,20 @@ async function runApp() {
 
   ipcMain.on('desk:focus', (e) => {
     if (isTrustedFrame(e.senderFrame)) showWindow();
+  });
+
+  // For the page's own menus. The page can write the clipboard but never read it: a paste goes
+  // into whatever has focus, the same as ⌘V.
+  ipcMain.on('desk:copy', (e, text) => {
+    if (isTrustedFrame(e.senderFrame) && typeof text === 'string' && text) clipboard.writeText(text.slice(0, 5_000_000));
+  });
+  const EDITS = new Set(['undo', 'redo', 'cut', 'copy', 'paste', 'selectAll']);
+  ipcMain.on('desk:edit', (e, cmd) => {
+    if (isTrustedFrame(e.senderFrame) && EDITS.has(cmd)) e.sender[cmd]();
+  });
+  // Selects the folder in Finder / Explorer; nothing is opened or run.
+  ipcMain.on('desk:reveal', (e, p) => {
+    if (isTrustedFrame(e.senderFrame) && typeof p === 'string' && path.isAbsolute(p) && fs.existsSync(p)) shell.showItemInFolder(p);
   });
 
   // ------------------------------------------------------------ updates (see updater.js)
@@ -289,15 +304,28 @@ async function runApp() {
 
   // ------------------------------------------------------------ menus
 
-  function editMenu(params) {
+  /** Only what applies where you clicked; nothing at all on plain page background. */
+  function contextMenu(params, wc) {
     const f = params.editFlags;
-    return Menu.buildFromTemplate([
-      { role: 'cut', label: '잘라내기', enabled: f.canCut },
-      { role: 'copy', label: '복사', enabled: f.canCopy },
-      { role: 'paste', label: '붙여넣기', enabled: f.canPaste },
-      { type: 'separator' },
-      { role: 'selectAll', label: '모두 선택', enabled: f.canSelectAll },
-    ]);
+    const sep = { type: 'separator' };
+    const items = [];
+    const link = params.linkURL && isExternalAllowed(params.linkURL) ? params.linkURL : '';
+    if (link) items.push({ label: '링크 열기', click: () => shell.openExternal(link) }, { label: '링크 주소 복사', click: () => clipboard.writeText(link) }, sep);
+    if (params.isEditable) {
+      items.push(
+        { role: 'undo', label: '실행 취소', enabled: f.canUndo },
+        { role: 'redo', label: '다시 실행', enabled: f.canRedo },
+        sep,
+        { role: 'cut', label: '잘라내기', enabled: f.canCut },
+        { role: 'copy', label: '복사', enabled: f.canCopy },
+        { role: 'paste', label: '붙여넣기', enabled: f.canPaste },
+        sep,
+        { role: 'selectAll', label: '모두 선택', enabled: f.canSelectAll },
+      );
+    } else if (params.selectionText.trim()) items.push({ role: 'copy', label: '복사' });
+    if (params.mediaType === 'image' && params.hasImageContents) items.push(sep, { label: '이미지 복사', click: () => wc.copyImageAt(params.x, params.y) });
+    const tidy = items.filter((it, i) => it !== sep || (i > 0 && items[i - 1] !== sep && i < items.length - 1));
+    return tidy.length ? Menu.buildFromTemplate(tidy) : null;
   }
 
   // The page sees keys before the menu does and already claims its own (⌘Z after a send), so the

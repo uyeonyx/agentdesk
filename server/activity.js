@@ -294,7 +294,7 @@ function codexRoot() {
 }
 
 /** Newest rollout file started after `since` whose session_meta cwd is this task's folder. */
-function findRollout(cwd, since) {
+export function findRollout(cwd, since) {
   const root = codexRoot();
   let realRoot;
   let realCwd;

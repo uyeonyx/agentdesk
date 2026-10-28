@@ -2,6 +2,7 @@
 // touching it: read its transcript as it grows and its status from Claude Code's session list.
 import fs from 'node:fs';
 import { liveStatus, claudeTranscriptOf } from './sessions.js';
+import { ActivityTracker } from './activity.js';
 
 const MAX_BACKLOG = 2_000_000;
 const ENTRIES = 300;
@@ -77,7 +78,7 @@ export class Watcher {
   read() {
     const w = this.task.watch;
     if (!this.file) {
-      this.file = w.agent === 'claude' ? claudeTranscriptOf(w.sessionId) : w.file && fs.existsSync(w.file) ? w.file : null;
+      this.file = w.file && fs.existsSync(w.file) ? w.file : w.agent === 'claude' ? claudeTranscriptOf(w.sessionId) : null;
       if (!this.file) return;
       try {
         const size = fs.statSync(this.file).size;
@@ -205,4 +206,12 @@ export class Watcher {
       if (e) e.st = 'ok';
     }
   }
+}
+
+/** A stopped task's conversation, read once from the end of its transcript file. */
+export function readHistory(agent, file, cwd) {
+  const scratch = { watch: { agent, file }, cwd };
+  const w = new Watcher(scratch, { tracker: new ActivityTracker(scratch, () => {}), onPrompt() {}, onStatus() {}, onReply() {} });
+  w.read();
+  return w.entries;
 }

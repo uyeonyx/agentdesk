@@ -219,6 +219,78 @@ test('an agent stuck on a permission gets its own lane above everything, in the 
   await call('POST', `/api/tasks/${t.id}/discard`);
 });
 
+test('right-click a row for its actions; a stopped session still shows what was said in it', async () => {
+  const repo = makeRepo(path.join(tmp, 'repo-menu'));
+  const call = (method, p, body) =>
+    page.evaluate(async ([m, p, b]) => JSON.parse((await window.desk.api(m, p, b === undefined ? undefined : JSON.stringify(b))).body || '{}'), [method, p, body]);
+  const task = async (id) => (await call('GET', '/api/state')).tasks.find((x) => x.id === id);
+  const proj = await call('POST', '/api/projects', { path: repo });
+  const t = await call('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'just answer: 지난 대화 확인' });
+  await expect.poll(async () => (await task(t.id))?.state, { timeout: 20_000 }).toBe('needs_input');
+  if (!(await page.locator('.inbox-list').isVisible())) await page.keyboard.press('b');
+  const row = page.locator('button.row', { hasText: t.title }).first();
+  await row.click();
+
+  const menu = page.locator('.menu.ctx');
+  await row.click({ button: 'right' });
+  await expect(menu).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(menu).toBeHidden();
+  await row.click({ button: 'right' });
+  for (const label of ['세션 중지', '작업 이름 바꾸기', '브랜치 이름 복사', '보관하기 · 나중에 이어서', '작업 버리기…']) await expect(menu.locator('.li', { hasText: label })).toBeVisible();
+  await page.screenshot({ path: path.join(tmp, 'row-menu.png'), animations: 'disabled' });
+  await menu.locator('.li', { hasText: '세션 중지' }).click();
+  await expect(menu).toBeHidden();
+  await expect.poll(async () => (await task(t.id))?.running).toBe(false);
+
+  // Not an empty terminal: the conversation it had, and the way back in.
+  const past = page.locator('.past.has');
+  await expect(past.locator('.wu')).toContainText('just answer: 지난 대화 확인');
+  await expect(past.locator('.wa')).toContainText('Answer: just answer: 지난 대화 확인');
+  await expect(past.getByRole('button', { name: /재개/ })).toBeVisible();
+  await page.screenshot({ path: path.join(tmp, 'past.png'), animations: 'disabled' });
+  await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('several rows at once: ⌘/Ctrl-click picks them, E puts them all away, the toast brings them back', async () => {
+  const repo = makeRepo(path.join(tmp, 'repo-pick'));
+  const call = (method, p, body) =>
+    page.evaluate(async ([m, p, b]) => JSON.parse((await window.desk.api(m, p, b === undefined ? undefined : JSON.stringify(b))).body || '{}'), [method, p, body]);
+  const task = async (id) => (await call('GET', '/api/state')).tasks.find((x) => x.id === id);
+  const proj = await call('POST', '/api/projects', { path: repo });
+  const ts = [];
+  for (const n of [1, 2]) ts.push(await call('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: `just answer: 한꺼번에 ${n}` }));
+  for (const t of ts) await expect.poll(async () => (await task(t.id))?.state, { timeout: 20_000 }).toBe('needs_input');
+  if (!(await page.locator('.inbox-list').isVisible())) await page.keyboard.press('b');
+  const rows = ts.map((t) => page.locator('button.row', { hasText: t.title }).first());
+
+  await rows[0].click();
+  await rows[1].click({ modifiers: [process.platform === 'darwin' ? 'Meta' : 'Control'] });
+  await expect(page.locator('.pickbar')).toContainText('2개 선택');
+  await expect(page.locator('button.row.picked')).toHaveCount(2);
+  await rows[1].click({ button: 'right' });
+  await expect(page.locator('.menu.ctx .li', { hasText: '2개 보관하기' })).toBeVisible();
+  await page.screenshot({ path: path.join(tmp, 'picked.png'), animations: 'disabled' });
+  await page.keyboard.press('Escape');
+
+  await page.keyboard.press('e');
+  for (const r of rows) await expect(r).toBeHidden();
+  await expect(page.locator('.pickbar')).toBeHidden();
+  for (const t of ts) expect((await task(t.id)).archived).toBe(true);
+  await page.locator('.toast', { hasText: '2개 보관했어요' }).getByRole('button', { name: '되돌리기' }).click();
+  for (const r of rows) await expect(r).toBeVisible();
+  for (const t of ts) expect((await task(t.id)).archived).toBe(false);
+
+  // One at a time: the button that shows on hover (a stopped one goes without asking).
+  await call('POST', `/api/tasks/${ts[0].id}/stop`);
+  await expect.poll(async () => (await task(ts[0].id))?.running).toBe(false);
+  await rows[0].hover();
+  await page.locator('.rowwrap', { has: rows[0] }).locator('.rowx').click();
+  await expect(rows[0]).toBeHidden();
+  expect((await task(ts[0].id)).archived).toBe(true);
+  for (const t of ts) await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
 test('no errors or CSP refusals in the page', () => {
   expect(problems).toEqual([]);
 });

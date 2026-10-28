@@ -5,6 +5,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { api, onTerm, wsSend, attachTerm, detachTerm } from '../api.js';
 import { set, toast } from '../store.js';
 import { I } from './bits.jsx';
+import { openMenu, termItems } from './Menu.jsx';
 
 export let focusShell = () => {};
 export const toggleShellKey = (e) => e.ctrlKey && !e.metaKey && !e.altKey && (e.code === 'Backquote' || e.key === '`');
@@ -115,7 +116,7 @@ export function ShellPane({ task, height }) {
         </button>
       </div>
       <div class="shell-body">
-        <div class="term-host" ref={host} />
+        <div class="term-host" ref={host} onContextMenu={(e) => st.current.term && openMenu(e, termItems(st.current.term))} />
         {exited && (
           <div class="overlay-msg">
             <div>

@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useStore, get, set, setView, openModal, projectOf, taskOf } from '../store.js';
 import { roomVars, ago, mod, undoKey, progressOf, SOURCE_LABEL } from '../util.js';
-import { undoBanner, dismissBanner, resume, stop, archive, archiveAsk, undoMessage, newTask, setRemote } from '../actions.js';
+import { undoBanner, dismissBanner, undoMessage, newTask, archive } from '../actions.js';
 import { Glyph, I } from './bits.jsx';
-import { vscodeLink } from '../util.js';
 import { TerminalView } from './Terminal.jsx';
 import { Composer } from './Composer.jsx';
 import { TermBar } from './TermBar.jsx';
@@ -13,6 +12,7 @@ import { ShellPane } from './Shell.jsx';
 import { Review } from './Review.jsx';
 import { Files } from './Files.jsx';
 import { AddProjectBody } from './Modals.jsx';
+import { MenuItems, taskItems } from './Menu.jsx';
 
 const VIEWS = [
   { key: 'chat', label: '대화', icon: 'terminal-2' },
@@ -205,7 +205,7 @@ function Room({ task, project }) {
               <button class="btn ghost sm icon" onClick={() => setMenu((m) => !m)} aria-label="더보기" aria-expanded={menu}>
                 <I n="dots" />
               </button>
-              {menu && <RoomMenu task={task} project={project} close={() => setMenu(false)} />}
+              {menu && <RoomMenu task={task} close={() => setMenu(false)} />}
             </div>
           </div>
         </header>
@@ -291,52 +291,15 @@ export function Banner({ banner, project, floating, inline }) {
   );
 }
 
-function RoomMenu({ task, project, close }) {
+function RoomMenu({ task, close }) {
   useEffect(() => {
     const h = (e) => !e.target.closest?.('.menu') && close();
     setTimeout(() => window.addEventListener('mousedown', h), 0);
     return () => window.removeEventListener('mousedown', h);
   }, []);
-  const item = (icon, label, run, danger) => (
-    <button
-      class="li"
-      style={danger ? 'color:var(--danger)' : ''}
-      onClick={() => {
-        close();
-        run();
-      }}
-    >
-      <I n={icon} style={danger ? 'color:var(--danger)' : ''} />
-      <span class="m">{label}</span>
-      <span />
-    </button>
-  );
-  const live = !['merged', 'discarded'].includes(task.state);
   return (
     <div class="menu" role="menu">
-      {live && !task.watching && (task.running ? item('player-stop', '세션 중지', () => stop(task.id)) : item('player-play', '세션 재개', () => resume(task.id)))}
-      {live && task.watching?.status === 'gone' && item('player-play', '여기서 이어가기', () => resume(task.id))}
-      {live && task.agent === 'claude' && !task.watching && (task.remote ? item('device-mobile-off', '폰 연결 끄기', () => setRemote(task.id, false)) : item('device-mobile', '폰(Claude 앱)에서 이어하기', () => setRemote(task.id, true)))}
-      {task.remoteUrl && (
-        <a class="li" href={task.remoteUrl} target="_blank" rel="noopener noreferrer" onClick={close}>
-          <I n="external-link" />
-          <span class="m">claude.ai에서 이 세션 열기</span>
-          <span />
-        </a>
-      )}
-      {item('pencil', '작업 이름 바꾸기', () => openModal('rename', { taskId: task.id }))}
-      {item('settings', `${project.name} 설정`, () => openModal('project', { id: project.id }))}
-      {task.worktreeAbs && (
-        <a class="li" href={vscodeLink(task.worktreeAbs)} onClick={close}>
-          <I n="external-link" />
-          <span class="m">{task.adopted ? 'VS Code에서 폴더 열기' : 'VS Code에서 worktree 열기'}</span>
-          <span />
-        </a>
-      )}
-      <hr />
-      {live && item('archive', '보관하기 · 나중에 이어서', () => archiveAsk(task.id))}
-      {live && (task.adopted ? item('logout', '목록에서 빼기 (파일은 그대로)', () => openModal('discard', { taskId: task.id })) : item('trash', '작업 버리기', () => openModal('discard', { taskId: task.id }), true))}
-      {!live && item('archive', '목록에서 치우기', () => archive(task.id))}
+      <MenuItems items={taskItems(task)} close={close} />
     </div>
   );
 }

@@ -1,14 +1,21 @@
 import { useEffect, useRef } from 'preact/hooks';
-import { useStore, set, projectOf } from '../store.js';
-import { LANES, laneOf, iconOf, ago, roomVars, progressOf } from '../util.js';
-import { select, visibleTasks, newTask, shelved } from '../actions.js';
+import { useStore, get, set, projectOf } from '../store.js';
+import { LANES, laneOf, iconOf, ago, roomVars, progressOf, isMac } from '../util.js';
+import { select, visibleTasks, newTask, shelved, archive, archiveAsk, archiveMany, resumeMany, togglePick, pickRange, clearPicks } from '../actions.js';
 import { Glyph, I, Spinner } from './bits.jsx';
 import { ShelfButton } from './Board.jsx';
+import { openMenu, taskItems, pickedItems } from './Menu.jsx';
+
+// Lanes you clear out once you've looked: they get a "put all away" button on hover.
+const CLEANUP = new Set(['review', 'paused', 'done']);
 
 export function Inbox() {
-  const s = useStore((s) => ({ tasks: s.tasks, projects: s.projects, filter: s.filter, selected: s.selected, collapsed: s.collapsed, loaded: s.loaded }));
+  const s = useStore((s) => ({ tasks: s.tasks, projects: s.projects, filter: s.filter, selected: s.selected, collapsed: s.collapsed, loaded: s.loaded, picked: s.picked }));
   const list = visibleTasks(s);
   const groups = LANES.map((l) => ({ ...l, items: list.filter((t) => laneOf(t) === l.key) })).filter((g) => g.items.length);
+  // Shift-click ranges follow the rows as shown, skipping folded lanes.
+  const order = groups.filter((g) => !s.collapsed[g.key]).flatMap((g) => g.items.map((t) => t.id));
+  const picked = list.filter((t) => s.picked.includes(t.id));
   const selRef = useRef();
   useEffect(() => selRef.current?.scrollIntoView({ block: 'nearest' }), [s.selected]);
 
@@ -16,6 +23,7 @@ export function Inbox() {
 
   return (
     <aside class="inbox" aria-label="작업 목록">
+      {picked.length > 0 && <PickBar tasks={picked} />}
       <div class="inbox-list scroll">
         {s.loaded && !list.length && (
           <div class="empty">
@@ -36,17 +44,27 @@ export function Inbox() {
         )}
         {groups.map((g) => {
           const closed = !!s.collapsed[g.key];
+          const lane = { title: g.title, ids: g.items.map((t) => t.id) };
+          const all = { icon: 'archive', label: `${g.items.length}개 모두 보관`, run: () => archiveMany(lane.ids) };
+          const fold = { icon: closed ? 'chevron-down' : 'chevron-up', label: closed ? '펼치기' : '접기', run: () => toggle(g.key) };
           return (
             <section key={g.key} aria-label={g.title}>
-              <button class={`lane-h ${closed ? 'closed' : ''} ${g.key === 'blocked' ? 'hot' : ''}`} onClick={() => toggle(g.key)} aria-expanded={!closed}>
-                <I n="chevron-down" />
-                {g.title} <span class="n">{g.items.length}</span>
-              </button>
+              <div class="lane-hd" onContextMenu={(e) => openMenu(e, [all, '-', fold])}>
+                <button class={`lane-h ${closed ? 'closed' : ''} ${g.key === 'blocked' ? 'hot' : ''}`} onClick={() => toggle(g.key)} aria-expanded={!closed}>
+                  <I n="chevron-down" />
+                  {g.title} <span class="n">{g.items.length}</span>
+                </button>
+                {CLEANUP.has(g.key) && (
+                  <button class="lane-x" onClick={all.run} title={`'${g.title}' ${g.items.length}개를 모두 보관함으로 옮겨요`}>
+                    <I n="archive" /> 모두 보관
+                  </button>
+                )}
+              </div>
               {!closed &&
                 g.items.map((t) => {
                   const p = projectOf(s, t.projectId);
                   const sel = t.id === s.selected;
-                  return <Row key={t.id} t={t} p={p} sel={sel} refEl={sel ? selRef : undefined} />;
+                  return <Row key={t.id} t={t} p={p} sel={sel} picked={s.picked.includes(t.id)} refEl={sel ? selRef : undefined} lane={lane} order={order} />;
                 })}
             </section>
           );
@@ -57,57 +75,101 @@ export function Inbox() {
   );
 }
 
-function Row({ t, p, sel, refEl }) {
+/** Shown while rows are picked: what can be done to all of them. */
+function PickBar({ tasks }) {
+  const stopped = tasks.filter((t) => !t.running && t.state === 'exited' && !t.watching);
+  return (
+    <div class="pickbar" role="toolbar" aria-label="선택한 작업">
+      <span class="n">
+        <I n="checks" /> {tasks.length}개 선택
+      </span>
+      <span class="sp" />
+      {stopped.length > 0 && (
+        <button class="btn sm" onClick={() => resumeMany(stopped.map((t) => t.id))} title={`멈춘 ${stopped.length}개를 재개해요`}>
+          <I n="player-play" /> 재개
+        </button>
+      )}
+      <button class="btn sm" onClick={() => archiveMany(tasks.map((t) => t.id))}>
+        <I n="archive" /> 보관 <kbd>E</kbd>
+      </button>
+      <button class="btn ghost sm icon" onClick={clearPicks} title="선택 해제 (Esc)" aria-label="선택 해제">
+        <I n="x" />
+      </button>
+    </div>
+  );
+}
+
+function Row({ t, p, sel, picked, refEl, lane, order }) {
   const icon = iconOf(t);
   const line = t.state === 'review' && t.summary ? t.summary : t.reason || t.summary || '';
   const done = t.state === 'merged' || t.state === 'discarded';
   const pr = progressOf(t);
   const working = t.state === 'working' || t.state === 'starting';
   const showAct = !done && (pr.running > 0 || pr.total > 0 || (working && pr.current));
+  const click = (e) => {
+    if (e.shiftKey) return pickRange(t.id, order);
+    if (isMac ? e.metaKey : e.ctrlKey) return togglePick(t.id);
+    clearPicks();
+    select(t.id);
+  };
+  const menu = (e) => {
+    const ids = get().picked;
+    openMenu(e, ids.length > 1 && ids.includes(t.id) ? pickedItems(ids) : taskItems(t, { lane }));
+  };
   return (
-    <button ref={refEl} class={`row ${sel ? 'sel' : ''} ${done ? 'done' : ''} ${t.ask ? 'blocked' : ''}`} style={roomVars(p?.color)} onClick={() => select(t.id)} aria-current={sel ? 'true' : undefined}>
-      <Glyph project={p} />
-      <span style="min-width:0">
-        <div class="t">
-          {t.remote && <I n="device-mobile" class="rm" />}
-          {t.watching && <span class="where">{t.watching.where}</span>}
-          {t.title}
-        </div>
-        <div class="s">
-          <b>{p?.name || '?'}</b> {line}
-        </div>
-        {showAct && (
-          <div class="act">
-            {pr.total > 0 && (
-              <span class="pl" title={pr.doing?.text || ''}>
-                <span class="bar">
-                  <i style={{ width: `${(pr.done / pr.total) * 100}%` }} />
-                </span>
-                {pr.done}/{pr.total}
-              </span>
-            )}
-            {pr.running > 0 && (
-              <span class="sa">
-                <I n="users" /> 서브 {pr.running}
-              </span>
-            )}
-            {working && pr.current && <span class="cur">{pr.current}</span>}
-          </div>
-        )}
-      </span>
-      <span class="meta">
-        <span class="st" title={t.state}>
-          {icon ? <I n={icon} /> : <Spinner />}
-        </span>
-        {t.state === 'review' && t.changes.files > 0 ? (
-          <span class="stat">
-            <span class="a">+{t.changes.adds}</span>
-            <span class="d">−{t.changes.dels}</span>
+    <div class="rowwrap" onContextMenu={menu}>
+      <button ref={refEl} class={`row ${sel ? 'sel' : ''} ${picked ? 'picked' : ''} ${done ? 'done' : ''} ${t.ask ? 'blocked' : ''}`} style={roomVars(p?.color)} onClick={click} aria-current={sel ? 'true' : undefined} aria-pressed={picked ? 'true' : undefined}>
+        <Glyph project={p} />
+        {picked && (
+          <span class="pk">
+            <I n="check" />
           </span>
-        ) : (
-          <span>{ago(t.updatedAt)}</span>
         )}
-      </span>
-    </button>
+        <span style="min-width:0">
+          <div class="t">
+            {t.remote && <I n="device-mobile" class="rm" />}
+            {t.watching && <span class="where">{t.watching.where}</span>}
+            {t.title}
+          </div>
+          <div class="s">
+            <b>{p?.name || '?'}</b> {line}
+          </div>
+          {showAct && (
+            <div class="act">
+              {pr.total > 0 && (
+                <span class="pl" title={pr.doing?.text || ''}>
+                  <span class="bar">
+                    <i style={{ width: `${(pr.done / pr.total) * 100}%` }} />
+                  </span>
+                  {pr.done}/{pr.total}
+                </span>
+              )}
+              {pr.running > 0 && (
+                <span class="sa">
+                  <I n="users" /> 서브 {pr.running}
+                </span>
+              )}
+              {working && pr.current && <span class="cur">{pr.current}</span>}
+            </div>
+          )}
+        </span>
+        <span class="meta">
+          <span class="st" title={t.state}>
+            {icon ? <I n={icon} /> : <Spinner />}
+          </span>
+          {t.state === 'review' && t.changes.files > 0 ? (
+            <span class="stat">
+              <span class="a">+{t.changes.adds}</span>
+              <span class="d">−{t.changes.dels}</span>
+            </span>
+          ) : (
+            <span>{ago(t.updatedAt)}</span>
+          )}
+        </span>
+      </button>
+      <button class="rowx" onClick={() => (done ? archive(t.id) : archiveAsk(t.id))} title={done ? '목록에서 치우기 (E)' : '보관하기 (E) · 보관함에서 꺼내면 같은 대화로 이어가요'} aria-label={`${t.title} 보관하기`}>
+        <I n="archive" />
+      </button>
+    </div>
   );
 }

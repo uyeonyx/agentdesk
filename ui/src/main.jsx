@@ -4,13 +4,14 @@ import { useEffect } from 'preact/hooks';
 import { connect, onState, focusWindow, watchUpdates } from './api.js';
 import { useStore, get, set, openModal, projectOf, taskOf, setView, toast } from './store.js';
 import { roomVars, isTyping, setFavicon, laneOf, ASK } from './util.js';
-import { undoBanner, select, visibleTasks, newTask, undoMessage, archiveAsk } from './actions.js';
+import { undoBanner, select, visibleTasks, newTask, undoMessage, archiveAsk, archiveMany, clearPicks } from './actions.js';
 import { isUndoKey } from './components/Terminal.jsx';
 import { Board } from './components/Board.jsx';
 import { Topbar } from './components/Topbar.jsx';
 import { Inbox } from './components/Inbox.jsx';
 import { RoomArea } from './components/Room.jsx';
 import { ModalHost } from './components/Modals.jsx';
+import { ContextMenu } from './components/Menu.jsx';
 import { Glyph, I } from './components/bits.jsx';
 import { focusInput as focusComposer } from './focus.js';
 
@@ -84,6 +85,7 @@ function App() {
       )}
       <ModalHost />
       <Toasts />
+      <ContextMenu />
     </div>
   );
 }
@@ -93,9 +95,14 @@ function App() {
 window.addEventListener('keydown', (e) => {
   const s = get();
   const mod = e.metaKey || e.ctrlKey;
-  if (s.modal) return; // modals own the keyboard
+  if (s.modal || s.ctx) return; // modals and an open menu own the keyboard
 
   const inTerm = !!document.activeElement?.closest?.('.xterm');
+  if (e.key === 'Escape' && s.picked.length && !inTerm && !isTyping()) {
+    e.preventDefault();
+    clearPicks();
+    return;
+  }
   if (e.key === 'Escape' && s.banner && !inTerm && !isTyping()) {
     e.preventDefault();
     undoBanner();
@@ -157,9 +164,10 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'n' || e.key === 'N' || e.key === 'ㅜ') {
     e.preventDefault();
     newTask();
-  } else if ((e.key === 'e' || e.key === 'E' || e.key === 'ㄷ') && s.selected) {
+  } else if ((e.key === 'e' || e.key === 'E' || e.key === 'ㄷ') && (s.picked.length || s.selected)) {
     e.preventDefault();
-    archiveAsk(s.selected);
+    if (s.picked.length) archiveMany(s.picked);
+    else archiveAsk(s.selected);
   } else if (e.key === '/') {
     e.preventDefault();
     openModal('palette');

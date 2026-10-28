@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api, updateAction } from '../api.js';
 import { useStore, get, set, closeModal, openModal, toast, projectOf, taskOf, setView } from '../store.js';
-import { roomVars, mod, fuzzyFilter, isLive, ago } from '../util.js';
-import { createTask, merge, pr, discard, archive, archiveAsk, restore, shelved, newTask, visibleTasks, select, openFileInTask, importSession, setRemote } from '../actions.js';
+import { roomVars, mod, fuzzyFilter, isLive, isBusy, ago } from '../util.js';
+import { createTask, merge, pr, discard, archive, archiveAsk, archiveMany, restore, shelved, newTask, visibleTasks, select, openFileInTask, importSession, setRemote } from '../actions.js';
 import { Glyph, I, Modal, Toggle, useAutoFocus } from './bits.jsx';
 import { loadFiles } from './Files.jsx';
 import { focusInput as focusComposer } from '../focus.js';
@@ -24,7 +24,7 @@ export function ModalHost() {
     case 'discard':
       return <ConfirmDiscard taskId={m.taskId} />;
     case 'archive':
-      return <ConfirmArchive taskId={m.taskId} />;
+      return m.taskIds ? <ConfirmArchiveMany ids={m.taskIds} /> : <ConfirmArchive taskId={m.taskId} />;
     case 'shelf':
       return <Shelf />;
     case 'rename':
@@ -750,6 +750,56 @@ function ConfirmArchive({ taskId }) {
         {t.state === 'waiting' ? '에이전트가 백그라운드 작업을 기다리고 있어요. 보관하면 그 작업도 함께 멈춰요.' : '에이전트가 아직 작업 중이에요. 보관하면 지금 하던 일을 멈춰요.'} worktree·브랜치·대화는 그대로라 보관함에서 꺼내면 같은 대화로 이어서 시킬 수 있어요.
       </p>
     </Confirm>
+  );
+}
+
+/** Several at once (picked rows, a whole lane) and some of them are still working. */
+function ConfirmArchiveMany({ ids }) {
+  const s = useStore((s) => ({ tasks: s.tasks, projects: s.projects }));
+  const ts = ids.map((id) => s.tasks.find((t) => t.id === id)).filter(Boolean);
+  const busy = ts.filter((t) => t.running && isBusy(t));
+  const go = async () => {
+    closeModal();
+    await archiveMany(ids, { confirmed: true });
+  };
+  useEffect(() => {
+    const h = (e) => e.key === 'Enter' && (e.preventDefault(), go());
+    window.addEventListener('keydown', h);
+    return () => window.removeEventListener('keydown', h);
+  });
+  return (
+    <Modal>
+      <div class="modal-h">
+        <div style="min-width:0;flex:1">
+          <h2>{ts.length}개 보관하기</h2>
+          <div class="sub">그중 {busy.length}개는 에이전트가 아직 작업 중이에요</div>
+        </div>
+      </div>
+      <div class="modal-b" style="padding-top:14px;font-size:14px;line-height:1.65">
+        <ul class="arch-list">
+          {busy.map((t) => {
+            const p = projectOf(s, t.projectId);
+            return (
+              <li key={t.id} style={roomVars(p?.color)}>
+                <Glyph project={p} size={20} />
+                <span class="m">{t.title}</span>
+                <span class="dim">{t.state === 'waiting' ? '백그라운드 대기 중' : '작업 중'}</span>
+              </li>
+            );
+          })}
+        </ul>
+        <p style="margin:10px 0 0;color:var(--muted)">보관하면 하던 일을 멈춰요. worktree·브랜치·대화는 그대로라 보관함에서 꺼내면 같은 대화로 이어서 시킬 수 있어요.</p>
+      </div>
+      <div class="modal-f">
+        <span class="sp" />
+        <button class="btn ghost" onClick={closeModal}>
+          취소
+        </button>
+        <button class="btn primary" onClick={go}>
+          <I n="archive" /> 멈추고 모두 보관 <kbd>↵</kbd>
+        </button>
+      </div>
+    </Modal>
   );
 }
 

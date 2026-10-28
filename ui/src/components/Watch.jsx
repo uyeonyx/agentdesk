@@ -51,24 +51,74 @@ export function WatchView({ task, visible }) {
         }}
       >
         {!data.entries.length && <div class="wnone">대화 기록을 읽는 중이에요…</div>}
-        {data.entries.map((e) =>
-          e.role === 'user' ? (
-            <div key={e.id} class="wu">
-              <span class="who">{task.watching?.where || '다른 곳'}에서 보낸 지시 · {ago(e.at)} 전</span>
-              <p>{e.text}</p>
-            </div>
-          ) : e.role === 'assistant' ? (
-            <div key={e.id} class="wa">
-              <p>{e.text}</p>
-            </div>
-          ) : (
-            <div key={e.id} class={`wt ${e.st}`}>
-              <I n={FEED_ICON[e.kind] || 'tool'} />
-              <span>{e.text}</span>
-              {e.st === 'run' ? <Spinner /> : e.st === 'err' ? <I n="x" /> : null}
-            </div>
-          )
-        )}
+        <LogEntries entries={data.entries} who={`${task.watching?.where || '다른 곳'}에서 보낸 지시`} />
+      </div>
+    </div>
+  );
+}
+
+function LogEntries({ entries, who, stopped }) {
+  return entries.map((e) =>
+    e.role === 'user' ? (
+      <div key={e.id} class="wu">
+        <span class="who">
+          {who} · {ago(e.at)} 전
+        </span>
+        <p>{e.text}</p>
+      </div>
+    ) : e.role === 'assistant' ? (
+      <div key={e.id} class="wa">
+        <p>{e.text}</p>
+      </div>
+    ) : (
+      // A tool still "running" when the session ended never finished: no spinner for it.
+      <div key={e.id} class={`wt ${stopped && e.st === 'run' ? '' : e.st}`}>
+        <I n={FEED_ICON[e.kind] || 'tool'} />
+        <span>{e.text}</span>
+        {e.st === 'run' && !stopped ? <Spinner /> : e.st === 'err' ? <I n="x" /> : null}
+      </div>
+    )
+  );
+}
+
+/** A stopped session: what was said in it (from the agent's own transcript), and the way back in. */
+export function PastSession({ task }) {
+  const [entries, setEntries] = useState(null);
+  const box = useRef();
+  useEffect(() => {
+    let alive = true;
+    api('GET', `/api/tasks/${task.id}/transcript`).then(
+      (r) => alive && setEntries(r.entries || []),
+      () => alive && setEntries([])
+    );
+    return () => {
+      alive = false;
+    };
+  }, [task.id, task.updatedAt]);
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [entries]);
+  const resumeCmd = task.agent === 'codex' ? 'codex resume --last' : 'claude --continue';
+  const has = entries?.length > 0;
+  return (
+    <div class={`past ${has ? 'has' : ''}`}>
+      {has && (
+        <div class="past-log scroll" ref={box}>
+          <div class="past-note">
+            <I n="history" /> 지난 대화 · 읽기만 할 수 있어요
+          </div>
+          <LogEntries entries={entries} who="보낸 지시" stopped />
+        </div>
+      )}
+      <div class="past-bar">
+        <div class="tx">
+          <h3>세션이 멈춰 있어요</h3>
+          <p>{task.reason || '에이전트 프로세스가 끝났어요 · 재개할 수 있어요'}</p>
+        </div>
+        <button class="btn primary" onClick={() => resume(task.id)} title="같은 작업 폴더에서 이 대화를 이어가요">
+          <I n="player-play" /> 재개 <span class="cmd">{resumeCmd}</span>
+        </button>
       </div>
     </div>
   );

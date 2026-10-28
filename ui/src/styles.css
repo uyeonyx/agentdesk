@@ -177,6 +177,44 @@ body:has(.scrim) .topbar { -webkit-app-region: no-drag; }
 .lane-h .n { color: var(--faint); font-weight: 550; }
 .lane-h .ti { font-size: 14px; color: var(--faint); transition: transform 0.15s var(--ease); }
 .lane-h.closed .ti-chevron-down { transform: rotate(-90deg); }
+/* Lane header: folds on click; lanes you clear out offer "모두 보관" on hover. */
+.lane-hd { display: flex; align-items: flex-end; gap: 6px; }
+.lane-hd .lane-h { flex: 1; min-width: 0; }
+.lane-x {
+  display: inline-flex; align-items: center; gap: 4px; flex: none;
+  margin: 0 2px 3px 0; padding: 2px 7px; border-radius: 6px; border: 0; background: none;
+  font-size: 11.5px; font-weight: 600; color: var(--faint); opacity: 0; transition: opacity 0.12s;
+}
+.lane-x .ti { font-size: 13px; }
+.lane-hd:hover .lane-x, .lane-x:focus-visible { opacity: 1; }
+.lane-x:hover { color: var(--text); background: var(--hover); }
+/* Picked rows (⌘/Ctrl or Shift click) and the bar that acts on them. */
+.pickbar {
+  display: flex; align-items: center; gap: 6px; flex: none;
+  margin: 8px 8px 0; padding: 6px 6px 6px 10px; border-radius: var(--r);
+  background: var(--raised); border: 1px solid var(--line-strong);
+  font-size: 12.5px; font-weight: 650;
+}
+.pickbar .n { display: inline-flex; align-items: center; gap: 5px; }
+.pickbar .sp { flex: 1; }
+.pickbar kbd { font-size: 10.5px; margin-left: 2px; }
+.rowwrap { position: relative; }
+.row.picked { background: var(--hover); border-color: var(--line-strong); }
+.row .pk {
+  position: absolute; left: 4px; top: 4px; width: 17px; height: 17px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--text); color: var(--bg); font-size: 11px;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+/* Hover a row: put it away in one click (E with the keyboard). */
+.rowx {
+  position: absolute; right: 8px; bottom: 8px; width: 26px; height: 26px;
+  display: grid; place-items: center; border-radius: 7px;
+  border: 1px solid var(--line-strong); background: var(--raised); color: var(--muted);
+  font-size: 15px; opacity: 0; pointer-events: none; transition: opacity 0.1s;
+}
+.rowwrap:hover .rowx, .rowx:focus-visible { opacity: 1; pointer-events: auto; }
+.rowwrap:hover .row .meta > :last-child { visibility: hidden; }
+.rowx:hover { color: var(--text); background: var(--hover); }
 /* 보관함 sits under the lanes, quieter than them. */
 .shelf-link {
   display: flex; align-items: center; gap: 8px; width: 100%;
@@ -285,6 +323,19 @@ body:has(.scrim) .topbar { -webkit-app-region: no-drag; }
 }
 .overlay-msg > div { text-align: center; max-width: 360px; }
 .overlay-msg p { color: var(--muted); margin: 6px 0 16px; }
+/* A stopped session: its past conversation above, the way back in below. */
+.past { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; justify-content: center; background: rgba(26, 28, 33, 0.72); backdrop-filter: blur(2px); }
+.past.has { justify-content: flex-end; background: var(--bg); backdrop-filter: none; }
+.past-log { flex: 1; min-height: 0; padding: 18px 22px 24px; display: flex; flex-direction: column; gap: 10px; }
+.past-note { align-self: center; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--faint); margin-bottom: 4px; }
+.past-bar { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 20px; }
+.past-bar h3 { margin: 0; }
+.past-bar p { color: var(--muted); margin: 6px auto 0; max-width: 360px; }
+.past-bar .cmd { opacity: 0.7; font-weight: 500; font-family: var(--mono); font-size: 11.5px; }
+.past.has .past-bar { flex-direction: row; text-align: left; gap: 16px; padding: 12px 18px; border-top: 1px solid var(--line); background: var(--panel); }
+.past.has .past-bar .tx { flex: 1; min-width: 0; }
+.past.has .past-bar h3 { font-size: 14px; }
+.past.has .past-bar p { margin: 2px 0 0; max-width: none; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ------------------------------------------------------------ composer */
 
@@ -507,6 +558,14 @@ textarea.input { height: auto; padding: 10px 12px; line-height: 1.55; resize: no
 .menu { position: absolute; z-index: 50; right: 0; top: calc(100% + 6px); min-width: 220px; background: var(--raised); border: 1px solid var(--line-strong); border-radius: 12px; padding: 5px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45); }
 .menu .li { padding: 7px 9px; }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
+.menu .li kbd { font-size: 11px; color: var(--faint); background: none; border: 0; padding: 0; }
+.menu .li:focus-visible { outline: none; background: var(--hover); }
+.menu .li[disabled] { opacity: 0.4; pointer-events: none; }
+.menu .li.danger, .menu .li.danger .ti { color: var(--danger); }
+/* A right-click menu: at the pointer, above everything, scrolling if the window is short. */
+.menu.ctx { position: fixed; z-index: 300; right: auto; top: 0; left: 0; min-width: 236px; max-height: calc(100vh - 12px); overflow-y: auto; outline: none; animation: pop 0.08s var(--ease); }
+@keyframes pop { from { opacity: 0; transform: scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .menu.ctx { animation: none; } }
 .rel { position: relative; }
 
 .history { position: absolute; z-index: 40; right: 14px; top: 8px; width: min(420px, calc(100% - 28px)); max-height: 70%; background: var(--raised); border: 1px solid var(--room-line); border-radius: 14px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45); display: flex; flex-direction: column; }
@@ -858,3 +917,9 @@ textarea.input { height: auto; padding: 10px 12px; line-height: 1.55; resize: no
 .cmdchip .ti { color: var(--room-text); flex: none; }
 .cmdchip code { font-family: var(--mono); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 @media (max-width: 860px) { .shell-pane { max-height: 45%; } }
+
+/* 보관하기 several at once: the ones still working, listed. */
+.arch-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.arch-list li { display: flex; align-items: center; gap: 8px; font-size: 13.5px; }
+.arch-list .m { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.arch-list .dim { color: var(--faint); font-size: 12px; flex: none; }

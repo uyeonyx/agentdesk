@@ -127,6 +127,19 @@ test('stop and resume keep the same worktree', async () => {
   assert.equal(sent.status, 200);
 });
 
+test('a stopped session still shows what was said in it, for both agents', async () => {
+  for (const agent of ['claude', 'codex']) {
+    const t = (await ctx.api('POST', '/api/tasks', { projectId: proj.id, agent, prompt: `just answer: ${agent} 지난 대화` })).json;
+    await ctx.waitTask(t.id, (x) => x.state === 'needs_input');
+    await ctx.api('POST', `/api/tasks/${t.id}/stop`);
+    await ctx.waitTask(t.id, (x) => !x.running);
+    const { entries } = (await ctx.api('GET', `/api/tasks/${t.id}/transcript`)).json;
+    const said = entries.filter((e) => e.role !== 'tool').map((e) => `${e.role}: ${e.text}`);
+    assert.deepEqual(said, [`user: just answer: ${agent} 지난 대화`, `assistant: Answer: just answer: ${agent} 지난 대화`], agent);
+    await ctx.api('POST', `/api/tasks/${t.id}/discard`);
+  }
+});
+
 test('archive puts even a running task away without deleting anything; taking it out resumes the same conversation', async () => {
   const t = (await ctx.api('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'create notes/later.md 나중에 볼 메모' })).json;
   const x = await ctx.waitTask(t.id, (x) => x.state === 'review' && x.running);

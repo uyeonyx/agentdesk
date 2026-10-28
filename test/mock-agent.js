@@ -153,6 +153,7 @@ function finish(text) {
     reply = `${file}를 업데이트했어요. ${text.replace(/^create \S+\s*/, '')} 반영 완료.`;
   }
   fs.appendFileSync(transcriptPath(), JSON.stringify({ type: 'assistant', cwd: process.cwd(), sessionId: sid, message: { content: [{ type: 'text', text: reply }] } }) + '\n');
+  codexLog({ type: 'event_msg', timestamp: new Date().toISOString(), payload: { type: 'agent_message', message: reply } });
   W(`\r\x1b[2K\x1b[32m⏺\x1b[0m ${reply}\r\n\r\n> `);
   if (/background|백그라운드/i.test(text) && kind === 'claude') {
     // Like a build left running with run_in_background: the turn ends, then its finish wakes Claude.
@@ -180,6 +181,9 @@ function work(text) {
     return;
   }
   hook('UserPromptSubmit', { prompt: text });
+  // Both agents keep the conversation on disk, prompt and reply, the way the real ones do.
+  if (kind === 'claude') fs.appendFileSync(transcriptPath(), JSON.stringify({ type: 'user', cwd: process.cwd(), sessionId: sid, timestamp: new Date().toISOString(), message: { role: 'user', content: text } }) + '\n');
+  codexLog({ type: 'event_msg', timestamp: new Date().toISOString(), payload: { type: 'user_message', message: text } });
   W(`\r\n\x1b[36m⏺\x1b[0m ${text}\r\n`);
   if (/plan|계획/i.test(text)) {
     const todos = [

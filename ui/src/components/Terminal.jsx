@@ -5,9 +5,10 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { onTerm, wsSend, attachTerm } from '../api.js';
 import { mix, isMac } from '../util.js';
 import { get, set } from '../store.js';
-import { resume, showBanner, undoBanner } from '../actions.js';
+import { showBanner, undoBanner } from '../actions.js';
 import { toggleShellKey } from './Shell.jsx';
-import { I } from './bits.jsx';
+import { PastSession } from './Watch.jsx';
+import { openMenu, termItems } from './Menu.jsx';
 
 const BASE_THEME = {
   background: '#1a1c21',
@@ -163,21 +164,15 @@ export function TerminalView({ task, project, visible }) {
   }, [visible]);
 
   const stopped = task && !task.running && ['exited', 'needs_input', 'review', 'working', 'starting', 'waiting'].includes(task.state);
-  const resumeCmd = task?.agent === 'codex' ? 'codex resume --last' : 'claude --continue';
   return (
     <div class="room-body" style={{ display: visible ? 'block' : 'none' }}>
-      <div class="term-host" ref={host} onMouseDown={() => setTimeout(() => st.current.term?.focus(), 0)} />
-      {stopped && (
-        <div class="overlay-msg">
-          <div>
-            <h3 style="margin:0">세션이 멈춰 있어요</h3>
-            <p>{task.reason || '에이전트 프로세스가 끝났어요.'} 같은 작업 폴더에서 대화를 이어서 시작해요.</p>
-            <button class="btn primary" onClick={() => resume(task.id)}>
-              <I n="player-play" /> 재개 <span style="opacity:.7;font-weight:500;font-family:var(--mono);font-size:11.5px">{resumeCmd}</span>
-            </button>
-          </div>
-        </div>
-      )}
+      <div
+        class="term-host"
+        ref={host}
+        onMouseDown={() => setTimeout(() => st.current.term?.focus(), 0)}
+        onContextMenu={(e) => st.current.term && openMenu(e, termItems(st.current.term))}
+      />
+      {stopped && <PastSession task={task} />}
     </div>
   );
 }

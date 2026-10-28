@@ -6,6 +6,7 @@ import { choose, quickSend, openTask, resume, stop, setWidget, newTask, visibleT
 import { Glyph, I, Spinner } from './bits.jsx';
 import { PlanBar, SubChip, FEED_ICON } from './Progress.jsx';
 import { Banner } from './Room.jsx';
+import { openMenu, taskItems } from './Menu.jsx';
 
 const STATE = {
   needs_input: { label: '답할 것', icon: 'message-question', cls: 'needs' },
@@ -86,7 +87,7 @@ function Card({ t, p, w }) {
   const menu = t.menu || screen?.menu || null;
 
   return (
-    <article class={`card size-${size} ${st.cls} ${careful ? 'careful' : ''} ${w.pinned ? 'pinned' : ''}`} style={roomVars(p?.color)} aria-label={`${p?.name} · ${t.title}`}>
+    <article class={`card size-${size} ${st.cls} ${careful ? 'careful' : ''} ${w.pinned ? 'pinned' : ''}`} style={roomVars(p?.color)} aria-label={`${p?.name} · ${t.title}`} onContextMenu={(e) => !e.target.closest('input, textarea') && !String(getSelection()).trim() && openMenu(e, taskItems(t))}>
       <header class="ch" onDblClick={() => openTask(t.id)}>
         <Glyph project={p} size={30} />
         <div class="cid">

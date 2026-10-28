@@ -8,9 +8,9 @@ import * as G from './git.js';
 import { AGENTS, lastAssistantText, summarize } from './agents.js';
 import { httpError, addProject } from './projects.js';
 import { findSession, liveClaude, stopClaude, queueCodex, claudeTranscriptOf } from './sessions.js';
-import { Watcher } from './watch.js';
+import { Watcher, readHistory } from './watch.js';
 import { commandsIn } from './shells.js';
-import { ActivityTracker, activityView, emptyActivity } from './activity.js';
+import { ActivityTracker, activityView, emptyActivity, findRollout } from './activity.js';
 
 const require = createRequire(import.meta.url);
 const { Terminal } = require('@xterm/headless');
@@ -43,6 +43,7 @@ export class Tasks {
     /** peer (a window's connection) -> taskId */
     this.viewers = new Map();
     this.watchers = new Map();
+    this.pastLogs = new Map(); // task id -> { key, entries }: a stopped session's transcript, read once
     for (const t of store.tasks) {
       migrate(t);
       if (t.watch) continue; // followed again by the watch poll
@@ -130,7 +131,29 @@ export class Tasks {
   transcript(id) {
     const task = this.need(id);
     const w = this.watchers.get(id);
-    return { entries: w ? w.entries.slice(-150) : [], status: w?.status || null };
+    if (w) return { entries: w.entries.slice(-150), status: w.status || null };
+    return { entries: this.history(task).slice(-150), status: null };
+  }
+
+  /** What was said in a task's own session, so a stopped one still shows what it was about. */
+  history(task) {
+    const file =
+      task.agent === 'claude'
+        ? [task.sessionId, ...(task.pastSessionIds || []).slice().reverse()].map((sid) => sid && claudeTranscriptOf(sid)).find(Boolean)
+        : task.watch?.file || (task.cwd && findRollout(task.cwd, 0));
+    if (!file) return [];
+    let key;
+    try {
+      const st = fs.statSync(file);
+      key = `${file}:${st.size}:${st.mtimeMs}`;
+    } catch {
+      return [];
+    }
+    const hit = this.pastLogs.get(task.id);
+    if (hit?.key === key) return hit.entries;
+    const entries = readHistory(task.agent, file, task.cwd);
+    this.pastLogs.set(task.id, { key, entries });
+    return entries;
   }
 
   setWatch(id, patch) {

@@ -80,6 +80,18 @@ contextBridge.exposeInMainWorld('desk', {
   focus() {
     ipcRenderer.send('desk:focus');
   },
+  /** Text onto the clipboard (a terminal's selection, a branch name). Reading it isn't offered. */
+  copy(text) {
+    ipcRenderer.send('desk:copy', String(text));
+  },
+  /** A native edit command on whatever has focus: 'paste' into a terminal, say. */
+  edit(cmd) {
+    ipcRenderer.send('desk:edit', String(cmd));
+  },
+  /** Show a folder in Finder / Explorer. */
+  reveal(p) {
+    ipcRenderer.send('desk:reveal', String(p));
+  },
   /** The top bar's colors, so the window's title bar area, background and native menus match. */
   setChrome({ bg, fg, dark }) {
     ipcRenderer.send('desk:chrome', { bg: String(bg), fg: String(fg), dark: !!dark });

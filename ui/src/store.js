@@ -20,6 +20,9 @@ let state = {
   views: load('views', {}),
   collapsed: load('collapsed', { done: true }),
   modal: null, // { kind, ... }
+  ctx: null, // the open right-click menu: { x, y, items }
+  picked: [], // rows picked with ⌘/Ctrl or Shift, for acting on several at once
+  pickAnchor: null,
   banner: null, // { kind:'send'|'create', taskId, msgId, text, projectId, at }
   toasts: [],
   comments: load('comments', {}), // taskId -> [{id,path,start,end,text}]

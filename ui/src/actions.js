@@ -188,6 +188,77 @@ export function archiveAsk(taskId) {
   else archive(taskId);
 }
 
+/**
+ * Put several tasks away at once (picked rows, a whole lane). Working agents among them are asked
+ * about first; afterwards one toast can bring them all back the way they were.
+ */
+export async function archiveMany(ids, { confirmed = false } = {}) {
+  const ts = ids.map((id) => taskOf(get(), id)).filter((t) => t && !t.archived);
+  if (ts.length === 1) {
+    clearPicks();
+    return confirmed ? archive(ts[0].id) : archiveAsk(ts[0].id);
+  }
+  if (!ts.length) return;
+  if (!confirmed && ts.some((t) => t.running && isBusy(t))) return openModal('archive', { taskIds: ts.map((t) => t.id) });
+  const done = [];
+  for (const t of ts) {
+    try {
+      await api('POST', `/api/tasks/${t.id}/archive`);
+      done.push(t);
+    } catch (e) {
+      toast(e.message, { kind: 'err' });
+    }
+  }
+  const gone = new Set(done.map((t) => t.id));
+  const patch = { picked: [], pickAnchor: null };
+  if (gone.has(get().selected)) patch.selected = visibleTasks().find((x) => !gone.has(x.id) && isLive(x))?.id || null;
+  set(patch);
+  if (!done.length) return;
+  // Finished ones (merged, discarded) just leave the list; the rest wait in 보관함.
+  const back = done.filter(isLive);
+  const running = new Set(done.filter((t) => t.running).map((t) => t.id));
+  toast(`${done.length}개 보관했어요`, back.length ? { ms: 7000, action: { label: '되돌리기', run: () => unarchiveMany(back.map((t) => t.id), running) } } : {});
+}
+
+/** Undo for archiveMany: back in the list, and only the ones that were running start again. */
+async function unarchiveMany(ids, running) {
+  for (const id of ids) {
+    try {
+      await api('POST', `/api/tasks/${id}/unarchive`);
+      if (running.has(id)) await api('POST', `/api/tasks/${id}/resume`);
+    } catch (e) {
+      toast(e.message, { kind: 'err' });
+    }
+  }
+}
+
+export async function resumeMany(ids) {
+  clearPicks();
+  for (const id of ids) await resume(id);
+}
+
+// Picking several rows: ⌘/Ctrl-click toggles one, Shift-click takes a range.
+
+/** The open task joins the pick the first time, the way Finder and Mail do it. */
+export function togglePick(taskId) {
+  const s = get();
+  const cur = s.picked.length ? s.picked : s.selected && s.selected !== taskId ? [s.selected] : [];
+  set({ picked: cur.includes(taskId) ? cur.filter((x) => x !== taskId) : [...cur, taskId], pickAnchor: taskId });
+}
+
+/** Everything between the last picked (or the open) row and this one, in the order the list shows. */
+export function pickRange(taskId, order) {
+  const s = get();
+  const from = order.indexOf(order.includes(s.pickAnchor) ? s.pickAnchor : s.selected);
+  const to = order.indexOf(taskId);
+  if (from < 0 || to < 0) return togglePick(taskId);
+  set({ picked: order.slice(Math.min(from, to), Math.max(from, to) + 1), pickAnchor: s.pickAnchor || order[from] });
+}
+
+export function clearPicks() {
+  if (get().picked.length) set({ picked: [], pickAnchor: null });
+}
+
 /** Out of 보관함 and straight back to work: the agent resumes the same conversation. */
 export async function restore(taskId) {
   const t = taskOf(get(), taskId);
