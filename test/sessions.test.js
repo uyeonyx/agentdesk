@@ -6,13 +6,14 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { execSync } from 'node:child_process';
 import { boot, makeRepo } from './helpers.js';
+import { realPath } from '../server/util.js';
 
 let ctx;
 let proj;
 let repo;
 before(async () => {
   ctx = await boot();
-  repo = fs.realpathSync(makeRepo(path.join(ctx.tmp, 'shop'), { 'README.md': '# shop\n', 'src/cart.ts': 'export const cart = [];\n' }));
+  repo = realPath(makeRepo(path.join(ctx.tmp, 'shop'), { 'README.md': '# shop\n', 'src/cart.ts': 'export const cart = [];\n' }));
   proj = (await ctx.api('POST', '/api/projects', { path: repo })).json;
 });
 after(() => ctx.s.shutdown(null));

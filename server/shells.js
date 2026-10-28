@@ -41,7 +41,7 @@ export class Shells {
     for (const k of Object.keys(env)) if (/^(AGENTDESK_|CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_SANDBOX|CODEX_THREAD|ELECTRON_|CHROME_)/.test(k)) delete env[k];
     const cols = 120;
     const rows = 14;
-    const proc = pty.spawn(shell, process.platform === 'win32' ? [] : ['-l'], { name: 'xterm-256color', cols, rows, cwd, env });
+    const proc = pty.spawn(shell, WIN ? [] : ['-l'], { name: 'xterm-256color', cols, rows, cwd, env, ...(WIN ? { useConptyDll: true } : {}) });
     const term = new Terminal({ cols, rows, scrollback: 3000, allowProposedApi: true });
     const ser = new SerializeAddon();
     term.loadAddon(ser);

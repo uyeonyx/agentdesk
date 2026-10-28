@@ -27,7 +27,8 @@ function planStatus(s) {
 
 function relTo(cwd, p) {
   if (typeof p !== 'string') return '';
-  if (cwd && (p === cwd || p.startsWith(cwd + path.sep))) return p.slice(cwd.length + 1) || '.';
+  // Shown like every other repo path in the UI: with "/" (Windows hands us "\\").
+  if (cwd && (p === cwd || p.startsWith(cwd + path.sep))) return p.slice(cwd.length + 1).split(path.sep).join('/') || '.';
   return p.replace(os.homedir(), '~');
 }
 

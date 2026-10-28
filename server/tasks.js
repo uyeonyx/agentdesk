@@ -16,6 +16,13 @@ const require = createRequire(import.meta.url);
 const { Terminal } = require('@xterm/headless');
 const { SerializeAddon } = require('@xterm/addon-serialize');
 
+/**
+ * Windows: node-pty's own conpty.dll + OpenConsole.exe instead of the system's ConPTY. The system
+ * one can hang on close (seen on Windows Server 2025 / 11 24H2), and its kill path forks a Node
+ * helper that the app binary can't run (RunAsNode is off).
+ */
+export const PTY_WIN = process.platform === 'win32' ? { useConptyDll: true } : {};
+
 const LIVE = new Set(['starting', 'working', 'needs_input', 'review', 'exited']);
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -324,7 +331,7 @@ export class Tasks {
     });
     if (task.remote) task.remoteUrl = '';
     const [file, ...pre] = commandFor(bin);
-    const proc = pty.spawn(file, [...pre, ...args], { name: 'xterm-256color', cols, rows, cwd: fs.existsSync(task.cwd) ? task.cwd : undefined, env });
+    const proc = pty.spawn(file, [...pre, ...args], { name: 'xterm-256color', cols, rows, cwd: fs.existsSync(task.cwd) ? task.cwd : undefined, env, ...PTY_WIN });
     const term = new Terminal({ cols, rows, scrollback: 4000, allowProposedApi: true });
     const ser = new SerializeAddon();
     term.loadAddon(ser);

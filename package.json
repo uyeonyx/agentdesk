@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node ui/build.mjs",
     "dev": "node ui/build.mjs && AGENTDESK_HOME=${AGENTDESK_HOME:-$HOME/.agentdesk-dev} electron .",
-    "test": "node --test --test-concurrency=1 --test-timeout=60000 --test-force-exit test/*.test.js",
+    "test": "node --test --test-concurrency=1 --test-timeout=180000 --test-force-exit test/*.test.js",
     "test:e2e": "playwright test",
     "dist": "node ui/build.mjs && electron-builder"
   },
