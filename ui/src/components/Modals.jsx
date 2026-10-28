@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api, updateAction } from '../api.js';
 import { useStore, get, set, closeModal, openModal, toast, projectOf, taskOf, setView } from '../store.js';
 import { roomVars, mod, fuzzyFilter, isLive, ago } from '../util.js';
-import { createTask, merge, pr, discard, newTask, visibleTasks, select, openFileInTask, importSession, setRemote } from '../actions.js';
+import { createTask, merge, pr, discard, archive, archiveAsk, restore, shelved, newTask, visibleTasks, select, openFileInTask, importSession, setRemote } from '../actions.js';
 import { Glyph, I, Modal, Toggle, useAutoFocus } from './bits.jsx';
 import { loadFiles } from './Files.jsx';
 import { focusInput as focusComposer } from '../focus.js';
@@ -23,6 +23,10 @@ export function ModalHost() {
       return <ConfirmPr taskId={m.taskId} />;
     case 'discard':
       return <ConfirmDiscard taskId={m.taskId} />;
+    case 'archive':
+      return <ConfirmArchive taskId={m.taskId} />;
+    case 'shelf':
+      return <Shelf />;
     case 'rename':
       return <Rename taskId={m.taskId} />;
     case 'palette':
@@ -727,6 +731,26 @@ function ConfirmDiscard({ taskId }) {
   );
 }
 
+function ConfirmArchive({ taskId }) {
+  const { t, p } = useTP(taskId);
+  if (!t || !p) return null;
+  return (
+    <Confirm
+      t={t}
+      p={p}
+      title="작업 중인 에이전트 보관하기"
+      action={async () => {
+        closeModal();
+        await archive(taskId);
+      }}
+      label="멈추고 보관"
+      icon="archive"
+    >
+      <p style="margin:0;color:var(--muted)">에이전트가 아직 작업 중이에요. 보관하면 지금 하던 일을 멈춰요. worktree·브랜치·대화는 그대로라 보관함에서 꺼내면 같은 대화로 이어서 시킬 수 있어요.</p>
+    </Confirm>
+  );
+}
+
 function Rename({ taskId }) {
   const { t, p } = useTP(taskId);
   const [v, setV] = useState(t?.title || '');
@@ -771,6 +795,7 @@ function Palette() {
     cmd('plus', '새 작업', () => newTask(), 'N');
     cmd('folder-plus', '프로젝트 추가', () => openModal('add'));
     cmd('history', '이미 있는 세션 불러오기 · 다른 터미널, 지난 대화', () => openModal('import', { projectId: get().filter }));
+    cmd('archive', '보관함 · 보관한 작업 꺼내기', () => openModal('shelf'));
     cmd('layout-dashboard', get().view === 'board' ? '목록으로' : '관제탑 · 모든 에이전트를 카드로', () => set({ view: get().view === 'board' ? 'inbox' : 'board' }), 'B');
     cmd('list-check', '진척 패널 열고 닫기', () => set({ progressOpen: !get().progressOpen }));
     if (cur) {
@@ -780,6 +805,7 @@ function Palette() {
       cmd('search', '파일 열기', () => openModal('quick', { taskId: cur.id }), `${mod}P`);
       if (cur.isolated && !cur.adopted && cur.changes.files) cmd('git-merge', `${curP?.name} · 머지`, () => openModal('merge', { taskId: cur.id }));
       if (curP) cmd('settings', `${curP.name} 설정`, () => openModal('project', { id: curP.id }));
+      if (isLive(cur)) cmd('archive', `${curP?.name} · 보관하기`, () => archiveAsk(cur.id), 'E');
       if (cur.agent === 'claude' && isLive(cur)) cmd('device-mobile', cur.remote ? `${curP?.name} · 폰 연결 끄기` : `${curP?.name} · 폰(Claude 앱)에서 이어하기`, () => setRemote(cur.id, !cur.remote));
     }
     if ('Notification' in window && Notification.permission !== 'granted')
@@ -947,6 +973,7 @@ function ImportSessions({ projectId }) {
   const act = async (x, mode) => {
     if (x.taskId) {
       closeModal();
+      if (taskOf(get(), x.taskId)?.archived) return restore(x.taskId);
       return set({ selected: x.taskId, view: 'inbox' });
     }
     setBusy(x.sessionId);
@@ -990,7 +1017,7 @@ function ImportSessions({ projectId }) {
         <div class="sa">
           {x.taskId ? (
             <button class="btn sm" onClick={() => act(x)}>
-              <I n="arrow-right" /> Desk에서 열려 있음
+              <I n={taskOf(s, x.taskId)?.archived ? 'archive' : 'arrow-right'} /> {taskOf(s, x.taskId)?.archived ? '보관함에서 꺼내기' : 'Desk에서 열려 있음'}
             </button>
           ) : x.live?.kind === 'background' ? (
             <>
@@ -1072,6 +1099,113 @@ function ImportSessions({ projectId }) {
         <small style="color:var(--faint);font-size:12px">불러온 세션은 새 worktree 없이 원래 폴더에서 이어가요. 보내는 지시마다 스냅샷을 찍어서 되돌릴 수 있어요.</small>
         <span class="sp" />
         <kbd>↵</kbd>
+      </div>
+    </Modal>
+  );
+}
+
+// ------------------------------------------------------------ 보관함
+
+function Shelf() {
+  const s = useStore((s) => ({ projects: s.projects, tasks: s.tasks, filter: s.filter }));
+  const [q, setQ] = useState('');
+  const [onlyProject, setOnlyProject] = useState(!!s.filter);
+  const [i, setI] = useState(0);
+  const [busy, setBusy] = useState(null);
+  const input = useAutoFocus();
+  const scope = s.filter && projectOf(s, s.filter);
+  const all = shelved(s.tasks, onlyProject ? s.filter : null).sort((a, b) => (b.archivedAt || b.updatedAt) - (a.archivedAt || a.updatedAt));
+  const list = fuzzyFilter(q, all, (t) => `${projectOf(s, t.projectId)?.name || ''} ${t.title} ${t.summary} ${t.branch}`, 200);
+  useEffect(() => setI(0), [q, onlyProject]);
+
+  const take = async (t) => {
+    if (busy) return;
+    setBusy(t.id);
+    closeModal();
+    await restore(t.id);
+  };
+
+  return (
+    <Modal class="wide" labelledBy="shelf-h">
+      <div class="modal-h">
+        <div style="flex:1;min-width:0">
+          <h2 id="shelf-h">보관함</h2>
+          <div class="sub">보관한 작업은 worktree·브랜치·대화가 그대로예요. 꺼내면 같은 대화로 에이전트가 다시 떠요.</div>
+        </div>
+      </div>
+      <div class="modal-b" style="padding-bottom:6px">
+        <div style="display:flex;gap:8px;align-items:center">
+          <input
+            ref={input}
+            class="input"
+            placeholder="제목, 프로젝트, 브랜치로 찾기"
+            value={q}
+            onInput={(e) => setQ(e.currentTarget.value)}
+            onKeyDown={(e) => {
+              if (e.isComposing || e.keyCode === 229) return;
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setI((x) => Math.min(list.length - 1, x + 1));
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setI((x) => Math.max(0, x - 1));
+              } else if (e.key === 'Enter' && list[i]) {
+                e.preventDefault();
+                take(list[i]);
+              }
+            }}
+          />
+          {scope && (
+            <button class={`chip ${onlyProject ? 'on' : ''}`} style={roomVars(scope.color)} onClick={() => setOnlyProject((v) => !v)} aria-pressed={onlyProject}>
+              <Glyph project={scope} /> {scope.name}만
+            </button>
+          )}
+        </div>
+      </div>
+      <div class="modal-b scroll" style="padding-top:4px;max-height:60vh">
+        {!all.length && (
+          <div class="empty" style="text-align:center;padding:28px 12px">
+            <h3>보관한 작업이 없어요</h3>
+            <p>
+              당장 볼 일은 없지만 버리긴 아까운 작업은 메뉴의 '보관하기'나 <kbd>E</kbd> 로 넣어 두세요. 목록에서만 빠지고 아무것도 지우지 않아요.
+            </p>
+          </div>
+        )}
+        {all.length > 0 && !list.length && <p style="color:var(--muted);padding:12px 4px">'{q}'에 맞는 작업이 없어요</p>}
+        {list.map((t, k) => {
+          const p = projectOf(s, t.projectId);
+          return (
+            <div key={t.id} class={`srow ${k === i ? 'on' : ''}`} style={p ? roomVars(p.color) : undefined} onMouseEnter={() => setI(k)}>
+              <Glyph project={p} />
+              <div class="sm">
+                <div class="st">
+                  <I n={t.agent === 'codex' ? 'brand-openai' : 'sparkles'} class="ag" />
+                  {t.title}
+                </div>
+                {t.summary && <div class="sx">{t.summary}</div>}
+                <div class="smeta">
+                  <span>{p?.name}</span>
+                  {t.branch && <span class="cwd">{t.branch}</span>}
+                  {t.changes.files > 0 && (
+                    <span>
+                      {t.changes.files}개 파일 <span style="color:var(--ok)">+{t.changes.adds}</span> <span style="color:var(--danger)">−{t.changes.dels}</span>
+                    </span>
+                  )}
+                  <span>{ago(t.archivedAt || t.updatedAt)} 전 보관</span>
+                  {t.watching && <span class="note">{t.watching.where}에서 돌던 세션 · 꺼내면 다시 지켜봐요</span>}
+                </div>
+              </div>
+              <div class="sa">
+                <button class="btn sm ghost icon" onClick={() => openModal('discard', { taskId: t.id })} title={t.adopted ? '목록에서 완전히 빼기 (파일은 그대로)' : '작업 버리기 · worktree와 브랜치를 지워요'} aria-label="버리기">
+                  <I n={t.adopted ? 'logout' : 'trash'} />
+                </button>
+                <button class="btn sm primary" disabled={busy} onClick={() => take(t)}>
+                  <I n={busy === t.id ? 'loader-2' : 'player-play'} /> 꺼내기
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Modal>
   );

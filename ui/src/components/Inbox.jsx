@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { useStore, set, projectOf } from '../store.js';
 import { LANES, laneOf, STATE_ICON, ago, roomVars, progressOf } from '../util.js';
-import { select, visibleTasks, newTask } from '../actions.js';
+import { select, visibleTasks, newTask, shelved } from '../actions.js';
 import { Glyph, I, Spinner } from './bits.jsx';
+import { ShelfButton } from './Board.jsx';
 
 export function Inbox() {
   const s = useStore((s) => ({ tasks: s.tasks, projects: s.projects, filter: s.filter, selected: s.selected, collapsed: s.collapsed, loaded: s.loaded }));
@@ -50,6 +51,7 @@ export function Inbox() {
             </section>
           );
         })}
+        {shelved(s.tasks, s.filter).length > 0 && <ShelfButton tasks={s.tasks} filter={s.filter} class="shelf-link" />}
       </div>
     </aside>
   );

@@ -4,7 +4,7 @@ import { useEffect } from 'preact/hooks';
 import { connect, onState, focusWindow, watchUpdates } from './api.js';
 import { useStore, get, set, openModal, projectOf, taskOf, setView, toast } from './store.js';
 import { roomVars, isTyping, setFavicon, laneOf } from './util.js';
-import { undoBanner, select, visibleTasks, newTask, undoMessage } from './actions.js';
+import { undoBanner, select, visibleTasks, newTask, undoMessage, archiveAsk } from './actions.js';
 import { isUndoKey } from './components/Terminal.jsx';
 import { Board } from './components/Board.jsx';
 import { Topbar } from './components/Topbar.jsx';
@@ -157,6 +157,9 @@ window.addEventListener('keydown', (e) => {
   } else if (e.key === 'n' || e.key === 'N' || e.key === 'ㅜ') {
     e.preventDefault();
     newTask();
+  } else if ((e.key === 'e' || e.key === 'E' || e.key === 'ㄷ') && s.selected) {
+    e.preventDefault();
+    archiveAsk(s.selected);
   } else if (e.key === '/') {
     e.preventDefault();
     openModal('palette');

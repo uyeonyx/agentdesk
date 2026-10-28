@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { useStore, get, set, setView, openModal, projectOf, taskOf } from '../store.js';
 import { roomVars, ago, mod, undoKey, progressOf, SOURCE_LABEL } from '../util.js';
-import { undoBanner, dismissBanner, resume, stop, archive, undoMessage, newTask, setRemote } from '../actions.js';
+import { undoBanner, dismissBanner, resume, stop, archive, archiveAsk, undoMessage, newTask, setRemote } from '../actions.js';
 import { Glyph, I } from './bits.jsx';
 import { vscodeLink } from '../util.js';
 import { TerminalView } from './Terminal.jsx';
@@ -334,6 +334,7 @@ function RoomMenu({ task, project, close }) {
         </a>
       )}
       <hr />
+      {live && item('archive', '보관하기 · 나중에 이어서', () => archiveAsk(task.id))}
       {live && (task.adopted ? item('logout', '목록에서 빼기 (파일은 그대로)', () => openModal('discard', { taskId: task.id })) : item('trash', '작업 버리기', () => openModal('discard', { taskId: task.id }), true))}
       {!live && item('archive', '목록에서 치우기', () => archive(task.id))}
     </div>

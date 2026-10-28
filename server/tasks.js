@@ -90,7 +90,7 @@ export class Tasks {
 
   async pollWatch() {
     for (const t of this.store.tasks) {
-      if (!t.watch || ['merged', 'discarded'].includes(t.state)) continue;
+      if (!t.watch || t.archived || ['merged', 'discarded'].includes(t.state)) continue;
       try {
         await this.watcher(t).poll();
       } catch {}
@@ -182,6 +182,7 @@ export class Tasks {
       prUrls: t.prUrls || [],
       mergedInto: t.mergedInto,
       archived: !!t.archived,
+      archivedAt: t.archivedAt || null,
       adopted: t.repos.some((x) => x.adopted) || (!!t.imported && !t.repos.length),
       imported: t.imported ? { mode: t.imported.mode, at: t.imported.at } : null,
       sessionId: t.sessionId || '',
@@ -191,7 +192,8 @@ export class Tasks {
       remoteUrl: t.remote || t.watch ? t.remoteUrl || '' : '',
       activity: activityView(t.activity),
       menu,
-      messages: (t.messages || []).map((m) => ({ id: m.id, text: m.text, at: m.at, undone: !!m.undone, canUndo: !!m.snap && !m.undone, source: m.source })),
+      // Put-away tasks can pile up; their history comes back with them when they're taken out.
+      messages: (t.archived ? [] : t.messages || []).map((m) => ({ id: m.id, text: m.text, at: m.at, undone: !!m.undone, canUndo: !!m.snap && !m.undone, source: m.source })),
     };
   }
 
@@ -361,7 +363,7 @@ export class Tasks {
       // A conversation that was never saved can't be reopened by id: fall back to the latest one here.
       // Only inside Desk's own worktree: in a person's real folder "latest" could be another live session.
       const ownFolder = !task.imported && task.repos.length > 0 && !task.repos.some((x) => x.adopted);
-      if (ownFolder && resume && !latest && !fork && task.sessionId && Date.now() - r.startedAt < 4000 && /No conversation found/i.test(r.head)) {
+      if (ownFolder && resume && !latest && !fork && !task.archived && task.sessionId && Date.now() - r.startedAt < 4000 && /No conversation found/i.test(r.head)) {
         this.spawn(task, { resume: true, latest: true });
         return;
       }
@@ -434,7 +436,8 @@ export class Tasks {
 
   async hook(body) {
     const task = this.store.task(String(body.task || ''));
-    if (!task) return;
+    // A put-away task's agent is gone; a hook still in flight from it changes nothing.
+    if (!task || task.archived) return;
     const r = this.rt.get(task.id);
     const p = body.payload && typeof body.payload === 'object' ? body.payload : {};
     if (body.agent === 'claude') {
@@ -947,6 +950,7 @@ export class Tasks {
     if (s.taskId && mode !== 'fork' && ownedHere(this.store.task(s.taskId))) {
       const t = this.store.task(s.taskId);
       if (t) {
+        if (t.archived) this.unarchive(t.id);
         if (!this.rt.get(t.id) && LIVE.has(t.state) && fs.existsSync(t.cwd)) this.spawn(t, { resume: true });
         return t;
       }
@@ -1111,10 +1115,40 @@ export class Tasks {
     this.setState(task, 'discarded', '버렸어요');
   }
 
-  archive(id) {
+  /**
+   * Put a task away without losing anything: its agent stops (the conversation is already saved),
+   * the worktree and branch stay, and 꺼내기 brings it back to resume. Watching a session that runs
+   * elsewhere just pauses; that session itself is left alone.
+   */
+  async archive(id) {
     const task = this.need(id);
-    if (LIVE.has(task.state) && this.rt.get(id)) throw httpError(409, '실행 중인 작업은 보관할 수 없어요');
+    if (task.archived) return;
     task.archived = true;
+    task.archivedAt = Date.now();
+    this.watchers.delete(id);
+    this.onGone?.(id);
+    const r = this.rt.get(id);
+    if (r) {
+      const exited = new Promise((resolve) => r.proc.onExit(() => resolve()));
+      r.proc.kill();
+      await Promise.race([exited, delay(3000)]);
+    }
+    if (LIVE.has(task.state) && !task.watch) {
+      task.state = 'exited';
+      task.reason = '보관했어요 · 꺼내면 이어서 할 수 있어요';
+    }
+    this.store.save();
+    this.changed();
+  }
+
+  /** Back from 보관함 the way it went in: stopped, ready to resume. */
+  unarchive(id) {
+    const task = this.need(id);
+    if (!task.archived) return;
+    task.archived = false;
+    delete task.archivedAt;
+    if (LIVE.has(task.state) && !task.watch) task.reason = '보관함에서 꺼냈어요 · 재개할 수 있어요';
+    task.updatedAt = Date.now();
     this.store.save();
     this.changed();
   }

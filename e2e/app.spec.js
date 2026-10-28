@@ -140,6 +140,35 @@ test('the top bar is the title bar: room for the window controls, colors handed 
   await page.screenshot({ path: path.join(tmp, 'titlebar.png'), clip: { x: 0, y: 0, width: 700, height: 60 } });
 });
 
+test('보관하기 takes a task off the list without stopping its story; 보관함 brings it back running', async () => {
+  const repo = makeRepo(path.join(tmp, 'repo-shelf'));
+  const call = (method, p, body) =>
+    page.evaluate(async ([m, p, b]) => JSON.parse((await window.desk.api(m, p, b === undefined ? undefined : JSON.stringify(b))).body || '{}'), [method, p, body]);
+  const task = async (id) => (await call('GET', '/api/state')).tasks.find((x) => x.id === id);
+  const proj = await call('POST', '/api/projects', { path: repo });
+  const t = await call('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'just answer: 나중에 이어서 볼 질문' });
+  await expect.poll(async () => (await task(t.id))?.state, { timeout: 20_000 }).toBe('needs_input');
+  const row = page.locator('button.row', { hasText: t.title }).first();
+  if (!(await row.isVisible())) await page.keyboard.press('b');
+  await row.click();
+
+  await page.keyboard.press('ControlOrMeta+k');
+  await page.locator('.modal .li', { hasText: '보관하기' }).first().click();
+  await expect(row).toBeHidden();
+  await expect.poll(async () => (await task(t.id))?.running).toBe(false);
+  expect((await task(t.id)).archived).toBe(true);
+
+  await page.locator('.shelf-link').click();
+  const item = page.locator('.modal .srow', { hasText: t.title });
+  await expect(item).toBeVisible();
+  await page.screenshot({ path: path.join(tmp, 'shelf.png'), animations: 'disabled' });
+  await item.getByRole('button', { name: '꺼내기' }).click();
+  await expect(row).toBeVisible();
+  await expect.poll(async () => (await task(t.id))?.running, { timeout: 10_000 }).toBe(true);
+  expect((await task(t.id)).archived).toBe(false);
+  await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
 test('no errors or CSP refusals in the page', () => {
   expect(problems).toEqual([]);
 });

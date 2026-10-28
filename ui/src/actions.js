@@ -28,6 +28,9 @@ export function visibleTasks(s = get()) {
     .sort((a, b) => order[laneOf(a)] - order[laneOf(b)] || b.updatedAt - a.updatedAt);
 }
 
+/** Put-away tasks that can still be resumed: 보관함. */
+export const shelved = (tasks, filter) => tasks.filter((t) => t.archived && isLive(t) && (!filter || t.projectId === filter));
+
 export async function sendMessage(taskId) {
   const s = get();
   const t = taskOf(s, taskId);
@@ -163,10 +166,35 @@ export async function discard(taskId) {
 }
 
 export async function archive(taskId) {
+  const t = taskOf(get(), taskId);
   try {
     await api('POST', `/api/tasks/${taskId}/archive`);
-    const next = visibleTasks().find((t) => t.id !== taskId && isLive(t));
-    set({ selected: next?.id || null });
+    if (get().selected === taskId) {
+      const next = visibleTasks().find((x) => x.id !== taskId && isLive(x));
+      set({ selected: next?.id || null });
+    }
+    // Finished ones (merged, discarded) just leave the list; anything else waits in 보관함.
+    if (t && isLive(t)) toast('보관했어요 · 보관함에서 언제든 꺼낼 수 있어요', { kind: 'room', projectId: t.projectId, action: { label: '꺼내기', run: () => restore(taskId) } });
+  } catch (e) {
+    toast(e.message, { kind: 'err' });
+  }
+}
+
+/** A working agent gets asked first: putting it away stops it mid-turn. */
+export function archiveAsk(taskId) {
+  const t = taskOf(get(), taskId);
+  if (!t || t.archived) return;
+  if (t.running && (t.state === 'working' || t.state === 'starting')) openModal('archive', { taskId });
+  else archive(taskId);
+}
+
+/** Out of 보관함 and straight back to work: the agent resumes the same conversation. */
+export async function restore(taskId) {
+  const t = taskOf(get(), taskId);
+  try {
+    await api('POST', `/api/tasks/${taskId}/unarchive`);
+    set({ selected: taskId, view: 'inbox' });
+    if (t && isLive(t) && !t.watching) await api('POST', `/api/tasks/${taskId}/resume`);
   } catch (e) {
     toast(e.message, { kind: 'err' });
   }

@@ -157,7 +157,10 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
             await tasks.discard(id);
             return { ok: true };
           case 'archive':
-            tasks.archive(id);
+            await tasks.archive(id);
+            return { ok: true };
+          case 'unarchive':
+            tasks.unarchive(id);
             return { ok: true };
           case 'rename':
             tasks.rename(id, body.title);

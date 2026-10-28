@@ -78,6 +78,35 @@ test('stop and resume keep the same worktree', async () => {
   assert.equal(sent.status, 200);
 });
 
+test('archive puts even a running task away without deleting anything; taking it out resumes the same conversation', async () => {
+  const t = (await ctx.api('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'create notes/later.md 나중에 볼 메모' })).json;
+  const x = await ctx.waitTask(t.id, (x) => x.state === 'review' && x.running);
+  assert.equal((await ctx.api('POST', `/api/tasks/${t.id}/archive`)).status, 200);
+  const a = (await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id);
+  assert.equal(a.archived, true);
+  assert.equal(a.running, false, 'its agent stopped');
+  assert.equal(a.state, 'exited');
+  assert.ok(a.archivedAt);
+  assert.deepEqual(a.messages, [], 'history stays out of every state push while put away');
+  assert.ok(fs.existsSync(path.join(x.worktreeAbs, 'notes/later.md')), 'worktree kept');
+  assert.ok(sh(`git rev-parse --verify --quiet refs/heads/${x.branch}`), 'branch kept');
+  // A hook still in flight from the stopped agent changes nothing.
+  await ctx.s.tasks.hook({ task: t.id, agent: 'claude', payload: { hook_event_name: 'Stop' } });
+  assert.equal((await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id).state, 'exited');
+
+  assert.equal((await ctx.api('POST', `/api/tasks/${t.id}/unarchive`)).status, 200);
+  const b = (await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id);
+  assert.equal(b.archived, false);
+  assert.ok(b.messages.length >= 1, 'history is back');
+  assert.equal((await ctx.api('POST', `/api/tasks/${t.id}/resume`)).status, 200);
+  await ctx.waitTask(t.id, (y) => y.running);
+  const end = Date.now() + 5000;
+  let screen;
+  while (Date.now() < end && !(screen = (await ctx.api('GET', `/api/tasks/${t.id}/screen?lines=20`)).json.lines.join('\n')).includes('resumed')) await new Promise((r) => setTimeout(r, 100));
+  assert.match(screen, new RegExp(`resumed ${x.sessionId}`), 'same conversation');
+  await ctx.api('POST', `/api/tasks/${t.id}/discard`);
+});
+
 test('merge refuses a dirty main checkout, then merges cleanly and cleans up', async () => {
   const id = ctx.t1;
   fs.writeFileSync(path.join(repo, 'dirty.txt'), 'x');

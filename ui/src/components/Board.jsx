@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api.js';
 import { useStore, set, openModal, projectOf } from '../store.js';
 import { roomVars, ago, mod, laneOf, LANES, progressOf } from '../util.js';
-import { choose, quickSend, openTask, resume, stop, setWidget, newTask, visibleTasks } from '../actions.js';
+import { choose, quickSend, openTask, resume, stop, setWidget, newTask, visibleTasks, archiveAsk, shelved } from '../actions.js';
 import { Glyph, I, Spinner } from './bits.jsx';
 import { PlanBar, SubChip, FEED_ICON } from './Progress.jsx';
 import { Banner } from './Room.jsx';
@@ -47,6 +47,7 @@ export function Board() {
         <label class="chk">
           <input type="checkbox" checked={s.showDone} onChange={(e) => set({ showDone: e.currentTarget.checked })} /> 끝난 것도 보기
         </label>
+        <ShelfButton tasks={s.tasks} filter={s.filter} />
         <button class="btn sm" onClick={() => openModal('import', { projectId: s.filter })}>
           <I n="history" /> 세션 불러오기
         </button>
@@ -170,6 +171,9 @@ function Card({ t, p, w }) {
             <button class={`btn ghost sm icon ${w.pinned ? 'on' : ''}`} onClick={() => setWidget(t.id, { pinned: !w.pinned })} aria-label="고정" title={w.pinned ? '고정 풀기' : '맨 앞에 고정'}>
               <I n={w.pinned ? 'pinned' : 'pin'} />
             </button>
+            <button class="btn ghost sm icon" onClick={() => archiveAsk(t.id)} aria-label="보관하기" title="보관하기 · worktree와 대화는 그대로 두고 목록에서 빼요 (E)">
+              <I n="archive" />
+            </button>
             <button class="btn ghost sm icon" onClick={() => openTask(t.id)} aria-label="방으로 들어가기" title="방으로 들어가기 (더블클릭)">
               <I n="arrows-maximize" />
             </button>
@@ -177,6 +181,15 @@ function Card({ t, p, w }) {
         </div>
       </footer>
     </article>
+  );
+}
+
+export function ShelfButton({ tasks, filter, class: cls = 'btn sm' }) {
+  const n = shelved(tasks, filter).length;
+  return (
+    <button class={cls} onClick={() => openModal('shelf')} title="보관한 작업 · 꺼내면 같은 대화로 이어가요">
+      <I n="archive" /> 보관함{n ? <b class="n">{n}</b> : null}
+    </button>
   );
 }
 
