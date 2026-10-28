@@ -190,6 +190,35 @@ test('a turn that leaves a build running in the background waits in 작업 중, 
   await call('POST', `/api/tasks/${t.id}/discard`);
 });
 
+test('an agent stuck on a permission gets its own lane above everything, in the warning color', async () => {
+  const repo = makeRepo(path.join(tmp, 'repo-ask'));
+  const call = (method, p, body) =>
+    page.evaluate(async ([m, p, b]) => JSON.parse((await window.desk.api(m, p, b === undefined ? undefined : JSON.stringify(b))).body || '{}'), [method, p, body]);
+  const task = async (id) => (await call('GET', '/api/state')).tasks.find((x) => x.id === id);
+  const proj = await call('POST', '/api/projects', { path: repo });
+  const t = await call('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'ask before deleting build' });
+  await expect.poll(async () => (await task(t.id))?.ask, { timeout: 20_000 }).toBe('permission');
+
+  if (!(await page.locator('.inbox-list').isVisible())) await page.keyboard.press('b');
+  await expect(page.locator('.inbox-list section').first()).toHaveAttribute('aria-label', '허락·선택할 것');
+  const row = page.locator('section[aria-label="허락·선택할 것"] button.row.blocked', { hasText: t.title });
+  await expect(row).toContainText('허락을 기다려요 · Bash: rm -rf build');
+  await expect(row.locator('.ti-shield-question')).toBeVisible();
+  await expect(page.locator('.chip .count.hot').first()).toBeVisible();
+  await page.screenshot({ path: path.join(tmp, 'blocked-list.png'), animations: 'disabled' });
+
+  await page.keyboard.press('b');
+  const card = page.locator('article.card', { hasText: t.title });
+  await expect(card.locator('.stchip.blocked')).toContainText('허락 필요');
+  await page.screenshot({ path: path.join(tmp, 'blocked-board.png'), animations: 'disabled' });
+  // Answered from the card, it's just working again.
+  await card.locator('.cmenu button.opt').first().click();
+  await expect.poll(async () => (await task(t.id))?.ask).toBe('');
+  await expect(card.locator('.stchip.blocked')).toHaveCount(0);
+  await page.keyboard.press('b');
+  await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
 test('no errors or CSP refusals in the page', () => {
   expect(problems).toEqual([]);
 });

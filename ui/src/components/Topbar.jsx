@@ -8,6 +8,8 @@ export function Topbar() {
   const s = useStore((s) => ({ projects: s.projects, tasks: s.tasks, filter: s.filter, connected: s.connected, view: s.view }));
   const attention = (pid) => s.tasks.filter((t) => !t.archived && (!pid || t.projectId === pid) && (t.state === 'needs_input' || t.state === 'review')).length;
   const all = attention(null);
+  // Some agent is stuck until you answer: the count turns to the warning color.
+  const hot = (pid) => s.tasks.some((t) => !t.archived && (!pid || t.projectId === pid) && t.state === 'needs_input' && t.ask);
   const markColors = s.projects.slice(0, 4).map((p) => p.color);
   while (markColors.length < 4) markColors.push(['#3b404a', '#4a505c', '#2f333b', '#565d6a'][markColors.length]);
 
@@ -23,7 +25,7 @@ export function Topbar() {
       </div>
       <nav class="chips" aria-label="프로젝트 필터">
         <button class={`chip all ${!s.filter ? 'on' : ''}`} onClick={() => set({ filter: null })} title="모든 프로젝트 (0)">
-          모두 {all > 0 && <span class="count">{all}</span>}
+          모두 {all > 0 && <span class={`count ${hot(null) ? 'hot' : ''}`}>{all}</span>}
         </button>
         {s.projects.map((p, i) => {
           const n = attention(p.id);
@@ -37,7 +39,7 @@ export function Topbar() {
             >
               <Glyph project={p} />
               {p.name}
-              {n > 0 && <span class="count">{n}</span>}
+              {n > 0 && <span class={`count ${hot(p.id) ? 'hot' : ''}`}>{n}</span>}
             </button>
           );
         })}

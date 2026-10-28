@@ -38,13 +38,15 @@ export function roomVars(color = '#7D8FA3') {
 // ------------------------------------------------------------ tasks
 
 export const LANES = [
+  // Stuck mid-turn on something only you can give (a permission, a choice, an answer): above everything.
+  { key: 'blocked', title: '허락·선택할 것', states: [] },
   { key: 'needs', title: '답할 것', states: ['needs_input'] },
   { key: 'review', title: '검토할 것', states: ['review'] },
   { key: 'working', title: '작업 중', states: ['working', 'starting', 'waiting'] },
   { key: 'paused', title: '멈춤', states: ['exited'] },
   { key: 'done', title: '끝남', states: ['merged', 'discarded'] },
 ];
-export const laneOf = (t) => LANES.find((l) => l.states.includes(t.state))?.key || 'paused';
+export const laneOf = (t) => (t.state === 'needs_input' && t.ask ? 'blocked' : LANES.find((l) => l.states.includes(t.state))?.key || 'paused');
 export const isLive = (t) => ['starting', 'working', 'waiting', 'needs_input', 'review', 'exited'].includes(t.state);
 /** The agent is busy, or will pick up again by itself once its background work is done. */
 export const isBusy = (t) => ['working', 'starting', 'waiting'].includes(t.state);
@@ -59,6 +61,14 @@ export const STATE_ICON = {
   merged: 'git-merge',
   discarded: 'trash',
 };
+
+/** What a stuck agent needs from you, by `task.ask`. */
+export const ASK = {
+  permission: { label: '허락 필요', icon: 'shield-question' },
+  choice: { label: '선택 필요', icon: 'list-check' },
+  question: { label: '답 필요', icon: 'message-circle-question' },
+};
+export const iconOf = (t) => (t.ask && ASK[t.ask] ? ASK[t.ask].icon : STATE_ICON[t.state]);
 
 export function ago(ms) {
   if (!ms) return '';

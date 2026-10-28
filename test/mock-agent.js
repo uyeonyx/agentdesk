@@ -243,6 +243,8 @@ function work(text) {
         );
         menuOpen = 6;
         pendingAfterMenu = text;
+        // Like Claude Code: the AskUserQuestion call goes out first, the generic notification ~6 s later.
+        tool('AskUserQuestion', { questions: [{ question: '테스트용 계획을 어떤 주제로 세울까요?', header: '주제', options: [{ label: '누름 깊이 테스트' }, { label: 'v1 tokens.css 제거 준비' }], multiSelect: false }] });
         hook('Notification', { message: 'Claude needs your permission', notification_type: 'permission_prompt' });
         return;
       }
@@ -252,6 +254,7 @@ function work(text) {
         );
         menuOpen = 3;
         pendingAfterMenu = text;
+        hook('PermissionRequest', { tool_name: 'Bash', tool_input: { command: 'rm -rf build', description: 'Remove build' } });
         hook('Notification', { message: 'Claude needs your permission to use Bash', notification_type: 'permission_prompt' });
         notifyCodex({ type: 'approval-requested', message: 'rm -rf build' });
         return;

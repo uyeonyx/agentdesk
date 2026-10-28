@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { useStore, set, projectOf } from '../store.js';
-import { LANES, laneOf, STATE_ICON, ago, roomVars, progressOf } from '../util.js';
+import { LANES, laneOf, iconOf, ago, roomVars, progressOf } from '../util.js';
 import { select, visibleTasks, newTask, shelved } from '../actions.js';
 import { Glyph, I, Spinner } from './bits.jsx';
 import { ShelfButton } from './Board.jsx';
@@ -38,7 +38,7 @@ export function Inbox() {
           const closed = !!s.collapsed[g.key];
           return (
             <section key={g.key} aria-label={g.title}>
-              <button class={`lane-h ${closed ? 'closed' : ''}`} onClick={() => toggle(g.key)} aria-expanded={!closed}>
+              <button class={`lane-h ${closed ? 'closed' : ''} ${g.key === 'blocked' ? 'hot' : ''}`} onClick={() => toggle(g.key)} aria-expanded={!closed}>
                 <I n="chevron-down" />
                 {g.title} <span class="n">{g.items.length}</span>
               </button>
@@ -58,14 +58,14 @@ export function Inbox() {
 }
 
 function Row({ t, p, sel, refEl }) {
-  const icon = STATE_ICON[t.state];
+  const icon = iconOf(t);
   const line = t.state === 'review' && t.summary ? t.summary : t.reason || t.summary || '';
   const done = t.state === 'merged' || t.state === 'discarded';
   const pr = progressOf(t);
   const working = t.state === 'working' || t.state === 'starting';
   const showAct = !done && (pr.running > 0 || pr.total > 0 || (working && pr.current));
   return (
-    <button ref={refEl} class={`row ${sel ? 'sel' : ''} ${done ? 'done' : ''}`} style={roomVars(p?.color)} onClick={() => select(t.id)} aria-current={sel ? 'true' : undefined}>
+    <button ref={refEl} class={`row ${sel ? 'sel' : ''} ${done ? 'done' : ''} ${t.ask ? 'blocked' : ''}`} style={roomVars(p?.color)} onClick={() => select(t.id)} aria-current={sel ? 'true' : undefined}>
       <Glyph project={p} />
       <span style="min-width:0">
         <div class="t">

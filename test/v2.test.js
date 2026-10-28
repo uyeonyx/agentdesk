@@ -64,7 +64,8 @@ test('widget button answers the permission menu', async () => {
   const id = ctx.menuTask;
   // the earlier Enter already chose the default in the mock? re-open a fresh menu task to be sure
   const t = (await ctx.api('POST', '/api/tasks', { projectId: one.id, agent: 'claude', prompt: 'ask again please' })).json;
-  await ctx.waitTask(t.id, (x) => x.state === 'needs_input' && x.menu);
+  const m = await ctx.waitTask(t.id, (x) => x.state === 'needs_input' && x.menu);
+  assert.equal(m.ask, 'permission');
   assert.equal((await ctx.api('POST', `/api/tasks/${t.id}/choose`, { key: '9' })).status, 409, 'only keys that are on screen');
   assert.equal((await ctx.api('POST', `/api/tasks/${t.id}/choose`, { key: '1' })).status, 200);
   const x = await ctx.waitTask(t.id, (x) => x.state === 'review');
@@ -204,6 +205,7 @@ test('AskUserQuestion form: options with descriptions and a separator become but
   assert.equal(x.menu.options[5].label, 'Chat about this');
   assert.equal(x.menu.question, '테스트용 계획을 어떤 주제로 세울까요?');
   assert.equal(x.reason, '테스트용 계획을 어떤 주제로 세울까요?');
+  assert.equal(x.ask, 'choice');
   assert.equal(await T().submit(t.id), null, 'Enter in a form picks, it is not a message');
   await ctx.api('POST', `/api/tasks/${t.id}/discard`);
 });

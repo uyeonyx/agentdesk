@@ -18,6 +18,8 @@ try {
 // Waiting tasks for the Dock badge: watch state like a window would.
 const WAITING = new Set(['needs_input', 'review']);
 let badge = -1;
+// Agents stuck until someone answers; a newly stuck one asks the shell to get the person's attention.
+let stuck = new Set();
 core.connectPeer({
   readyState: 1,
   send(s) {
@@ -30,6 +32,9 @@ core.connectPeer({
     if (m.t !== 'state') return;
     const n = m.tasks.filter((t) => !t.archived && WAITING.has(t.state)).length;
     if (n !== badge) parent.postMessage({ t: 'badge', n: (badge = n) });
+    const now = new Set(m.tasks.filter((t) => !t.archived && t.state === 'needs_input' && t.ask).map((t) => t.id));
+    if ([...now].some((id) => !stuck.has(id))) parent.postMessage({ t: 'attention' });
+    stuck = now;
   },
 });
 

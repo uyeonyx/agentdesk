@@ -100,6 +100,8 @@ async function runApp() {
           app.exit(1);
         } else if (m?.t === 'badge') {
           app.setBadgeCount(m.n);
+        } else if (m?.t === 'attention') {
+          attention();
         } else if (m?.t === 'status' || m?.t === 'bye') {
           asks.shift()?.(m);
         }
@@ -230,6 +232,16 @@ async function runApp() {
     if (win.isMinimized()) win.restore();
     win.show();
     win.focus();
+  }
+
+  /** An agent just got stuck on the person: bounce the Dock icon / flash the taskbar, unless they're looking. */
+  function attention() {
+    if (win?.isFocused()) return;
+    if (process.platform === 'darwin') app.dock?.bounce('informational');
+    else if (win) {
+      win.flashFrame(true);
+      win.once('focus', () => win?.flashFrame(false));
+    }
   }
 
   ipcMain.on('desk:focus', (e) => {

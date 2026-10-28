@@ -85,11 +85,35 @@ test('codex task: notify hook ends the turn; a no-change answer lands in "needs 
   ctx.codex = t.id;
 });
 
-test('permission prompt: Notification hook marks the task as waiting with the reason', async () => {
+test('permission prompt: the task is stuck on it, saying exactly what it wants to run', async () => {
   const t = (await ctx.api('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'ask before deleting build' })).json;
-  const x = await ctx.waitTask(t.id, (x) => x.state === 'needs_input' && /permission/i.test(x.reason));
-  assert.match(x.reason, /permission/i);
+  const x = await ctx.waitTask(t.id, (x) => x.state === 'needs_input' && x.ask === 'permission');
+  await new Promise((r) => setTimeout(r, 300)); // the generic Notification arrives after it
+  const y = (await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id);
+  assert.equal(y.reason, '허락을 기다려요 · Bash: rm -rf build', 'not replaced by "Claude needs your permission"');
+  // Another call finishing (a parallel one) doesn't answer it; this one going ahead does.
+  const post = (input) => ctx.s.tasks.hook({ task: t.id, agent: 'claude', payload: { hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_input: input } });
+  await post({ command: 'ls' });
+  assert.equal((await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id).ask, 'permission');
+  await post({ command: 'rm -rf build', description: 'Remove build' });
+  const z = (await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id);
+  assert.equal(z.state, 'working', 'answered elsewhere (the phone)');
+  assert.equal(z.ask, '');
+  void x;
   ctx.ask = t.id;
+});
+
+test('a finished turn is "your turn", not a block, and a minute of quiet does not change that', async () => {
+  const t = (await ctx.api('POST', '/api/tasks', { projectId: proj.id, agent: 'claude', prompt: 'just answer: 한 줄 요약' })).json;
+  const x = await ctx.waitTask(t.id, (x) => x.state === 'needs_input');
+  assert.equal(x.ask, '');
+  await ctx.s.tasks.hook({ task: t.id, agent: 'claude', payload: { hook_event_name: 'Notification', notification_type: 'idle_prompt', message: 'Claude is waiting for your input' } });
+  assert.equal((await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id).reason, x.reason);
+  await ctx.s.tasks.hook({ task: t.id, agent: 'claude', payload: { hook_event_name: 'Notification', notification_type: 'elicitation_dialog', message: 'GitHub MCP가 저장소 이름을 물어요' } });
+  const y = (await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id);
+  assert.equal(y.ask, 'question');
+  assert.equal(y.reason, 'GitHub MCP가 저장소 이름을 물어요');
+  await ctx.api('POST', `/api/tasks/${t.id}/discard`);
 });
 
 test('stop and resume keep the same worktree', async () => {

@@ -56,6 +56,8 @@ export const AGENTS = {
           UserPromptSubmit: sync,
           Notification: sync,
           Stop: sync,
+          // Only to know a prompt is open; an async hook can't answer it, so the person still decides.
+          PermissionRequest: bg,
           PreToolUse: bg,
           PostToolUse: bg,
           PostToolUseFailure: bg,

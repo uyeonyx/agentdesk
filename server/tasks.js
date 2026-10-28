@@ -102,7 +102,7 @@ export class Tasks {
   async watchStatus(task, st) {
     const where = task.watch?.where || '다른 곳';
     if (st === 'busy') return this.setState(task, 'working', `${where}에서 작업 중`);
-    if (st === 'waiting') return this.setState(task, 'needs_input', `${where}에서 선택을 기다려요`);
+    if (st === 'waiting') return this.setState(task, 'needs_input', `${where}에서 선택을 기다려요`, { ask: 'choice' });
     if (st === 'idle') {
       this.tracker(task).turnEnded();
       return this.settle(task, `${where}에서 다음 지시를 기다려요`, task.lastReply);
@@ -167,6 +167,7 @@ export class Tasks {
       agent: t.agent,
       title: t.title,
       state: t.state,
+      ask: t.state === 'needs_input' ? t.ask || askOfMenu(menu) : '',
       // A question on screen says more than the hook's generic "needs your permission".
       reason: (menu?.question && !/^(do you want|proceed)/i.test(menu.question) ? menu.question : '') || t.reason || '',
       summary: t.summary || '',
@@ -378,6 +379,10 @@ export class Tasks {
     task.state = state;
     if (reason !== undefined) task.reason = reason;
     if (extra.summary) task.summary = extra.summary;
+    // What the agent is stuck on mid-turn until a person answers: 'permission', 'choice' or 'question'.
+    task.ask = state === 'needs_input' ? extra.ask || '' : '';
+    const r = this.rt.get(task.id);
+    if (r) r.askTool = null;
     task.updatedAt = Date.now();
     this.store.save();
     this.changed();
@@ -428,7 +433,17 @@ export class Tasks {
     const r = this.rt.get(task.id);
     const waitingOnMenu = r && this.menuOf(r);
     if (pending && !waitingOnMenu) return this.setState(task, 'waiting', pending, { summary: summarize(summary) });
-    this.setState(task, hasChanges && !waitingOnMenu ? 'review' : 'needs_input', reason, { summary: summarize(summary) });
+    this.setState(task, hasChanges && !waitingOnMenu ? 'review' : 'needs_input', reason, { summary: summarize(summary), ask: askOfMenu(waitingOnMenu) });
+  }
+
+  /** The agent stopped mid-turn on something only a person can answer: a permission, a choice, a question. */
+  blockOn(task, r, p, ask, reason) {
+    if (r) {
+      clearTimeout(r.idleTimer);
+      r.byHook = true;
+    }
+    this.setState(task, 'needs_input', reason, { ask });
+    if (r && p.tool_name) r.askTool = { name: p.tool_name, input: JSON.stringify(p.tool_input ?? null) };
   }
 
   markInput(task) {
@@ -456,23 +471,35 @@ export class Tasks {
       }
       if (['PreToolUse', 'PostToolUse', 'PostToolUseFailure', 'SubagentStart', 'SubagentStop'].includes(ev)) {
         this.tracker(task).claude(p);
+        // Asking the person is a tool too, and the agent stops on it until they answer.
+        if (ev === 'PreToolUse' && !p.agent_id && ASKS_PERSON.has(p.tool_name)) return this.blockOn(task, r, p, 'choice', choiceAsk(p));
         // Tool activity means the agent is working (unless it's waiting on a permission prompt).
         if (ev === 'PreToolUse' && !p.agent_id && task.state !== 'working' && task.state !== 'needs_input') this.setState(task, 'working', '');
+        // Answered where Desk doesn't see it (the phone): the call it was stuck on went ahead.
+        if (ev !== 'PreToolUse' && task.ask && r?.askTool?.name === p.tool_name && (ASKS_PERSON.has(p.tool_name) || r.askTool.input === JSON.stringify(p.tool_input ?? null))) {
+          this.setState(task, 'working', '');
+        }
         return;
       }
       if (ev === 'UserPromptSubmit') return this.promptArrived(task, r, p.prompt);
+      // Right when the prompt opens, with the command itself (the Notification comes ~6 s later).
+      if (ev === 'PermissionRequest') return ASKS_PERSON.has(p.tool_name) ? this.blockOn(task, r, p, 'choice', choiceAsk(p)) : this.blockOn(task, r, p, 'permission', permissionAsk(p));
+      if (ev === 'Notification') {
+        const msg = String(p.message || '입력이 필요해요');
+        const type = String(p.notification_type || '');
+        if (type === 'permission_prompt' || (!type && /permission|권한/i.test(msg))) {
+          return task.state === 'needs_input' && task.ask ? undefined : this.blockOn(task, r, {}, 'permission', msg);
+        }
+        if (type === 'elicitation_dialog' || type === 'elicitation_url_dialog') return this.blockOn(task, r, {}, 'question', msg);
+        // "Finished a minute ago and you haven't typed" says nothing new unless Desk still thinks it's working;
+        // the other kinds (signed in, quota notices…) don't change what the task is doing.
+        if (type && !(type === 'idle_prompt' && task.state === 'working')) return;
+      }
       if (r) {
         clearTimeout(r.idleTimer);
         r.byHook = true;
       }
-      if (ev === 'Notification') {
-        const msg = String(p.message || '입력이 필요해요');
-        const type = String(p.notification_type || '');
-        if (/permission/i.test(type) || /permission|권한/i.test(msg)) return this.setState(task, 'needs_input', msg);
-        // "You haven't typed in a while" means nothing while background work is still due to wake it.
-        if (type === 'idle_prompt' && task.state === 'waiting') return;
-        return this.settle(task, msg);
-      }
+      if (ev === 'Notification') return this.settle(task, String(p.message || '입력이 필요해요'));
       if (ev === 'Stop') {
         this.tracker(task).turnEnded();
         const text = lastAssistantText(p.transcript_path) || p.last_assistant_message;
@@ -481,12 +508,8 @@ export class Tasks {
       }
     } else if (body.agent === 'codex') {
       if (p.type === 'approval-requested' || p.type === 'async-question') {
-        if (r) {
-          clearTimeout(r.idleTimer);
-          r.byHook = true;
-        }
         const what = p.type === 'approval-requested' ? '승인을 기다려요' : '질문이 있어요';
-        return this.setState(task, 'needs_input', p.message ? `${what} · ${String(p.message).slice(0, 160)}` : what);
+        return this.blockOn(task, r, {}, p.type === 'approval-requested' ? 'permission' : 'question', p.message ? `${what} · ${String(p.message).slice(0, 160)}` : what);
       }
       if (p.type === 'agent-turn-complete') {
         if (r) {
@@ -1296,6 +1319,37 @@ export class Tasks {
  * A session id reported by an agent's hook is only adopted if Claude Code keeps that conversation
  * for this task's folder; an agent can't attach one of the person's other sessions to its task.
  */
+/** Tools whose whole job is to ask the person something; the agent waits on the answer. */
+const ASKS_PERSON = new Set(['AskUserQuestion', 'ExitPlanMode']);
+
+/** A menu on screen is a permission prompt ("Do you want to proceed?") or some other choice. */
+function askOfMenu(menu) {
+  if (!menu) return '';
+  return /do you want|proceed|allow|permission|허용|권한/i.test(menu.question || '') ? 'permission' : 'choice';
+}
+
+const oneLine = (v, n) => {
+  const s = String(v ?? '').replace(/\s+/g, ' ').trim();
+  return s.length > n ? s.slice(0, n - 1) + '…' : s;
+};
+
+/** "Bash · npm install", from a PermissionRequest: what exactly the agent wants to do. */
+function permissionAsk(p) {
+  const tool = String(p.tool_name || '');
+  const name = tool.startsWith('mcp__') ? tool.split('__').slice(1).join(' · ') : tool || '도구';
+  const i = p.tool_input && typeof p.tool_input === 'object' ? p.tool_input : {};
+  const what = oneLine(i.command || i.file_path || i.url || i.path || i.pattern || i.description || '', 120);
+  return `허락을 기다려요 · ${name}${what ? `: ${what}` : ''}`;
+}
+
+/** The question an AskUserQuestion puts to the person, or the plan waiting for approval. */
+function choiceAsk(p) {
+  if (p.tool_name === 'ExitPlanMode') return '계획을 승인할지 기다려요';
+  const qs = Array.isArray(p.tool_input?.questions) ? p.tool_input.questions : [];
+  const q = oneLine(qs[0]?.question, 140);
+  return q ? `${q}${qs.length > 1 ? ` 외 ${qs.length - 1}개` : ''}` : '선택을 기다려요';
+}
+
 const BG_KIND = { shell: '셸', subagent: '서브에이전트', monitor: '모니터', workflow: '워크플로', teammate: '팀원', 'cloud session': '클라우드 세션', 'MCP task': 'MCP 작업' };
 
 /**

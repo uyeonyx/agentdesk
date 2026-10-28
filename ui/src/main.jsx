@@ -3,7 +3,7 @@ import { render } from 'preact';
 import { useEffect } from 'preact/hooks';
 import { connect, onState, focusWindow, watchUpdates } from './api.js';
 import { useStore, get, set, openModal, projectOf, taskOf, setView, toast } from './store.js';
-import { roomVars, isTyping, setFavicon, laneOf } from './util.js';
+import { roomVars, isTyping, setFavicon, laneOf, ASK } from './util.js';
 import { undoBanner, select, visibleTasks, newTask, undoMessage, archiveAsk } from './actions.js';
 import { isUndoKey } from './components/Terminal.jsx';
 import { Board } from './components/Board.jsx';
@@ -196,11 +196,15 @@ onState((prev, next) => {
 onState((prev, next) => {
   // A desktop window can sit unfocused behind other apps, or be closed to the Dock, without being "hidden".
   if (!prev.loaded || !('Notification' in window) || Notification.permission !== 'granted' || document.hasFocus()) return;
-  const before = Object.fromEntries(prev.tasks.map((t) => [t.id, t.state]));
+  const key = (t) => `${t.state}:${t.ask || ''}`;
+  const before = Object.fromEntries(prev.tasks.map((t) => [t.id, key(t)]));
   for (const t of next.tasks) {
-    if (before[t.id] === t.state || !['needs_input', 'review'].includes(t.state)) continue;
+    if (before[t.id] === key(t) || !['needs_input', 'review'].includes(t.state)) continue;
     const p = next.projects.find((x) => x.id === t.projectId);
-    const n = new Notification(`${p?.name || ''} · ${t.title}`, { body: t.state === 'review' ? `검토할 것 · ${t.summary || t.reason}` : `답할 것 · ${t.reason}`, tag: t.id });
+    const ask = t.ask && ASK[t.ask];
+    const body = ask ? `${ask.label} · ${t.reason}` : t.state === 'review' ? `검토할 것 · ${t.summary || t.reason}` : `답할 것 · ${t.reason}`;
+    // A stuck agent stays on screen until you look: nothing moves until you do.
+    const n = new Notification(`${p?.name || ''} · ${t.title}`, { body, tag: t.id, requireInteraction: !!ask });
     n.onclick = () => {
       focusWindow();
       select(t.id);

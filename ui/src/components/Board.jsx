@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../api.js';
 import { useStore, set, openModal, projectOf } from '../store.js';
-import { roomVars, ago, mod, laneOf, LANES, progressOf, isBusy } from '../util.js';
+import { roomVars, ago, mod, laneOf, LANES, progressOf, isBusy, ASK } from '../util.js';
 import { choose, quickSend, openTask, resume, stop, setWidget, newTask, visibleTasks, archiveAsk, shelved } from '../actions.js';
 import { Glyph, I, Spinner } from './bits.jsx';
 import { PlanBar, SubChip, FEED_ICON } from './Progress.jsx';
@@ -29,7 +29,9 @@ export function Board() {
   const list = visibleTasks(s)
     .filter((t) => s.showDone || !['merged', 'discarded'].includes(t.state))
     .sort((a, b) => (s.widgets[b.id]?.pinned ? 1 : 0) - (s.widgets[a.id]?.pinned ? 1 : 0) || order[laneOf(a)] - order[laneOf(b)] || b.updatedAt - a.updatedAt);
-  const counts = LANES.slice(0, 4).map((l) => ({ ...l, n: list.filter((t) => laneOf(t) === l.key).length }));
+  const counts = LANES.filter((l) => l.key !== 'done')
+    .map((l) => ({ ...l, n: list.filter((t) => laneOf(t) === l.key).length }))
+    .filter((c) => c.key !== 'blocked' || c.n);
   const bannerTask = s.banner && s.tasks.find((t) => t.id === s.banner.taskId);
   const bannerProject = bannerTask && projectOf(s, bannerTask.projectId);
 
@@ -76,7 +78,7 @@ export function Board() {
 
 function Card({ t, p, w }) {
   const size = w.size || (t.state === 'needs_input' || t.state === 'working' ? 'm' : 's');
-  const st = STATE[t.state] || STATE.exited;
+  const st = t.ask && ASK[t.ask] ? { ...ASK[t.ask], cls: 'blocked' } : STATE[t.state] || STATE.exited;
   const pr = progressOf(t);
   const live = !['merged', 'discarded'].includes(t.state);
   const careful = !!p?.careful;

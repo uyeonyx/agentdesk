@@ -30,6 +30,11 @@
   --faint: #6f7581;
   --danger: #f2706b;
   --ok: #4cc38a;
+  /* An agent stuck until you answer. Not a project color, so it reads the same in every room. */
+  --warn: #f5b544;
+  --warn-ink: #1d1606;
+  --warn-soft: rgba(245, 181, 68, 0.1);
+  --warn-line: rgba(245, 181, 68, 0.55);
   --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
   --mono: 'SF Mono', ui-monospace, Menlo, 'JetBrains Mono', D2Coding, Consolas, monospace;
   --r-sm: 6px;
@@ -132,6 +137,7 @@ kbd {
 .chip.addp { flex: none; }
 .chip .count { font-size: 11.5px; font-weight: 650; color: var(--room-ink); background: var(--room); border-radius: 999px; padding: 0 6px; line-height: 17px; }
 .chip.all .count { background: var(--line-strong); color: var(--text); }
+.chip .count.hot, .chip.all .count.hot { background: var(--warn); color: var(--warn-ink); }
 .topbar .right { display: flex; align-items: center; gap: 6px; flex: none; }
 /* The top bar is the window's title bar: drag the window by it, click what's on it. */
 .topbar { -webkit-app-region: drag; user-select: none; }
@@ -198,6 +204,14 @@ body:has(.scrim) .topbar { -webkit-app-region: no-drag; }
 .row .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 11.5px; color: var(--faint); padding-top: 1px; }
 .row .st { font-size: 16px; color: var(--text); height: 16px; }
 .row.done { opacity: 0.6; }
+/* Stuck on you: tinted, with a bar down the left and a pulsing mark, whatever the project color. */
+.lane-h.hot, .lane-h.hot .n, .lane-h.hot .ti { color: var(--warn); }
+.row.blocked { background: var(--warn-soft); border-color: var(--warn-line); }
+.row.blocked::before { content: ''; position: absolute; left: -1px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--warn); }
+.row.blocked .st { color: var(--warn); animation: beckon 1.6s ease-in-out infinite; }
+.row.blocked .s { color: var(--text); }
+@keyframes beckon { 50% { opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .row.blocked .st { animation: none; } }
 .stat { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
 .stat .a { color: var(--ok); }
 .stat .d { color: var(--danger); margin-left: 4px; }
@@ -666,6 +680,7 @@ textarea.input { height: auto; padding: 10px 12px; line-height: 1.55; resize: no
 .lanecount { display: flex; gap: 12px; font-size: 12.5px; color: var(--faint); }
 .lanecount b { color: var(--text); font-weight: 700; margin-left: 2px; }
 .lanecount .needs b { color: var(--room-text); }
+.lanecount .blocked, .lanecount .blocked b { color: var(--warn); }
 .chk { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
 .chk input { margin: 0; }
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 12px; align-items: start; grid-auto-flow: row dense; }
@@ -678,6 +693,8 @@ textarea.input { height: auto; padding: 10px 12px; line-height: 1.55; resize: no
 .card.size-l { grid-column: span 2; }
 .card.done { opacity: 0.6; }
 .card.needs { box-shadow: 0 0 0 4px var(--room-glow); }
+.card.blocked { box-shadow: 0 0 0 2px var(--warn), 0 0 0 6px rgba(245, 181, 68, 0.22); }
+.card.blocked .creason { color: var(--text); }
 .card .ch { display: flex; align-items: center; gap: 10px; padding: 10px 10px 10px 12px; background: linear-gradient(var(--room-soft), var(--room-soft)), var(--panel); border-bottom: 1px solid var(--room-line); min-width: 0; user-select: none; }
 .card .cid { min-width: 0; flex: 1; }
 .card .cp { font-weight: 720; font-size: 14px; color: var(--room-text); letter-spacing: -0.015em; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -685,6 +702,7 @@ textarea.input { height: auto; padding: 10px 12px; line-height: 1.55; resize: no
 .stchip { display: inline-flex; align-items: center; gap: 5px; flex: none; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 11.5px; font-weight: 650; background: var(--bg); border: 1px solid var(--line-strong); color: var(--muted); }
 .stchip .spin { width: 10px; height: 10px; border-width: 1.5px; border-top-color: var(--room); }
 .stchip.needs { background: var(--room); color: var(--room-ink); border-color: var(--room); }
+.stchip.blocked { background: var(--warn); color: var(--warn-ink); border-color: var(--warn); }
 .stchip.review { color: var(--text); border-color: var(--room-line); }
 .sizes { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 7px; overflow: hidden; margin-right: 2px; }
 .sizes button { width: 22px; height: 22px; border: 0; background: transparent; color: var(--faint); font-size: 10.5px; font-weight: 700; padding: 0; }
