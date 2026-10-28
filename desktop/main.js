@@ -305,7 +305,8 @@ async function runApp() {
         if (response !== 0) return;
       }
       quitting = true;
-      await Promise.race([ask('shutdown'), new Promise((r) => setTimeout(r, 3000))]);
+      // The core waits up to 3 s for terminals to close before it answers.
+      await Promise.race([ask('shutdown'), new Promise((r) => setTimeout(r, 5000))]);
       // A downloaded, verified update swaps in once this process has exited.
       updater.applyOnExit();
       app.quit();

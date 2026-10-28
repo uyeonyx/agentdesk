@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import pty from '@lydell/node-pty';
-import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, realPath, trace } from './util.js';
+import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, realPath } from './util.js';
 import * as G from './git.js';
 import { AGENTS, lastAssistantText, summarize } from './agents.js';
 import { httpError, addProject } from './projects.js';
@@ -1223,19 +1223,19 @@ export class Tasks {
     return t;
   }
 
+  /** Stops every agent; resolves once their terminals have closed (Windows needs a moment for ConPTY). */
   shutdown() {
     clearInterval(this.changesTimer);
     clearInterval(this.codexTimer);
     clearInterval(this.watchTimer);
-    for (const [id, r] of this.rt) {
+    const closed = [];
+    for (const [, r] of this.rt) {
+      closed.push(new Promise((resolve) => r.proc.onExit(() => resolve())));
       try {
-        trace(`task kill ${id} pid=${r.proc.pid}`);
         r.proc.kill();
-        trace(`task killed ${id}`);
-      } catch (e) {
-        trace(`task kill error ${id} ${e.message}`);
-      }
+      } catch {}
     }
+    return Promise.all(closed);
   }
 }
 

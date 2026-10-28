@@ -12,7 +12,7 @@ import { availability, configureHooks } from './agents.js';
 import { listSessions } from './sessions.js';
 import { Shells, isShellId, needShellTask } from './shells.js';
 import { startHookServer } from './hookserver.js';
-import { VERSION, tilde, trace } from './util.js';
+import { VERSION, tilde } from './util.js';
 
 const BODY_LIMIT = 1_000_000;
 const IMAGE_TYPES = { '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon' };
@@ -235,21 +235,22 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
   warmTimer.unref?.();
   warmEvery.unref?.();
 
-  let closed = false;
+  let closing = null;
+  /**
+   * Stop agents and shells and wait (up to 3 s) for their terminals to close, then save. Exiting
+   * right after kill() leaves Windows console hosts behind, still holding this process's pipes.
+   */
   function shutdown() {
-    if (closed) return;
-    closed = true;
-    trace('core shutdown: tasks');
-    tasks.shutdown();
-    trace('core shutdown: shells');
-    shells.shutdown();
-    trace('core shutdown: rest');
+    if (closing) return closing;
     clearTimeout(warmTimer);
     clearInterval(warmEvery);
     clearTimeout(broadcastTimer);
-    store.flush();
-    hooks.close();
-    trace('core shutdown: done');
+    const closed = Promise.all([tasks.shutdown(), shells.shutdown()]);
+    closing = Promise.race([closed, new Promise((r) => setTimeout(r, 3000))]).then(() => {
+      store.flush();
+      hooks.close();
+    });
+    return closing;
   }
 
   if (!quiet) console.log(`Agent Desk ${VERSION} core ready · hooks at ${hooks.path}`);

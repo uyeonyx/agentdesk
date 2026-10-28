@@ -82,9 +82,10 @@ parent.on('message', ({ data: m, ports }) => {
   if (m?.t === 'peer' && ports[0]) attach(ports[0]);
   else if (m?.t === 'status') parent.postMessage({ t: 'status', running: core.running() });
   else if (m?.t === 'shutdown') {
-    core.shutdown();
-    parent.postMessage({ t: 'bye' });
-    setTimeout(() => process.exit(0), 50);
+    core.shutdown().then(() => {
+      parent.postMessage({ t: 'bye' });
+      setTimeout(() => process.exit(0), 50);
+    });
   }
 });
 

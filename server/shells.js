@@ -127,12 +127,17 @@ export class Shells {
     this.byId.delete(s.id);
   }
 
+  /** Closes every shell; resolves once their terminals have closed. */
   shutdown() {
+    const closed = [];
     for (const s of this.byId.values()) {
+      if (s.exited) continue;
+      closed.push(new Promise((resolve) => s.proc.onExit(() => resolve())));
       try {
         s.proc.kill();
       } catch {}
     }
+    return Promise.all(closed);
   }
 }
 
