@@ -1,0 +1,38 @@
+name: ci
+on:
+  push:
+    branches: [main, desktop]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.27.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: unit tests (core, hook socket, app shell rules)
+        run: pnpm test
+      - name: package (unpacked)
+        run: pnpm build && pnpm exec electron-builder --dir --publish never
+      - name: end to end on the packaged app
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then exe="$PWD/release/win-unpacked/Agent Desk.exe"; else exe="$(ls -d "$PWD"/release/mac*/Agent\ Desk.app)/Contents/MacOS/Agent Desk"; fi
+          AGENTDESK_E2E_EXE="$exe" pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-${{ matrix.os }}
+          path: test-results/
