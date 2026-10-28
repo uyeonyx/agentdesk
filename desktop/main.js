@@ -1,6 +1,6 @@
 // Agent Desk's main process: the window, the app:// page, menus and lifecycle. The Desk itself
 // runs in a separate core process (core-host.js); this process only connects windows to it.
-import { app, BrowserWindow, Menu, MessageChannelMain, dialog, ipcMain, net, protocol, session, shell, utilityProcess } from 'electron';
+import { app, BrowserWindow, Menu, MessageChannelMain, dialog, ipcMain, nativeTheme, net, protocol, session, shell, utilityProcess } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -138,6 +138,43 @@ async function runApp() {
     w.webContents.postMessage('desk:port', null, [port2]);
   }
 
+  // ------------------------------------------------------------ window chrome
+
+  // The title bar is the page's own top bar: macOS keeps only the traffic lights, Windows overlays
+  // its caption buttons. Their colors, the window background and the native theme (menus, dialogs)
+  // follow whatever the page's top bar looks like; the page reports it on load and whenever its
+  // theme changes, and the last report is kept so the next launch opens in the same colors.
+  const BAR_H = 48;
+  const chromeFile = path.join(app.getPath('userData'), 'chrome.json');
+  let chrome = { bg: '#1a1c21', fg: '#e7e9ed', dark: true };
+  try {
+    const saved = JSON.parse(fs.readFileSync(chromeFile, 'utf8'));
+    if (isHex(saved.bg) && isHex(saved.fg)) chrome = { bg: saved.bg, fg: saved.fg, dark: !!saved.dark };
+  } catch {}
+  nativeTheme.themeSource = chrome.dark ? 'dark' : 'light';
+
+  function isHex(c) {
+    return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+  }
+
+  function applyChrome(w) {
+    nativeTheme.themeSource = chrome.dark ? 'dark' : 'light';
+    if (!w || w.isDestroyed()) return;
+    w.setBackgroundColor(chrome.bg);
+    if (!mac) w.setTitleBarOverlay({ color: chrome.bg, symbolColor: chrome.fg, height: BAR_H - 1 });
+  }
+
+  ipcMain.on('desk:chrome', (e, c) => {
+    if (!isTrustedFrame(e.senderFrame) || !isHex(c?.bg) || !isHex(c?.fg)) return;
+    const next = { bg: c.bg.toLowerCase(), fg: c.fg.toLowerCase(), dark: !!c.dark };
+    if (next.bg === chrome.bg && next.fg === chrome.fg && next.dark === chrome.dark) return;
+    chrome = next;
+    applyChrome(win);
+    try {
+      fs.writeFileSync(chromeFile, JSON.stringify(chrome));
+    } catch {}
+  });
+
   // ------------------------------------------------------------ window
 
   function createWindow() {
@@ -147,9 +184,11 @@ async function runApp() {
       minWidth: 860,
       minHeight: 560,
       show: false,
-      backgroundColor: '#111113',
+      backgroundColor: chrome.bg,
       title: 'Agent Desk',
-      autoHideMenuBar: !mac,
+      ...(mac
+        ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 17 } }
+        : { titleBarStyle: 'hidden', titleBarOverlay: { color: chrome.bg, symbolColor: chrome.fg, height: BAR_H - 1 } }),
       webPreferences: {
         preload: path.join(here, 'preload.cjs'),
         contextIsolation: true,
@@ -172,6 +211,9 @@ async function runApp() {
     wc.on('did-finish-load', () => connectWindow(win));
     wc.on('context-menu', (_e, params) => editMenu(params).popup({ window: win }));
     win.once('ready-to-show', () => win.show());
+    // Full screen hides the traffic lights: the top bar can use that space again.
+    win.on('enter-full-screen', () => wc.send('desk:fullscreen', true));
+    win.on('leave-full-screen', () => wc.send('desk:fullscreen', false));
     win.on('close', (e) => {
       if (quitting) return;
       e.preventDefault();

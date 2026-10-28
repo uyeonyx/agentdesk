@@ -118,6 +118,28 @@ test('a task room: the agent terminal, then the Monaco diff of its changes', asy
   await page.screenshot({ path: path.join(tmp, 'review.png') });
 });
 
+test('the top bar is the title bar: room for the window controls, colors handed to the window', async () => {
+  const os = process.platform === 'darwin' ? 'os-darwin' : process.platform === 'win32' ? 'os-win32' : `os-${process.platform}`;
+  expect(await page.evaluate(() => document.documentElement.className)).toContain(os);
+  const bar = await page.evaluate(() => {
+    const cs = getComputedStyle(document.querySelector('.topbar'));
+    return { pl: cs.paddingLeft, pr: cs.paddingRight, drag: cs.getPropertyValue('-webkit-app-region') || cs.webkitAppRegion, bg: cs.backgroundColor };
+  });
+  if (process.platform === 'darwin') expect(bar.pl).toBe('84px');
+  if (process.platform === 'win32') expect(parseFloat(bar.pr)).toBeGreaterThan(100);
+  expect(bar.drag).toBe('drag');
+  // A theme change on <html> reaches the window (and is kept for the next launch).
+  const file = path.join(tmp, 'home', 'electron', 'chrome.json');
+  const rgb = '#' + bar.bg.match(/\d+/g).slice(0, 3).map((n) => (+n).toString(16).padStart(2, '0')).join('');
+  expect(rgb).toBe('#1a1c21');
+  await page.evaluate(() => document.documentElement.style.setProperty('--bg', '#f4f4f6'));
+  await expect.poll(() => fs.existsSync(file) && JSON.parse(fs.readFileSync(file, 'utf8')).bg).toBe('#f4f4f6');
+  expect(JSON.parse(fs.readFileSync(file, 'utf8')).dark).toBe(false);
+  await page.evaluate(() => document.documentElement.style.removeProperty('--bg'));
+  await expect.poll(() => JSON.parse(fs.readFileSync(file, 'utf8'))).toEqual({ bg: rgb, fg: expect.stringMatching(/^#[0-9a-f]{6}$/), dark: true });
+  await page.screenshot({ path: path.join(tmp, 'titlebar.png'), clip: { x: 0, y: 0, width: 700, height: 60 } });
+});
+
 test('no errors or CSP refusals in the page', () => {
   expect(problems).toEqual([]);
 });

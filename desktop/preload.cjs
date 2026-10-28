@@ -80,6 +80,15 @@ contextBridge.exposeInMainWorld('desk', {
   focus() {
     ipcRenderer.send('desk:focus');
   },
+  /** The top bar's colors, so the window's title bar area, background and native menus match. */
+  setChrome({ bg, fg, dark }) {
+    ipcRenderer.send('desk:chrome', { bg: String(bg), fg: String(fg), dark: !!dark });
+  },
+  onFullscreen(fn) {
+    const h = (_e, on) => fn(!!on);
+    ipcRenderer.on('desk:fullscreen', h);
+    return () => ipcRenderer.off('desk:fullscreen', h);
+  },
   /** 'state' | 'check' | 'download' | 'apply' | 'page' → the update state (see desktop/updater.js). */
   update(action) {
     return ipcRenderer.invoke('desk:update', String(action));

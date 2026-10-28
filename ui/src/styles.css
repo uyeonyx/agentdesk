@@ -133,6 +133,15 @@ kbd {
 .chip .count { font-size: 11.5px; font-weight: 650; color: var(--room-ink); background: var(--room); border-radius: 999px; padding: 0 6px; line-height: 17px; }
 .chip.all .count { background: var(--line-strong); color: var(--text); }
 .topbar .right { display: flex; align-items: center; gap: 6px; flex: none; }
+/* The top bar is the window's title bar: drag the window by it, click what's on it. */
+.topbar { -webkit-app-region: drag; user-select: none; }
+.topbar :is(button, a, input, kbd, [role='tab']) { -webkit-app-region: no-drag; }
+/* Anything over the bar (dialogs, the palette) must get its clicks, not the window drag. */
+body:has(.scrim) .topbar { -webkit-app-region: no-drag; }
+/* macOS traffic lights sit at the left of the bar (hidden in full screen); Windows caption buttons at the right. */
+.os-darwin .topbar { padding-left: 84px; }
+.os-darwin.fullscreen .topbar { padding-left: 16px; }
+.os-win32 .topbar { padding-right: calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100vw - 150px)) + 8px); }
 .conn { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
 .conn.off { background: var(--danger); animation: blink 1s steps(2) infinite; }
 .btn.sm.upd { border-color: color-mix(in srgb, var(--ok) 55%, transparent); color: var(--ok); }

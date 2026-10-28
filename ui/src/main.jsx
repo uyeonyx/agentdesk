@@ -209,3 +209,38 @@ onState((prev, next) => {
 connect();
 watchUpdates();
 render(<App />, document.getElementById('app'));
+windowChrome();
+
+/**
+ * The window has no native title bar: the top bar is it. Mark the platform so CSS leaves room for
+ * the traffic lights (macOS) or the caption buttons (Windows), and tell the app the top bar's
+ * colors, now and whenever the theme changes, so those controls, the window background and native
+ * menus match.
+ */
+function windowChrome() {
+  const root = document.documentElement;
+  root.classList.add(`os-${window.desk.platform}`);
+  window.desk.onFullscreen((on) => root.classList.toggle('fullscreen', on));
+  const hex = (c) => {
+    const m = String(c).match(/\d+(\.\d+)?/g);
+    return m ? '#' + m.slice(0, 3).map((n) => Math.round(+n).toString(16).padStart(2, '0')).join('') : null;
+  };
+  const report = () => {
+    const bar = document.querySelector('.topbar') || document.body;
+    const bg = hex(getComputedStyle(bar).backgroundColor);
+    const fg = hex(getComputedStyle(bar).color);
+    if (!bg || !fg) return;
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(bg.slice(i, i + 2), 16) / 255);
+    window.desk.setChrome({ bg, fg, dark: 0.2126 * r + 0.7152 * g + 0.0722 * b < 0.5 });
+  };
+  let t;
+  const later = () => {
+    clearTimeout(t);
+    t = setTimeout(report, 50);
+  };
+  // A theme is a class, attribute or style on <html> or <body>, or the system's light/dark setting.
+  const watch = new MutationObserver(later);
+  for (const el of [root, document.body]) watch.observe(el, { attributes: true, attributeFilter: ['class', 'style', 'data-theme'] });
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', later);
+  requestAnimationFrame(report);
+}
