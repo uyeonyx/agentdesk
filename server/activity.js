@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { realPath } from './util.js';
+import { describeTool, relTo } from './transcript.js';
 
 const FEED_MAX = 120;
 const SUB_FEED_MAX = 30;
@@ -28,56 +29,7 @@ function planStatus(s) {
   return 'pending';
 }
 
-function relTo(cwd, p) {
-  if (typeof p !== 'string') return '';
-  // Shown like every other repo path in the UI: with "/" (Windows hands us "\\").
-  if (cwd && (p === cwd || p.startsWith(cwd + path.sep))) return p.slice(cwd.length + 1).split(path.sep).join('/') || '.';
-  return p.replace(os.homedir(), '~');
-}
 
-/** Short human line for a tool call. kind drives the icon in the UI. */
-export function describeTool(name, input = {}, cwd = '') {
-  const n = String(name || '');
-  const i = input && typeof input === 'object' ? input : {};
-  switch (n) {
-    case 'Bash':
-      return { kind: 'cmd', text: `$ ${clip(String(i.command || '').split('\n')[0], 110)}` };
-    case 'Edit':
-    case 'MultiEdit':
-      return { kind: 'edit', text: `수정 ${relTo(cwd, i.file_path)}` };
-    case 'Write':
-      return { kind: 'edit', text: `작성 ${relTo(cwd, i.file_path)}` };
-    case 'NotebookEdit':
-      return { kind: 'edit', text: `노트북 수정 ${relTo(cwd, i.notebook_path)}` };
-    case 'Read':
-      return { kind: 'read', text: `읽기 ${relTo(cwd, i.file_path)}` };
-    case 'Grep':
-      return { kind: 'search', text: `찾기 "${clip(i.pattern, 60)}"` };
-    case 'Glob':
-      return { kind: 'search', text: `파일 찾기 ${clip(i.pattern, 60)}` };
-    case 'WebFetch':
-      return { kind: 'web', text: `웹 ${clip(safeHost(i.url), 60)}` };
-    case 'WebSearch':
-      return { kind: 'web', text: `검색 "${clip(i.query, 60)}"` };
-    case 'AskUserQuestion':
-      return { kind: 'ask', text: '질문하기' };
-    case 'ExitPlanMode':
-      return { kind: 'plan', text: '계획 승인 요청' };
-    case 'Agent':
-    case 'Task':
-      return { kind: 'agent', text: `서브에이전트: ${clip(i.description || i.subagent_type || '작업', 80)}` };
-    case 'TodoWrite':
-    case 'TaskCreate':
-    case 'TaskUpdate':
-      return { kind: 'plan', text: '할 일 갱신' };
-    default:
-      if (n.startsWith('mcp__')) {
-        const [, server, tool] = n.split('__');
-        return { kind: 'tool', text: `${server}: ${tool}` };
-      }
-      return { kind: 'tool', text: n };
-  }
-}
 
 function safeHost(u) {
   try {

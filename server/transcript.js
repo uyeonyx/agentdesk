@@ -152,8 +152,13 @@ function planStatus(s) {
 
 export function relTo(cwd, p) {
   if (typeof p !== 'string') return '';
-  // Shown like every other repo path in the UI: with "/" (Windows hands us "\\").
-  if (cwd && (p === cwd || p.startsWith(cwd + path.sep))) return p.slice(cwd.length + 1).split(path.sep).join('/') || '.';
+  // Shown like every other repo path in the UI: with "/". Either separator can arrive on Windows
+  // (tools hand over "C:/x" as often as "C:\\x"), and drive letters differ in case.
+  const slash = (s) => s.replace(/\\/g, '/');
+  const c = slash(cwd || '').replace(/\/+$/, '');
+  const q = slash(p);
+  const same = (a, b) => (process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b);
+  if (c && (same(q, c) || same(q.slice(0, c.length + 1), c + '/'))) return q.slice(c.length + 1) || '.';
   return p.replace(os.homedir(), '~');
 }
 

@@ -56,6 +56,28 @@ test('careful projects ask for a second press; a stale card is refused', async (
   await ctx.api('POST', `/api/tasks/${t.id}/discard`);
 });
 
+test('one block announced twice is one card: the id holds and the detailed version stays', async () => {
+  const t = await start(one.id, 'just answer: 잠깐');
+  await ctx.waitTask(t.id, (x) => x.state === 'needs_input' || x.state === 'review');
+  const hook = (payload) => ctx.s.tasks.hook({ task: t.id, agent: 'claude', payload });
+  const card = async () => (await ctx.api('GET', '/api/state')).json.tasks.find((x) => x.id === t.id).prompt;
+  const bash = { hook_event_name: 'PermissionRequest', tool_name: 'Bash', tool_input: { command: 'rm -rf build' } };
+  // The bare notice first, then the hook that names the command: same card, now with the command.
+  await hook({ hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'Claude needs your permission to use Bash' });
+  const a = await card();
+  await hook(bash);
+  const b = await card();
+  assert.equal(b.id, a.id);
+  assert.equal(b.command.text, 'rm -rf build');
+  // The same call again, and a late bare notice: still the same card, still detailed.
+  await hook(bash);
+  await hook({ hook_event_name: 'Notification', notification_type: 'permission_prompt', message: 'Claude needs your permission' });
+  const c = await card();
+  assert.equal(c.id, a.id);
+  assert.equal(c.command.text, 'rm -rf build');
+  await ctx.api('POST', `/api/tasks/${t.id}/discard`);
+});
+
 test('an Edit permission shows the diff with the file own line numbers', async () => {
   const t = await start(one.id, 'askedit 제목 바꾸기');
   const x = await blocked(t.id);

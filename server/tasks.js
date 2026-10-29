@@ -484,17 +484,20 @@ export class Tasks {
       r.byHook = true;
     }
     const prev = task.state === 'needs_input' ? this.prompts.get(task.id) : null;
+    // One block can be announced more than once: PreToolUse then PermissionRequest for the same call,
+    // or a bare "needs your permission" notice before or after the hook that names the tool. It's
+    // the same question: keep its id (a card already on screen must not be refused as stale), and
+    // never trade the detailed version for the bare one.
+    if (prev?.tool && !p.tool_name) return;
     this.setState(task, 'needs_input', reason, { ask });
     if (r && p.tool_name) r.askTool = { name: p.tool_name, input: JSON.stringify(p.tool_input ?? null) };
     const kind = p.tool_name === 'AskUserQuestion' ? 'question' : p.tool_name === 'ExitPlanMode' ? 'plan' : ask === 'question' ? 'elicitation' : 'permission';
     const feed = task.activity?.feed || [];
     const running = [...feed].reverse().find((f) => f.st === 'run' && !f.by);
     const next = buildPrompt({ task, kind, tool: p.tool_name || '', input: p.tool_input, message: p.tool_name ? '' : reason, by: p.agent_id ? { agentId: p.agent_id, type: p.agent_type } : null, running });
-    // One tool call can announce itself twice (PreToolUse, then PermissionRequest). It's the same
-    // question: keep its id, or a card already on screen would be refused as stale.
     const sig = JSON.stringify([kind, p.tool_name || '', p.tool_input ?? null, p.agent_id || '']);
     Object.defineProperty(next, 'sig', { value: sig });
-    if (prev?.sig === sig) Object.assign(next, { id: prev.id, at: prev.at });
+    if (prev && (prev.sig === sig || !prev.tool)) Object.assign(next, { id: prev.id, at: prev.at });
     this.prompts.set(task.id, next);
     this.changed();
   }
