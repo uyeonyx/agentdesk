@@ -111,7 +111,7 @@
   justify-content: flex-end;
   gap: 6px;
 }
-.yours {
+.turnpill {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -121,19 +121,19 @@
   font-weight: var(--w-3);
   font-size: var(--fs-2);
 }
-.yours .dot {
+.turnpill .dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--text-2);
 }
-.yours.hot {
+.turnpill.hot {
   color: var(--warn-text);
 }
-.yours.hot .dot {
+.turnpill.hot .dot {
   background: var(--warn);
 }
-.yours.on {
+.turnpill.on {
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .upd {

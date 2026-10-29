@@ -234,7 +234,8 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
         else if (m.t === 'in' && isShellId(m.task)) shells.input(m.task, m.d);
         else if (m.t === 'in' && typeof m.task === 'string') tasks.input(m.task, m.d);
         else if (m.t === 'resize' && isShellId(m.task)) shells.resize(m.task, m.cols, m.rows);
-        else if (m.t === 'resize' && typeof m.task === 'string') tasks.resize(m.task, m.cols, m.rows);
+        // Only a window that has this terminal open sizes it (a late resize from a closed drawer must not shrink it again).
+        else if (m.t === 'resize' && typeof m.task === 'string' && tasks.viewers.get(peer) === m.task) tasks.resize(m.task, m.cols, m.rows);
         else if (m.t === 'convo' && typeof m.task === 'string') m.op === 'unsub' ? tasks.convos.unsub(peer, m.task) : tasks.convos.sub(peer, m.task);
         else if (m.t === 'submit' && typeof m.task === 'string') {
           tasks

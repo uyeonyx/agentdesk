@@ -42,6 +42,7 @@ export const ASK = {
   elicitation: { label: '답 필요', short: '질문', icon: 'message-circle-question' },
   menu: { label: '선택 필요', short: '선택', icon: 'list-numbers' },
   choice: { label: '선택 필요', short: '선택', icon: 'list-numbers' },
+  terminal: { label: '터미널에서 답하기', short: '터미널', icon: 'terminal-2' },
 };
 
 export function askOf(t) {

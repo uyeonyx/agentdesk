@@ -100,6 +100,26 @@ function tabsAbove(lines, from) {
 }
 
 /**
+ * Screens a CLI shows before it takes any instruction, answered only in its own terminal: trusting
+ * a folder, signing in, first-run setup. Desk can't answer them for you (and typing a message into
+ * one would pick whatever is highlighted), so the task says what's there and where to answer it.
+ */
+const GATES = [
+  [/Yes, I trust this folder|Do you trust the files in this folder/i, 'Claude Code가 이 폴더를 믿을지 물어요'],
+  [/Select login method|Please run \/login/i, 'Claude Code 로그인이 필요해요'],
+  [/Choose the text style that looks best/i, 'Claude Code 처음 실행 설정을 기다려요'],
+  [/Sign in with ChatGPT/i, 'Codex 로그인이 필요해요'],
+];
+export function gateFromLines(lines) {
+  let end = lines.length;
+  while (end > 0 && !lines[end - 1].trim()) end--;
+  // Only the bottom of the screen: these phrases higher up are just text in a reply.
+  const text = lines.slice(Math.max(0, end - 20), end).join('\n');
+  for (const [re, what] of GATES) if (re.test(text)) return what;
+  return null;
+}
+
+/**
  * The text in the agent's input box, if the cursor is in one: Claude Code's "> " / "│ > " box and
  * Codex's "› ". `lines` should have dim placeholder text blanked out. null when there is no input
  * box under the cursor (or a menu is up: Enter there picks an option, it's never a message).
@@ -157,6 +177,9 @@ export function planChoices(menu, { careful = false } = {}) {
     } else if (/auto.?accept|accept edits|allow all edits/i.test(l)) {
       action = 'approve';
       ko = '승인 · 수정은 자동 허락';
+    } else if (/auto mode/i.test(l)) {
+      action = 'approve';
+      ko = '승인 · 자동 모드로 진행';
     } else if (/manual/i.test(l)) {
       action = 'approve';
       ko = '승인 · 수정마다 확인';
@@ -167,6 +190,8 @@ export function planChoices(menu, { careful = false } = {}) {
       action = 'keep';
       ko = '계획 더 다듬기';
     } else continue;
+    // "Yes, clear context and …": the plan goes on in a fresh conversation.
+    if (action === 'approve' && /clear context/i.test(l)) ko = ko.replace('승인', '승인 · 대화 비우고');
     out.push({ key: o.key, label: l, ko, action });
   }
   return out;

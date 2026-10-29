@@ -145,6 +145,7 @@ function AgentTerminal({ task, project }) {
       off();
       offTheme();
       ro.disconnect();
+      cancelAnimationFrame(raf);
       detachTerm(task.id);
       term.dispose();
     };
@@ -226,6 +227,7 @@ function ShellTerminal({ task, project }) {
       off();
       offTheme();
       ro.disconnect();
+      cancelAnimationFrame(raf);
       detachTerm(info.id);
       term.dispose();
     };

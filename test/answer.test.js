@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { boot, makeRepo } from './helpers.js';
+import { buildPrompt } from '../server/prompt.js';
 
 let ctx;
 let one;
@@ -75,6 +76,21 @@ test('one block announced twice is one card: the id holds and the detailed versi
   const c = await card();
   assert.equal(c.id, a.id);
   assert.equal(c.command.text, 'rm -rf build');
+  await ctx.api('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('a hand-back or task notification arriving as a prompt is not recorded as an instruction of mine', async () => {
+  const t = await start(one.id, 'just answer: 잠깐');
+  await ctx.waitTask(t.id, (x) => x.state === 'needs_input' || x.state === 'review');
+  const count = async () => (await ctx.api('GET', '/api/state')).json.tasks.find((x) => x.id === t.id).messages.length;
+  const n = await count();
+  const prompt = (text) => ctx.s.tasks.hook({ task: t.id, agent: 'claude', payload: { hook_event_name: 'UserPromptSubmit', prompt: text } });
+  await prompt('Another Claude session sent a message:\n<agent-message from="a333">\n[Subagent hand-back] …</agent-message>');
+  await prompt('<task-notification>\n<task-id>b1</task-id>\n<status>completed</status>\n</task-notification>');
+  assert.equal(await count(), n);
+  // Something a person typed elsewhere still is.
+  await prompt('테스트도 돌려 줘');
+  assert.equal(await count(), n + 1);
   await ctx.api('POST', `/api/tasks/${t.id}/discard`);
 });
 
@@ -169,4 +185,12 @@ test('a pasted image is saved where the agent can read it', async () => {
   assert.ok(fs.existsSync(r.json.path) && r.json.path.endsWith('.png'));
   assert.equal((await ctx.api('POST', `/api/tasks/${t.id}/attachments`, { type: 'text/html', data: png })).status, 400);
   await ctx.api('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('a new file on the card: its lines, not a phantom empty one after the final newline', () => {
+  const p = buildPrompt({ task: { cwd: '/nowhere-' + Date.now() }, kind: 'permission', tool: 'Write', input: { file_path: '/nowhere/hello.txt', content: 'hi\n' } });
+  const f = p.edit.files[0];
+  assert.equal(f.op, 'create');
+  assert.deepEqual(f.hunks[0].lines, ['+hi']);
+  assert.deepEqual([f.adds, f.dels], [1, 0]);
 });

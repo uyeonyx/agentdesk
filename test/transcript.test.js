@@ -178,6 +178,42 @@ test('claude: background commands and agents finish by notification, hand-back o
   assert.match(notices[0].summary, /exit code 0/);
 });
 
+test('claude: a hand-back delivered as a message from the subagent (SubagentHandback) fills its card', () => {
+  const at = (sec) => `2026-10-29T02:53:${String(sec).padStart(2, '0')}.000Z`;
+  const r = run({ agent: 'claude', cwd: '/work/demo' }, [
+    { type: 'user', uuid: 'u1', timestamp: at(0), message: { role: 'user', content: 'README 첫 줄을 서브에이전트로 읽어 줘' } },
+    { type: 'assistant', uuid: 'a1', timestamp: at(1), message: { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_hb', name: 'Agent', input: { description: 'README 첫 줄 읽기', subagent_type: 'general-purpose', prompt: 'Read the first line', run_in_background: true } }] } },
+    {
+      type: 'user',
+      uuid: 'u2',
+      timestamp: at(2),
+      message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_hb', content: 'This agent\'s report was delivered to you as a message from "a333" (its SubagentHandback call). Read it there; it is not repeated here.' }] },
+      toolUseResult: { agentId: 'a333', isAsync: true, status: 'async_launched' },
+    },
+    {
+      type: 'user',
+      uuid: 'u3',
+      timestamp: at(9),
+      isMeta: true,
+      message: { role: 'user', content: 'Another Claude session sent a message:\n<agent-message from="a333">\n[Subagent hand-back] The text below is the final report…' },
+      origin: { kind: 'peer', from: 'a333', handback: true, body: '[Subagent hand-back] …', handbackReportText: 'README.md의 첫 줄은 # Real repo 예요.' },
+    },
+    // Then the task notification, whose result only points back at that message.
+    {
+      type: 'user',
+      uuid: 'u4',
+      timestamp: at(10),
+      message: { role: 'user', content: '<task-notification>\n<task-id>a333</task-id>\n<tool-use-id>toolu_hb</tool-use-id>\n<status>completed</status>\n<summary>Agent "README 첫 줄 읽기" finished</summary>\n<result>This agent\'s report was delivered to you as a message from "a333" (its SubagentHandback call). Read it there; it is not repeated here.</result>\n</task-notification>' },
+    },
+  ]);
+  const card = byTool(r, 'toolu_hb');
+  assert.equal(card.detail.agentId, 'a333');
+  assert.equal(card.detail.result, 'README.md의 첫 줄은 # Real repo 예요.');
+  assert.equal(card.st, 'ok');
+  // The hand-back is the subagent's, not a turn of mine.
+  assert.equal(r.list.filter((e) => e.kind === 'user').length, 1);
+});
+
 test('claude: notices, compaction and turn ends', () => {
   const r = claudeRich();
   const notice = (re) => r.list.find((e) => e.kind === 'notice' && re.test(e.text));

@@ -67,7 +67,9 @@ export function Composer({ task, project, blocked }) {
   }, [s.draft, task.id]);
 
   const setDraft = (v) => set((st) => ({ drafts: { ...st.drafts, [task.id]: v } }));
-  const canSend = !!s.draft.trim() || s.comments.length > 0 || s.images.length > 0;
+  // A screen only the terminal can answer (trusting a folder…): typed text would pick whatever is highlighted.
+  const gated = task.ask === 'terminal';
+  const canSend = !gated && (!!s.draft.trim() || s.comments.length > 0 || s.images.length > 0);
 
   async function doSend() {
     if (!canSend || busy) return;
@@ -145,7 +147,7 @@ export function Composer({ task, project, blocked }) {
   };
 
   const popKeys = useRef();
-  const placeholder = task.watching ? '' : stopped ? '보내면 세션을 재개하고 이어서 지시해요' : yourTurn ? '답장을 적어 주세요' : task.state === 'working' ? '작업 중이에요 · 보내면 다음 지시로 이어가요' : '에이전트에게 지시하기';
+  const placeholder = task.watching ? '' : gated ? '원본 터미널에서 먼저 답해 주세요' : stopped ? '보내면 세션을 재개하고 이어서 지시해요' : yourTurn ? '답장을 적어 주세요' : task.state === 'working' ? '작업 중이에요 · 보내면 다음 지시로 이어가요' : '에이전트에게 지시하기';
   const pills = s.comments.length + s.refs.length + s.images.length;
 
   return (

@@ -53,7 +53,7 @@ export function stats(hunks) {
   return { adds, dels };
 }
 
-const splitLines = (s) => {
+export const splitLines = (s) => {
   const t = String(s ?? '');
   if (!t) return [];
   const lines = t.split('\n');

@@ -1,7 +1,7 @@
 // What the CLIs show when they wait on a person, read from terminal rows.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { menuFromLines, promptTextFromLines, menuActions, planChoices } from '../server/screen.js';
+import { menuFromLines, promptTextFromLines, menuActions, planChoices, gateFromLines } from '../server/screen.js';
 
 const rows = (s) => s.replace(/^\n/, '').split('\n');
 
@@ -167,4 +167,40 @@ test('the text in the input box, across wrapped lines, and none while a menu is 
 `);
   assert.equal(promptTextFromLines(lines, 2), '이 버그 고쳐줘\n그리고 테스트도');
   assert.equal(promptTextFromLines(lines, 2, true), null);
+});
+
+test('screens only the terminal can answer: trusting a folder, signing in; the same words in a reply are not one', () => {
+  const trust = [
+    ' Accessing workspace:',
+    '',
+    ' /tmp/repo/.agentdesk/worktrees/abc',
+    '',
+    ' Quick safety check: Is this a project you created or one you trust? (Like your own code, a well-known open source',
+    ' project, or work from your team). If not, take a moment to review what\'s in this folder first.',
+    '',
+    ' ❯ No, exit',
+    '   Yes, I trust this folder',
+    '',
+    ' Enter to confirm · Esc to cancel',
+  ];
+  assert.equal(gateFromLines(trust), 'Claude Code가 이 폴더를 믿을지 물어요');
+  assert.equal(gateFromLines(['', ' Select login method:', '', ' ❯ 1. Claude account with subscription', '   2. Anthropic Console account']), 'Claude Code 로그인이 필요해요');
+  // A reply that mentions it, with the input box and footer below and plenty of output after it.
+  const reply = ['⏺ The dialog says "Yes, I trust this folder" when a folder is new.', ...Array.from({ length: 22 }, (_, i) => `  line ${i}`), '────', '❯ ', '────', '  ? for shortcuts'];
+  assert.equal(gateFromLines(reply), null);
+  assert.equal(gateFromLines(['⏺ 다 했어요', '────', '❯ ', '────']), null);
+});
+
+test('plan approval options in my words, including the newer auto mode and clear-context ones', () => {
+  const menu = (labels) => ({ question: 'Would you like to proceed?', options: labels.map((label, i) => ({ key: String(i + 1), label })) });
+  const ko = (labels, o) => planChoices(menu(labels), o).map((c) => [c.ko, c.action]);
+  assert.deepEqual(ko(['Yes, and use auto mode', 'Yes, manually approve edits', 'Tell Claude what to change']), [
+    ['승인 · 자동 모드로 진행', 'approve'],
+    ['승인 · 수정마다 확인', 'approve'],
+    ['계획 더 다듬기', 'keep'],
+  ]);
+  assert.deepEqual(ko(['Yes, clear context and auto-accept edits', 'Yes, and bypass permissions', 'No, keep planning'], { careful: true }), [
+    ['승인 · 대화 비우고 · 수정은 자동 허락', 'approve'],
+    ['계획 더 다듬기', 'keep'],
+  ]);
 });

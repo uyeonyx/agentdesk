@@ -3,7 +3,7 @@
 // Built once, when the agent blocks; the screen part (which key is which button) is read live.
 import fs from 'node:fs';
 import path from 'node:path';
-import { diffLines, parseApplyPatch, stats } from './diff.js';
+import { diffLines, parseApplyPatch, splitLines, stats } from './diff.js';
 import { sanitize, relTo } from './transcript.js';
 import { randomId, resolveInside, realPath } from './util.js';
 import { menuActions, planChoices } from './screen.js';
@@ -96,7 +96,8 @@ function readInside(cwd, file) {
 function editOf(tool, i, before, rel) {
   if (tool === 'Write') {
     const after = String(i.content ?? '');
-    const hunks = before == null ? [{ a: null, b: 1, lines: after.split('\n').map((l) => '+' + l) }] : diffLines(before, after, { context: 3, maxLines: CAP.diffLines });
+    // A new file: its lines, the final newline ending the last one rather than starting another.
+    const hunks = before == null ? [{ a: null, b: 1, lines: splitLines(after).map((l) => '+' + l) }] : diffLines(before, after, { context: 3, maxLines: CAP.diffLines });
     return capFiles([{ path: rel, op: before == null ? 'create' : 'edit', hunks }]);
   }
   const edits = tool === 'MultiEdit' ? (Array.isArray(i.edits) ? i.edits : []) : [i];

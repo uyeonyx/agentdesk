@@ -258,7 +258,11 @@ class Convo {
         return null;
       }
     }
-    return got ? out({ ...relative(got, this.task), seq: e.seq }) : null;
+    if (!got) return null;
+    // A background agent's ending (its hand-back, its notification) lives on other lines: the call
+    // and its first result alone would show it still running, without a report.
+    if (got.cat === 'agent') got = { ...got, st: e.st, ms: e.ms ?? got.ms, detail: { ...got.detail, result: got.detail?.result || e.detail?.result || '' } };
+    return out({ ...relative(got, this.task), seq: e.seq });
   }
 }
 

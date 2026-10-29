@@ -1,10 +1,10 @@
 // One task: its conversation (or its changes, or its files), and at the bottom what it's doing
 // now, what it waits on, and where I answer.
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { useStore, set, setView, openModal } from '../../store.js';
 import { isLive, isBusy, isBlocked, labelOf, markOf } from '../../core/status.js';
 import { duration } from '../../core/turns.js';
-import { interrupt, resume, toggleDrawer, rename, setRemote } from '../../actions.js';
+import { interrupt, resume, toggleDrawer, openDrawer, rename, setRemote } from '../../actions.js';
 import { api } from '../../api.js';
 import { toast } from '../../store.js';
 import { Conversation } from '../conversation/Conversation.jsx';
@@ -171,6 +171,10 @@ function StatusLine({ task }) {
 }
 
 function TerminalNeeded({ task }) {
+  // Only the CLI's own terminal can answer this one: open it right away, once.
+  useEffect(() => {
+    if (task.ask === 'terminal') openDrawer('agent', task.id);
+  }, [task.id, task.ask === 'terminal']);
   return (
     <div class="pcard glass-2" role="region" aria-label="터미널에서 답하기">
       <div class="pc-h">

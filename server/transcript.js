@@ -491,10 +491,14 @@ function webDetail(i, text, r, caps) {
   return { query: sanitize(String(i.query ?? r?.query ?? i.action?.query ?? ''), 1000), host: '', code: null, results: hits.slice(0, caps.items).map((x) => ({ title: sanitize(x.title ?? '', 300), url: sanitize(x.url, 2000) })) };
 }
 
+// What a tool result or notification says when the report itself came as the subagent's message.
+const HANDED_BACK = /^This agent's report was delivered to you as a message from\b/;
+
 function agentDetail(i, text, r, caps) {
   // Started in the background: the tool result only says so; the real one comes in a task notification.
   const launched = r?.status === 'async_launched';
   let result = launched ? '' : (Array.isArray(r?.content) && textOf(r.content)) || text;
+  if (HANDED_BACK.test(String(result).trim())) result = '';
   let agentId = typeof r?.agentId === 'string' ? r.agentId : '';
   // Codex's spawn_agent answers with JSON that names the agent.
   if (!r && text[0] === '{') {
@@ -696,6 +700,9 @@ export function createParser({ agent = 'claude', cwd = '', parent = null, caps =
   function claudeUser(j, src, p, ops, queued = false) {
     const at = timeOf(j);
     if (j.isMeta) {
+      // A background agent's report, delivered as a message from it (SubagentHandback).
+      const o = j.origin && typeof j.origin === 'object' ? j.origin : {};
+      if (o.kind === 'peer' && o.handback) return handback(String(o.from ?? ''), o.handbackReportText ?? o.body, at, ops);
       // Inside a subagent's transcript a task notification is a meta line (after a
       // "[SYSTEM NOTIFICATION …]" preamble): it still ends that task.
       const t = textOf(j.message?.content);
@@ -833,7 +840,8 @@ export function createParser({ agent = 'claude', cwd = '', parent = null, caps =
     let st = /complete/i.test(status) ? 'ok' : failed ? 'err' : /kill|stop|cancel/i.test(status) ? 'stopped' : rec.e.st;
     const detail = { ...rec.e.detail };
     const result = tag(s, 'result');
-    if (rec.e.cat === 'agent' && result) detail.result = sanitize(result, caps.md);
+    // With SubagentHandback the notification only points at the hand-back message; keep the report.
+    if (rec.e.cat === 'agent' && result && !HANDED_BACK.test(result)) detail.result = sanitize(result, caps.md);
     const code = summary.match(/exit code (-?\d+)/i);
     if (rec.e.cat === 'cmd' && code) {
       detail.exit = +code[1];

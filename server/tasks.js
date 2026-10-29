@@ -10,7 +10,7 @@ import { ConvoHub, legacyEntries } from './convo.js';
 import { httpError, addProject } from './projects.js';
 import { findSession, liveClaude, stopClaude, queueCodex, claudeTranscriptOf } from './sessions.js';
 import { Watcher } from './watch.js';
-import { menuFromLines, promptTextFromLines } from './screen.js';
+import { gateFromLines, menuFromLines, promptTextFromLines } from './screen.js';
 import { buildPrompt, promptView, replyExcerpt } from './prompt.js';
 import { drive, answerLine, Fallback } from './answer.js';
 import { commandsIn } from './shells.js';
@@ -27,6 +27,13 @@ const { SerializeAddon } = require('@xterm/addon-serialize');
  */
 export const PTY_WIN = process.platform === 'win32' ? { useConptyDll: true } : {};
 
+// Prompts the CLI writes itself: another session's message (a subagent handing its report back), a
+// background task's notification. They aren't instructions from a person.
+const MACHINE_PROMPT = /^(Another Claude session sent a message:\s*)?<(agent-message|task-notification)\b/;
+
+// The agent's terminal while nobody watches it: tall enough for a four-question form.
+const COLS = 120;
+const ROWS = 40;
 const LIVE = new Set(['starting', 'working', 'waiting', 'needs_input', 'review', 'exited']);
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -360,8 +367,8 @@ export class Tasks {
       AGENTDESK_HOOK_TOKEN: this.auth.hookTokenFor(task.id),
       AGENTDESK_TASK: task.id,
     });
-    const cols = task.cols || 120;
-    const rows = task.rows || 40; // tall enough for a four-question form
+    const cols = task.cols || COLS;
+    const rows = Math.max(task.rows || 0, ROWS);
     this.tracker(task).restart();
     const args = ad.args({
       prompt,
@@ -417,7 +424,8 @@ export class Tasks {
     task.state = state;
     if (reason !== undefined) task.reason = reason;
     if (extra.summary) task.summary = extra.summary;
-    // What the agent is stuck on mid-turn until a person answers: 'permission', 'choice' or 'question'.
+    // What the agent is stuck on until a person answers: 'permission', 'choice', 'question', or
+    // 'terminal' (a screen only the CLI's own terminal can answer, like trusting a folder).
     task.ask = state === 'needs_input' ? extra.ask || '' : '';
     const r = this.rt.get(task.id);
     if (r) r.askTool = null;
@@ -458,8 +466,15 @@ export class Tasks {
 
   async onIdle(task, r) {
     if (this.rt.get(task.id) !== r) return;
-    if (task.state !== 'working') return;
+    if (task.state !== 'working' && task.state !== 'starting') return;
     r.byHook = false;
+    // Trusting a folder, signing in: only the CLI's own terminal can answer it.
+    const gate = gateFromLines(this.screenLines(r));
+    if (gate) {
+      this.prompts.delete(task.id);
+      return this.setState(task, 'needs_input', `${gate} · 원본 터미널에서 답해 주세요`, { ask: 'terminal' });
+    }
+    if (task.state !== 'working') return;
     await this.settle(task, this.menuOf(r) ? '선택을 기다려요' : '입력을 기다리는 것 같아요');
   }
 
@@ -563,7 +578,9 @@ export class Tasks {
       if (ev === 'Notification') return this.settle(task, String(p.message || '입력이 필요해요'));
       if (ev === 'Stop') {
         this.tracker(task).turnEnded();
-        const text = lastAssistantText(p.transcript_path) || p.last_assistant_message;
+        // The hook's own copy is this turn's; the transcript may not have its last line yet when Stop fires.
+        const hooked = typeof p.last_assistant_message === 'string' && p.last_assistant_message.trim() ? p.last_assistant_message : '';
+        const text = hooked || lastAssistantText(p.transcript_path);
         task.lastReply = typeof text === 'string' ? text.slice(-6000) : '';
         return this.settle(task, '응답을 마쳤어요', text, pendingOf(p));
       }
@@ -608,6 +625,8 @@ export class Tasks {
     }
     const text = safeTyped(String(prompt || '')).trim();
     if (!text || /^\/remote-control\b/.test(text)) return this.markInput(task);
+    // A subagent's hand-back or a task notification reaches the agent as a prompt too; nobody typed it.
+    if (MACHINE_PROMPT.test(text)) return;
     const fromHere = r && now - r.rawEnterAt < 4000;
     const snap = await this.snapshotAll(task, text.slice(0, 60));
     task.messages.push({ id: randomId('m'), text: text.slice(0, 4000), at: now, snap, source: fromHere ? 'terminal' : task.remote ? 'remote' : 'outside' });
@@ -723,7 +742,7 @@ export class Tasks {
     const lines = this.screenLines(r);
     let end = lines.length;
     while (end > 0 && !lines[end - 1].trim()) end--;
-    return { lines: lines.slice(Math.max(0, end - Math.min(40, n)), end), running: true, menu: this.menuOf(r) };
+    return { lines: lines.slice(Math.max(0, end - Math.min(40, n)), end), running: true, menu: this.menuOf(r), size: [r.term.cols, r.term.rows] };
   }
 
   // ------------------------------------------------------------ terminal I/O
@@ -738,7 +757,12 @@ export class Tasks {
   }
 
   detach(ws) {
+    const id = this.viewers.get(ws);
     this.viewers.delete(ws);
+    // Nobody is looking at the raw terminal any more: give the CLI its full height back, or the
+    // drawer's few rows would stay and long menus (a four-question form) would scroll out of reach.
+    const task = id && this.store.task(id);
+    if (task && ![...this.viewers.values()].includes(id) && (task.rows || 0) < ROWS) this.resize(id, task.cols || COLS, ROWS);
   }
 
   resize(id, cols, rows) {

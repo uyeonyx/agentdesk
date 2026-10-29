@@ -52,7 +52,7 @@ export function Titlebar() {
         )}
         <UpdatePill u={s.update} />
         {yours > 0 && (
-          <button class={`yours glass ${blocked ? 'hot' : ''} ${s.triage ? 'on' : ''}`} data-sheen onClick={startTriage} data-tip={blocked ? `${blocked}개가 허락이나 선택을 기다려요 · 차례로 처리` : '차례로 처리'} data-kbd={keyLabel('triage')} data-testid="yours">
+          <button class={`turnpill glass ${blocked ? 'hot' : ''} ${s.triage ? 'on' : ''}`} data-sheen onClick={startTriage} data-tip={blocked ? `${blocked}개가 허락이나 선택을 기다려요 · 차례로 처리` : '차례로 처리'} data-kbd={keyLabel('triage')} data-testid="yours">
             <span class="dot" />
             내 차례 <b class="num">{yours}</b>
           </button>
