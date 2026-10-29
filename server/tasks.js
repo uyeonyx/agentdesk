@@ -483,6 +483,8 @@ export class Tasks {
    * (`pending`, in words) will wake it again: then it's neither done nor asking, just waiting.
    */
   async settle(task, reason, summary, pending) {
+    const settling = this.rt.get(task.id);
+    if (settling) settling.settledAt = Date.now();
     const files = await this.refreshChanges(task);
     const hasChanges = files && files.length > 0;
     const r = this.rt.get(task.id);
@@ -866,6 +868,7 @@ export class Tasks {
     const turning = (prompt.kind === 'plan' && body.action === 'approve') || prompt.kind === 'question';
     const snap = turning ? await this.snapshotAll(task, answerLine({ ...prompt }, body).slice(0, 60)) : null;
     const io = { menu: () => this.menuOf(r), promptText: () => this.promptText(r), flush: () => new Promise((res) => r.term.write('', res)), key: (k) => r.proc.write(k) };
+    const sentAt = Date.now();
     r.answering = true;
     const run = (r.chain || Promise.resolve()).then(() => drive(io, prompt, body));
     r.chain = run.catch(() => {});
@@ -882,7 +885,9 @@ export class Tasks {
       task.messages.push({ id: randomId('m'), text: answerLine(prompt, body), at: Date.now(), snap, source: 'answer' });
       if (task.messages.length > 300) task.messages.splice(1, task.messages.length - 300);
     }
-    this.markInput(task);
+    // A quick agent can finish its turn before we get here; marking input after its Stop would read
+    // its last output as fresh work and leave it "working" for good.
+    if (!(r.settledAt >= sentAt)) this.markInput(task);
     const message = res.thenSend ? await this.send(id, res.thenSend, 'answer') : null;
     this.store.save();
     this.changed();
