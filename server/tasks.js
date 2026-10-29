@@ -483,12 +483,19 @@ export class Tasks {
       clearTimeout(r.idleTimer);
       r.byHook = true;
     }
+    const prev = task.state === 'needs_input' ? this.prompts.get(task.id) : null;
     this.setState(task, 'needs_input', reason, { ask });
     if (r && p.tool_name) r.askTool = { name: p.tool_name, input: JSON.stringify(p.tool_input ?? null) };
     const kind = p.tool_name === 'AskUserQuestion' ? 'question' : p.tool_name === 'ExitPlanMode' ? 'plan' : ask === 'question' ? 'elicitation' : 'permission';
     const feed = task.activity?.feed || [];
     const running = [...feed].reverse().find((f) => f.st === 'run' && !f.by);
-    this.prompts.set(task.id, buildPrompt({ task, kind, tool: p.tool_name || '', input: p.tool_input, message: p.tool_name ? '' : reason, by: p.agent_id ? { agentId: p.agent_id, type: p.agent_type } : null, running }));
+    const next = buildPrompt({ task, kind, tool: p.tool_name || '', input: p.tool_input, message: p.tool_name ? '' : reason, by: p.agent_id ? { agentId: p.agent_id, type: p.agent_type } : null, running });
+    // One tool call can announce itself twice (PreToolUse, then PermissionRequest). It's the same
+    // question: keep its id, or a card already on screen would be refused as stale.
+    const sig = JSON.stringify([kind, p.tool_name || '', p.tool_input ?? null, p.agent_id || '']);
+    Object.defineProperty(next, 'sig', { value: sig });
+    if (prev?.sig === sig) Object.assign(next, { id: prev.id, at: prev.at });
+    this.prompts.set(task.id, next);
     this.changed();
   }
 

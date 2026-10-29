@@ -66,12 +66,18 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
     tasks: store.tasks.map((t) => tasks.view(t)),
   });
 
+  // Coalesce bursts (60ms of quiet), but never hold a push longer than 250ms: a busy agent changes
+  // something every few milliseconds, and a plain debounce would starve every other update.
+  let firstChange = 0;
   const changed = () => {
     clearTimeout(broadcastTimer);
+    const now = Date.now();
+    if (!firstChange) firstChange = now;
     broadcastTimer = setTimeout(() => {
+      firstChange = 0;
       const s = JSON.stringify(publicState());
       for (const p of peers) if (p.readyState === 1) p.send(s);
-    }, 60);
+    }, Math.max(0, Math.min(60, firstChange + 250 - now)));
   };
 
   let hooks;

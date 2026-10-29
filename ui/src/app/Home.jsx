@@ -13,9 +13,6 @@ export function Home() {
     return (
       <div class="home">
         <div class="home-c">
-          <div class="home-mark" aria-hidden="true">
-            <i />
-          </div>
           <h1>프로젝트부터 추가해 주세요</h1>
           <p class="muted">git 저장소를 고르면 작업마다 별도 worktree에서 에이전트가 일해요. 서로 부딪히지 않아요.</p>
           <div class="home-add glass-2">
@@ -31,41 +28,46 @@ export function Home() {
   return (
     <div class="home">
       <div class="home-c">
-        <div class="home-mark" aria-hidden="true">
-          <i />
-        </div>
-        <h1>무엇을 시킬까요?</h1>
-        <button class="home-ask glass-2 lens" data-sheen onClick={() => openCommand('new')}>
-          <I n="sparkles" />
-          <span>에이전트에게 맡길 일을 적어 주세요</span>
-          <kbd>{keyLabel('new') || 'N'}</kbd>
-        </button>
+        <section class="home-sec">
+          <h2>새 작업</h2>
+          <button class="home-ask" onClick={() => openCommand('new')}>
+            <span>에이전트에게 맡길 일</span>
+            <kbd>{keyLabel('new') || 'N'}</kbd>
+          </button>
+        </section>
         {yours.length > 0 && (
-          <button class={`home-yours ${blocked.length ? 'hot' : ''}`} onClick={startTriage}>
-            <span class="dot" />
-            {blocked.length ? `${blocked.length}개가 허락이나 선택을 기다려요` : `내 차례 ${yours.length}개`}
-            <span class="muted">· 차례로 처리</span> <kbd>Space</kbd>
-          </button>
-        )}
-        <div class="home-projects">
-          {recent.map((p) => (
-            <button key={p.id} class="hp glass" data-sheen onClick={() => newTask(p.id)}>
-              <Glyph project={p} size={30} />
-              <span class="hp-m">
-                <b>{p.name}</b>
-                <small>{p.desc || p.display}</small>
-              </span>
-              <I n="plus" class="hp-plus" />
+          <section class="home-sec">
+            <h2>내 차례</h2>
+            <button class={`home-yours ${blocked.length ? 'hot' : ''}`} onClick={startTriage}>
+              <span class="dot" />
+              {blocked.length ? `허락이나 선택을 기다리는 작업 ${blocked.length}개` : `확인할 작업 ${yours.length}개`}
+              <span class="sp" />
+              <span class="dim">차례로 처리</span> <kbd>Space</kbd>
             </button>
-          ))}
-          <button class="hp ghost" onClick={() => openModal('import', {})}>
-            <I n="history" />
-            <span class="hp-m">
-              <b>세션 불러오기</b>
-              <small>다른 터미널이나 지난 대화</small>
-            </span>
-          </button>
-        </div>
+          </section>
+        )}
+        <section class="home-sec">
+          <h2>프로젝트</h2>
+          <div class="home-projects">
+            {recent.map((p) => (
+              <button key={p.id} class="hp" onClick={() => newTask(p.id)} data-tip="이 프로젝트에서 새 작업">
+                <Glyph project={p} size={22} />
+                <span class="hp-m">
+                  <b>{p.name}</b>
+                  <small>{p.desc || p.display}</small>
+                </span>
+                <I n="plus" class="hp-plus" />
+              </button>
+            ))}
+            <button class="hp ghost" onClick={() => openModal('import', {})}>
+              <I n="history" />
+              <span class="hp-m">
+                <b>세션 불러오기</b>
+                <small>다른 터미널이나 지난 대화</small>
+              </span>
+            </button>
+          </div>
+        </section>
       </div>
     </div>
   );

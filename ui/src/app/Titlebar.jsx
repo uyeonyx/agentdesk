@@ -18,9 +18,6 @@ export function Titlebar() {
   return (
     <header class="titlebar" data-testid="titlebar">
       <div class="tb-left">
-        <span class="brand" aria-hidden="true">
-          <i />
-        </span>
         <nav class="crumbs" aria-label="지금 위치">
           {s.screen === 'overview' ? (
             <b>관제탑</b>

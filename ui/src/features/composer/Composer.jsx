@@ -149,7 +149,7 @@ export function Composer({ task, project, blocked }) {
   const pills = s.comments.length + s.refs.length + s.images.length;
 
   return (
-    <div class={`composer glass-2 lens ${nudge ? 'nudge' : ''}`} data-sheen data-testid="composer" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
+    <div class={`composer glass-2 lens ${nudge ? 'nudge' : ''}`} data-testid="composer" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
       {pills > 0 && (
         <div class="cp-pills">
           {s.comments.map((c) => (

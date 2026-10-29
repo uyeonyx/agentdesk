@@ -16,7 +16,9 @@ filled as noted. Palettes are used under the licenses listed.
 | --- | --- | --- | --- | --- | --- |
 | Desk Glass Dark | `desk-glass-dark` | dark | this repo | MIT | Original. Default dark theme. |
 | Desk Glass Light | `desk-glass-light` | light | this repo | MIT | Original. Default light theme. |
-| Cyberpunk | `cyberpunk` | dark | this repo | MIT | Original genre palette, glow on. |
+| Cyberpunk | `cyberpunk` | dark | https://github.com/prometheux-ar/cyberpunk | GPL-3.0 | Color values only. The theme has no terminal palette; the 16 colors come from its syntax colors, and its yellow stands in for "waiting on me". |
+| Cyberpunk Umbra | `cyberpunk-umbra` | dark | https://github.com/prometheux-ar/cyberpunk | GPL-3.0 | As above. |
+| Cyberpunk Scarlet | `cyberpunk-scarlet` | dark | https://github.com/prometheux-ar/cyberpunk | GPL-3.0 | As above. |
 | SynthWave '84 | `synthwave-84` | dark | https://github.com/robb0wen/synthwave-vscode | MIT | Glow on. Terminal black/white use VS Code defaults (the theme leaves them unset). |
 | Dracula | `dracula` | dark | https://draculatheme.com/spec | MIT | Includes the spec's ANSI palette. |
 | Nord | `nord` | dark | https://www.nordtheme.com/docs/colors-and-palettes | MIT | Terminal from nord-iterm2, syntax from nord-visual-studio-code. |

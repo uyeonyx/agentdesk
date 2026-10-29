@@ -14,7 +14,7 @@ const TABS = [
   { key: 'theme', label: '테마', icon: 'palette' },
   { key: 'notify', label: '알림과 소리', icon: 'bell' },
   { key: 'keys', label: '단축키', icon: 'keyboard' },
-  { key: 'agents', label: '에이전트', icon: 'sparkles' },
+  { key: 'agents', label: '에이전트', icon: 'terminal-2' },
   { key: 'projects', label: '프로젝트', icon: 'folders' },
   { key: 'about', label: '정보', icon: 'info-circle' },
 ];
@@ -407,7 +407,7 @@ function AgentsTab() {
           <label key={k} class="st-row">
             <span class="st-l">
               <b>
-                <I n={k === 'codex' ? 'brand-openai' : 'sparkles'} /> {a.label}
+                <I n="terminal-2" /> {a.label}
               </b>
               <small>{a.available ? '사용할 수 있어요' : '설치되지 않았어요'}</small>
             </span>

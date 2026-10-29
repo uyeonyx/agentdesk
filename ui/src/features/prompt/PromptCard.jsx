@@ -1,6 +1,6 @@
 // What the agent is waiting on, as a card I can answer: the exact command, the diff of the edit,
 // its questions, the plan. Digits answer like in the CLI. Careful projects take two presses.
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { answer } from '../../actions.js';
 import { permissionButtons, menuButtons, translate } from '../../core/prompts.js';
 import { ASK } from '../../core/status.js';
@@ -45,7 +45,8 @@ export function PromptCard({ task, project, compact = false, focus = false }) {
   };
 
   // Digits answer the visible card, like the CLI's own menu (handled here so it's per card).
-  useEffect(() => {
+  // Listening from the commit, not after paint: a digit pressed as the card appears still counts.
+  useLayoutEffect(() => {
     if (!focus) return;
     const onKey = (e) => {
       if (e.isComposing || !/^Digit[1-9]$/.test(e.code) || e.altKey) return;
@@ -121,7 +122,7 @@ export function PromptCard({ task, project, compact = false, focus = false }) {
 
   const ready = p.screen?.ready !== false;
   return (
-    <div class={`pcard glass-2 ${compact ? 'compact' : ''} ${careful ? 'careful' : ''}`} data-sheen ref={box} role="region" aria-label={ask.label} data-testid="prompt-card" data-kind={kind}>
+    <div class={`pcard glass-2 ${compact ? 'compact' : ''} ${careful ? 'careful' : ''}`} ref={box} role="region" aria-label={ask.label} data-testid="prompt-card" data-kind={kind}>
       <div class="pc-h">
         <span class="pc-ic">
           <I n={ask.icon} />
@@ -230,7 +231,7 @@ function QuestionCard({ task, p, careful, compact, send, busy, focus }) {
     next(all);
   };
   const box = useRef();
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!focus) return;
     const onKey = (e) => {
       if (e.isComposing || e.altKey || e.metaKey || e.ctrlKey) return;
@@ -248,7 +249,7 @@ function QuestionCard({ task, p, careful, compact, send, busy, focus }) {
     return () => window.removeEventListener('keydown', onKey);
   });
   return (
-    <div class={`pcard glass-2 q ${compact ? 'compact' : ''}`} data-sheen ref={box} role="region" aria-label="질문" data-testid="prompt-card" data-kind="question">
+    <div class={`pcard glass-2 q ${compact ? 'compact' : ''}`} ref={box} role="region" aria-label="질문" data-testid="prompt-card" data-kind="question">
       <div class="pc-h">
         <span class="pc-ic">
           <I n="message-circle-question" />

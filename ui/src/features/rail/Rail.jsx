@@ -27,7 +27,7 @@ export function Rail() {
   const toggle = (k) => set((st) => ({ collapsed: { ...st.collapsed, [k]: !st.collapsed[k] } }));
 
   return (
-    <aside class="rail glass" data-sheen style={{ width: s.railW + 'px' }} aria-label="작업 목록" data-testid="rail">
+    <aside class="rail glass" style={{ width: s.railW + 'px' }} aria-label="작업 목록" data-testid="rail">
       <ProjectFilter projects={s.projects} tasks={s.tasks} filter={s.filter} />
       {picked.length > 0 && <PickBar tasks={picked} />}
       {s.railView === 'shelf' ? (
@@ -264,7 +264,7 @@ function Shelf({ tasks }) {
 function RailEmpty({ hasProjects }) {
   return (
     <div class="empty rail-empty">
-      <I n={hasProjects ? 'sparkles' : 'folder-plus'} style="font-size:22px;color:var(--text-3)" />
+      <I n={hasProjects ? 'inbox' : 'folder-plus'} style="font-size:22px;color:var(--text-3)" />
       <p>{hasProjects ? '지금은 할 일이 없어요' : '프로젝트부터 추가해 주세요'}</p>
       {hasProjects ? (
         <button class="btn sm" onClick={() => newTask()}>

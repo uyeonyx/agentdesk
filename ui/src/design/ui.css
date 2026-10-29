@@ -45,18 +45,14 @@
 .btn.primary {
   color: var(--accent-ink);
   background: var(--accent);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.25),
-    0 1px 2px rgb(0 0 0 / 0.2),
-    0 0 calc(var(--glow) * 18px) var(--glow-color);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.12);
 }
 .btn.primary:hover {
-  background: color-mix(in oklab, var(--accent) 88%, white);
+  background: color-mix(in oklab, var(--accent) 86%, var(--bg-surface));
 }
 .btn.warn {
   color: var(--warn-ink);
   background: var(--warn);
-  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
 }
 .btn.danger {
   color: var(--danger-text);
@@ -122,8 +118,8 @@
   transform: scale(0.92);
 }
 .ibtn.on {
-  color: var(--accent-text);
-  background: var(--accent-soft);
+  color: var(--text);
+  background: var(--bg-active);
 }
 .ibtn.sm {
   width: 26px;
@@ -153,9 +149,7 @@ textarea.field {
   color: var(--text-3);
 }
 .field:focus {
-  box-shadow:
-    inset 0 0 0 1px var(--accent-line),
-    0 0 0 3px var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--text-3);
 }
 
 /* Segmented control: the chosen one sits on a raised plate. */
@@ -221,7 +215,10 @@ textarea.field {
   transition: transform var(--dur-3) var(--ease-spring);
 }
 .switch[aria-checked='true'] {
-  background: var(--accent);
+  background: var(--text);
+}
+.switch[aria-checked='true']::after {
+  background: var(--bg-surface);
 }
 .switch[aria-checked='true']::after {
   transform: translateX(14px);
@@ -432,13 +429,11 @@ textarea.field {
   flex: none;
   width: 22px;
   height: 22px;
-  border-radius: 7px;
+  border-radius: 6px;
   font-size: 13px;
   color: var(--room-ink, #fff);
   background: var(--room);
-  box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.25),
-    inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
 }
 .glyph img {
   width: 100%;
@@ -462,18 +457,22 @@ textarea.field {
   box-shadow: 0 0 0 2px var(--mark-ring, var(--bg-app));
 }
 .mark.working {
-  background: conic-gradient(var(--accent) 0 70%, transparent 70%);
-  animation: turn 1s linear infinite;
+  background: var(--text-2);
+  animation: pulse 1.6s var(--ease-in-out) infinite;
 }
 .mark.waiting {
-  background: conic-gradient(var(--accent) 0 30%, transparent 30% 50%, var(--accent) 50% 80%, transparent 80%);
-  animation: turn 3s linear infinite;
+  background: transparent;
+  box-shadow:
+    0 0 0 2px var(--mark-ring, var(--bg-app)),
+    inset 0 0 0 1.5px var(--text-2);
 }
 .mark.blocked {
   background: var(--warn);
-  box-shadow:
-    0 0 0 2px var(--mark-ring, var(--bg-app)),
-    0 0 8px var(--warn);
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
 }
 .mark.yours {
   background: var(--info);
@@ -495,11 +494,11 @@ textarea.field {
 
 .spin {
   display: inline-block;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  border: 2px solid var(--line-strong);
-  border-top-color: var(--accent);
+  border: 1.5px solid var(--line-strong);
+  border-top-color: var(--text-2);
   animation: turn 0.8s linear infinite;
 }
 
@@ -516,9 +515,8 @@ textarea.field {
   background: var(--bg-active);
 }
 .count.hot {
-  color: var(--warn-ink);
-  background: var(--warn);
-  box-shadow: 0 0 calc(6px + var(--glow) * 8px) color-mix(in oklab, var(--warn) 50%, transparent);
+  color: var(--warn-text);
+  background: var(--warn-soft);
 }
 
 .empty {

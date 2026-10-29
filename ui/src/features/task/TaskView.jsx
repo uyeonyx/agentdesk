@@ -87,30 +87,28 @@ function Header({ task, project, view }) {
             {labelOf(task)}
           </span>
           {task.branch && (
-            <span class="chip mono" data-tip={task.worktree}>
+            <span class="meta-i mono" data-tip={task.worktree}>
               <I n="git-branch" /> {task.branch}
             </span>
           )}
           {task.multi && (
-            <span class="chip" data-tip={task.repos.map((r) => r.name).join(', ')}>
-              <I n="stack-2" /> 저장소 {task.repos.length}개
+            <span class="meta-i" data-tip={task.repos.map((r) => r.name).join(', ')}>
+              저장소 {task.repos.length}개
             </span>
           )}
           {!task.isolated && (
-            <span class="chip" data-tip="worktree 없이 원래 폴더에서 일해요">
-              <I n="folder" /> 원래 폴더
+            <span class="meta-i" data-tip="worktree 없이 원래 폴더에서 일해요">
+              원래 폴더
             </span>
           )}
-          <span class="chip">
-            <I n={task.agent === 'codex' ? 'brand-openai' : 'sparkles'} /> {task.agent === 'codex' ? 'Codex' : 'Claude Code'}
-          </span>
+          <span class="meta-i">{task.agent === 'codex' ? 'Codex' : 'Claude Code'}</span>
           {project?.careful && (
-            <span class="chip warn" data-tip="신중 모드 · 보내기와 허락은 ⌘와 함께 눌러요">
+            <span class="meta-i warn" data-tip="신중 모드 · 보내기와 허락은 ⌘와 함께 눌러요">
               <I n="shield-lock" /> 신중
             </span>
           )}
           {task.remote && (
-            <button class="chip" onClick={() => setRemote(task.id, false)} data-tip={task.remoteUrl ? '폰과 연결됨 · 누르면 끊어요' : '폰 연결 준비 중'}>
+            <button class="meta-i" onClick={() => setRemote(task.id, false)} data-tip={task.remoteUrl ? '폰과 연결됨 · 누르면 끊어요' : '폰 연결 준비 중'}>
               <I n="device-mobile" /> {task.remoteUrl ? '폰 연결됨' : '폰 연결 중'}
             </button>
           )}
@@ -162,7 +160,7 @@ function StatusLine({ task }) {
   return (
     <div class={`statusline glass ${waiting ? 'waiting' : ''}`} role="status" aria-live="polite">
       <span class="breath" aria-hidden="true" />
-      <span class="what shimmer">{what}</span>
+      <span class="what">{what}</span>
       {!waiting && <span class="num el">{duration(now - since)}</span>}
       <span class="sp" />
       <button class="btn sm ghost" onClick={() => interrupt(task.id)} data-tip="이번 턴만 멈춰요 · 세션은 그대로" data-kbd={keyLabel('interrupt')}>

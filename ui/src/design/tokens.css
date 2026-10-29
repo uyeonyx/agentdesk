@@ -4,7 +4,8 @@
 :root {
   /* Type: six sizes, four weights. 13 is the UI, 15 is for reading and writing. */
   --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, 'Desk Mono', monospace;
+  /* Hangul in code-ish lines falls back to the UI face: a fixed-width Hangul looks letter-spaced. */
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, 'Pretendard Variable', Pretendard, monospace;
   /* The terminal needs Hangul exactly two cells wide. */
   --font-term: 'Desk Mono', 'D2Coding', ui-monospace, Menlo, monospace;
   --fs-1: 11px;
@@ -37,11 +38,11 @@
   --s-11: 56px;
 
   /* Concentric: each level inset by its padding keeps the same center of curvature. */
-  --r-1: 6px;
-  --r-2: 10px;
-  --r-3: 14px;
-  --r-4: 20px;
-  --r-5: 28px;
+  --r-1: 5px;
+  --r-2: 8px;
+  --r-3: 11px;
+  --r-4: 14px;
+  --r-5: 20px;
   --r-full: 999px;
 
   --dur-1: 90ms;

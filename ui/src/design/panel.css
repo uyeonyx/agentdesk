@@ -50,7 +50,7 @@ body {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .pn-item.focused {
-  box-shadow: inset 0 0 0 1.5px var(--accent-line);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .pn-item.blocked {
   box-shadow:
@@ -102,8 +102,11 @@ body {
 .pn-item .pcard::after {
   display: none;
 }
-.pn-item .pc-h {
+.pn-item .pc-ic {
   display: none;
+}
+.pn-item .pc-title {
+  font-size: var(--fs-3);
 }
 .pn-item .pc-b {
   margin-top: 0;

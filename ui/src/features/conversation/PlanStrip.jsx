@@ -7,7 +7,7 @@ export function PlanStrip({ items }) {
   const done = items.filter((x) => x.status === 'done').length;
   const now = items.find((x) => x.status === 'active');
   return (
-    <div class={`planstrip glass-2 ${open ? 'open' : ''}`} data-sheen>
+    <div class={`planstrip ${open ? 'open' : ''}`}>
       <button class="ps-h" onClick={() => setOpen(!open)} aria-expanded={open}>
         <span class="ps-bar" aria-hidden="true">
           {items.map((x, i) => (

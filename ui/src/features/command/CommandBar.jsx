@@ -63,13 +63,13 @@ function Bar({ mode: startMode, initial }) {
       const w = at[1].toLowerCase();
       const ags = Object.entries(s.agents || {})
         .filter(([k, a]) => a.available !== false && (k.startsWith(w) || (a.label || '').toLowerCase().startsWith(w)))
-        .map(([k, a]) => ({ id: 'agent:' + k, icon: k === 'codex' ? 'brand-openai' : 'sparkles', label: a.label || k, sub: '에이전트', run: () => (setAgent(k), setQ(q.replace(/@\S*$/, ''))) }));
+        .map(([k, a]) => ({ id: 'agent:' + k, icon: 'terminal-2', label: a.label || k, sub: '에이전트', run: () => (setAgent(k), setQ(q.replace(/@\S*$/, ''))) }));
       const ps = fuzzyFilter(w, s.projects, (p) => p.name, 8).map((p) => ({ id: 'p:' + p.id, project: p, label: p.name, sub: '프로젝트', run: () => (setPid(p.id), setQ(q.replace(/@\S*$/, ''))) }));
       return [...ps, ...ags];
     }
     const out = [];
     const text = q.trim();
-    const newRow = { id: 'new', icon: 'sparkles', label: text ? text : '무엇을 시킬까요?', sub: project ? `${project.name}에서 새 작업` : '프로젝트를 먼저 추가해 주세요', isNew: true, run: () => start() };
+    const newRow = { id: 'new', icon: 'plus', label: text ? text : '무엇을 시킬까요?', sub: project ? `${project.name}에서 새 작업` : '프로젝트를 먼저 추가해 주세요', isNew: true, run: () => start() };
     if (mode === 'new') return [newRow];
     const tasks = fuzzyFilter(text, s.tasks.filter((t) => !t.archived), (t) => `${t.title} ${projectOf(s, t.projectId)?.name || ''}`, text ? 12 : 8).map((t) => ({
       id: 't:' + t.id,
@@ -142,7 +142,7 @@ function Bar({ mode: startMode, initial }) {
         <div class="cb-in">
           {mode !== 'all' && (
             <span class="cb-mode">
-              <I n={{ new: 'sparkles', files: 'file', theme: 'palette' }[mode]} /> {{ new: '새 작업', files: '파일', theme: '테마' }[mode]}
+              <I n={{ new: 'plus', files: 'file', theme: 'palette' }[mode]} /> {{ new: '새 작업', files: '파일', theme: '테마' }[mode]}
             </span>
           )}
           {showPills && project && (
@@ -151,7 +151,7 @@ function Bar({ mode: startMode, initial }) {
                 <Glyph project={project} size={16} /> {project.name}
               </button>
               <button class="cb-pill" onClick={() => setAgent(agent === 'codex' ? 'claude' : 'codex')} data-tip="에이전트 바꾸기">
-                <I n={agent === 'codex' ? 'brand-openai' : 'sparkles'} /> {agent === 'codex' ? 'Codex' : 'Claude Code'}
+                {agent === 'codex' ? 'Codex' : 'Claude Code'}
               </button>
             </span>
           )}

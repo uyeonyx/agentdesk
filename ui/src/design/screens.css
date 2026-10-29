@@ -27,16 +27,14 @@
 .tile.focused {
   box-shadow:
     inset 0 1px 0 var(--glass-edge),
-    0 0 0 1.5px var(--accent-line),
-    0 18px 48px -18px var(--glass-shadow),
-    0 0 calc(var(--glow) * 24px) var(--glow-color);
+    0 0 0 1px var(--line-strong),
+    0 16px 40px -20px var(--glass-shadow);
 }
 .tile.blocked {
   box-shadow:
     inset 0 1px 0 var(--glass-edge),
     0 0 0 1px var(--warn-line),
-    0 18px 48px -18px var(--glass-shadow),
-    0 0 40px -16px color-mix(in oklab, var(--warn) 60%, transparent);
+    0 16px 40px -20px var(--glass-shadow);
 }
 .tl-h {
   display: grid;
@@ -54,8 +52,8 @@
   color: var(--text-3);
 }
 .tl-t {
-  font-size: 14.5px;
-  font-weight: var(--w-4);
+  font-size: 14px;
+  font-weight: var(--w-3);
   line-height: 1.35;
   text-align: left;
   overflow: hidden;
@@ -88,9 +86,10 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font: 12px/1.5 var(--font-mono);
+  font-size: var(--fs-2);
+  line-height: 1.5;
 }
-.tl-now .shimmer {
+.tl-now .what {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -160,7 +159,7 @@
 .tl-plan i {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--text-3);
 }
 
 /* ---------------------------------------------------------------- 차례로 */
@@ -187,7 +186,7 @@
 .tr-bar i {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--text-2);
   transition: width var(--dur-4) var(--ease-out);
 }
 .tr-keys {
@@ -218,23 +217,16 @@
 }
 .td-card h2 {
   margin: 0;
-  font-size: var(--fs-6);
-  line-height: var(--lh-6);
+  font-size: var(--fs-5);
+  font-weight: var(--w-3);
 }
 .td-card p {
   margin: 0 0 6px;
   color: var(--text-2);
 }
 .td-ic {
-  display: grid;
-  place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
-  font-size: 28px;
-  color: var(--ok-ink);
-  background: var(--ok);
-  box-shadow: 0 0 30px color-mix(in oklab, var(--ok) 50%, transparent);
+  font-size: 26px;
+  color: var(--text-2);
 }
 
 /* ---------------------------------------------------------------- command bar */
@@ -245,16 +237,16 @@
 .cmdbar {
   display: flex;
   flex-direction: column;
-  width: min(680px, calc(100vw - 48px));
+  width: min(660px, calc(100vw - 48px));
   max-height: 70vh;
-  border-radius: 22px;
+  border-radius: 14px;
   overflow: hidden;
   animation: bloom var(--dur-3) var(--ease-spring);
 }
 @keyframes bloom {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.96);
+    transform: translateY(-6px) scale(0.985);
   }
 }
 .cb-in {
@@ -282,13 +274,13 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: var(--r-full);
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 6px;
   font-size: var(--fs-2);
   font-weight: var(--w-3);
-  color: var(--accent-text);
-  background: var(--accent-soft);
+  color: var(--text-2);
+  background: var(--bg-active);
 }
 .cb-pills {
   display: inline-flex;
@@ -298,9 +290,9 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 26px;
-  padding: 0 10px 0 5px;
-  border-radius: var(--r-full);
+  height: 24px;
+  padding: 0 8px 0 4px;
+  border-radius: 6px;
   font-size: var(--fs-2);
   font-weight: var(--w-3);
   background: var(--bg-active);
@@ -323,9 +315,7 @@
 .cb-row small {
   display: inline;
 }
-.cb-row.new .ti {
-  color: var(--accent-text);
-}
+
 .cb-row.new .m {
   font-weight: var(--w-3);
 }
@@ -442,9 +432,7 @@
     var(--shadow-2);
 }
 .tcard.on {
-  box-shadow:
-    inset 0 0 0 2px var(--accent),
-    0 0 calc(var(--glow) * 16px) var(--glow-color);
+  box-shadow: inset 0 0 0 1.5px var(--text);
 }
 .tc-mini {
   position: relative;
@@ -552,12 +540,12 @@
   position: absolute;
   top: 14px;
   right: 14px;
-  padding: 1px 7px;
-  border-radius: var(--r-full);
+  padding: 1px 6px;
+  border-radius: 4px;
   font-size: 10.5px;
-  font-weight: var(--w-4);
-  color: var(--accent-ink);
-  background: var(--accent);
+  font-weight: var(--w-3);
+  color: var(--bg-surface);
+  background: var(--text);
 }
 .drop {
   display: flex;
@@ -572,8 +560,8 @@
     background var(--dur-2);
 }
 .drop.on {
-  border-color: var(--accent);
-  background: var(--accent-soft);
+  border-color: var(--text-2);
+  background: var(--bg-hover);
 }
 .drop .ti {
   font-size: 20px;
@@ -686,134 +674,122 @@ input[type='range'] {
 }
 
 /* ---------------------------------------------------------------- home */
+/* A plain page: start something, see what's waiting, pick a project. Left-aligned, no hero. */
 .home {
   height: 100%;
-  display: grid;
-  place-items: center;
   overflow: auto;
-  padding: 40px 24px;
+  padding: 12vh 32px 40px;
 }
 .home-c {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  width: min(640px, 100%);
-  text-align: center;
+  gap: 28px;
+  width: min(600px, 100%);
+  margin: 0 auto;
 }
 .home-c h1 {
-  margin: 0;
-  font-size: 28px;
-  line-height: 36px;
-  font-weight: var(--w-4);
-  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: var(--w-3);
+  letter-spacing: -0.01em;
 }
 .home-c > p {
-  margin: -8px 0 0;
+  margin: -20px 0 0;
 }
-.home-mark {
-  position: relative;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: conic-gradient(from 210deg, var(--amb-1), var(--accent), var(--amb-2), var(--amb-3), var(--amb-1));
-  box-shadow:
-    inset 0 2px 3px rgb(255 255 255 / 0.45),
-    0 0 50px color-mix(in oklab, var(--accent) 45%, transparent);
-  animation: turn 30s linear infinite;
+.home-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.home-mark i {
-  position: absolute;
-  inset: 12px;
-  border-radius: 50%;
-  background: var(--bg-surface);
-  box-shadow: inset 0 0 10px color-mix(in oklab, var(--accent) 50%, transparent);
+.home-sec h2 {
+  margin: 0 0 4px;
+  font-size: var(--fs-2);
+  font-weight: var(--w-3);
+  color: var(--text-3);
 }
 .home-ask {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  height: 56px;
-  padding: 0 14px 0 20px;
-  border-radius: var(--r-full);
+  height: 44px;
+  padding: 0 10px 0 14px;
+  border-radius: var(--r-3);
   font-size: var(--fs-4);
   color: var(--text-3);
-  transition: transform var(--dur-3) var(--ease-spring);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: box-shadow var(--dur-2);
 }
-.home-ask .ti {
-  font-size: 20px;
-  color: var(--accent-text);
+.home-ask:hover {
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .home-ask span {
   flex: 1;
   text-align: left;
 }
-.home-ask:hover {
-  transform: translateY(-1px);
-}
 .home-yours {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
-  height: 32px;
-  padding: 0 14px;
-  border-radius: var(--r-full);
+  height: 36px;
+  padding: 0 10px 0 2px;
+  border-radius: var(--r-2);
   font-size: var(--fs-3);
-  font-weight: var(--w-3);
-  background: var(--bg-hover);
+  text-align: left;
+}
+.home-yours:hover {
+  color: var(--text);
 }
 .home-yours .dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: var(--info);
-}
-.home-yours.hot {
-  color: var(--warn-text);
-  background: var(--warn-soft);
+  background: var(--text-2);
 }
 .home-yours.hot .dot {
   background: var(--warn);
-  box-shadow: 0 0 10px var(--warn);
+}
+.home-yours .sp {
+  flex: 1;
 }
 .home-projects {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  width: 100%;
-  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--line);
 }
 .hp {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  padding: 12px 14px;
-  border-radius: var(--r-3);
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--line);
   text-align: left;
-  transition: transform var(--dur-3) var(--ease-spring);
 }
 .hp:hover {
-  transform: translateY(-2px);
+  background: var(--bg-hover);
 }
 .hp.ghost {
-  box-shadow: inset 0 0 0 1px var(--line);
   color: var(--text-2);
 }
 .hp.ghost > .ti {
-  font-size: 20px;
+  font-size: 17px;
   justify-self: center;
 }
 .hp-m {
   min-width: 0;
   display: flex;
-  flex-direction: column;
+  align-items: baseline;
+  gap: 10px;
 }
 .hp-m b {
+  flex: none;
   font-weight: var(--w-3);
 }
 .hp-m small {
+  min-width: 0;
   font-size: var(--fs-2);
   color: var(--text-3);
   overflow: hidden;
@@ -822,6 +798,11 @@ input[type='range'] {
 }
 .hp-plus {
   color: var(--text-3);
+  opacity: 0;
+  transition: opacity var(--dur-2);
+}
+.hp:hover .hp-plus {
+  opacity: 1;
 }
 .home-add {
   width: 100%;
@@ -924,8 +905,8 @@ input[type='range'] {
   gap: 6px;
 }
 .btn.on {
-  background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent-line);
+  background: var(--bg-active);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
 }
 .arch-list {
   list-style: none;

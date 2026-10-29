@@ -283,7 +283,7 @@ function ImportSessions({ projectId }) {
         )}
         <div class="sr-m">
           <div class="sr-t">
-            <I n={x.agent === 'codex' ? 'brand-openai' : 'sparkles'} /> {x.title}
+            <I n="terminal-2" /> {x.title}
           </div>
           {sub && <div class="sr-s">{sub}</div>}
           <div class="sr-meta">

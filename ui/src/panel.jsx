@@ -60,9 +60,6 @@ function Panel() {
   return (
     <div class="panel" ref={root} data-testid="panel">
       <header class="pn-h">
-        <span class="brand" aria-hidden="true">
-          <i />
-        </span>
         <b>{items.length ? `기다리는 작업 ${items.length}` : 'Desk'}</b>
         <span class="sp" />
         <button class="ibtn sm" onClick={() => window.desk.panel('hide')} aria-label="닫기" data-tip="닫기" data-kbd="Esc">

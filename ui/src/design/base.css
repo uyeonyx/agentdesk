@@ -61,7 +61,7 @@ code {
   outline: none;
 }
 :focus-visible {
-  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 4px var(--focus), 0 0 calc(var(--glow) * 14px) var(--glow-color);
+  box-shadow: 0 0 0 2px var(--bg-surface), 0 0 0 3.5px var(--focus);
   border-radius: var(--r-1);
 }
 .num,

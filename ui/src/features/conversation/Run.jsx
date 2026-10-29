@@ -49,7 +49,7 @@ export function Run({ tools, task, live, waiting }) {
       {running && !isOpen && (
         <div class={`run-now ${waiting ? 'wait' : ''}`}>
           {waiting ? <I n="hand-stop" /> : <Spinner />}
-          <span class={waiting ? '' : 'shimmer'}>
+          <span>
             {waiting ? `${waiting} · ` : ''}
             {running.title}
           </span>

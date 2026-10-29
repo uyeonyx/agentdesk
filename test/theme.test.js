@@ -152,7 +152,7 @@ test('derive: glass modes differ the way the controls promise', () => {
   assert.ok(parseColor(light['--glass-tint']).a > parseColor(rich['--glass-tint']).a);
   assert.equal(off['--glass-blur'], '0px');
   assert.equal(parseColor(off['--glass-tint']).a, 1);
-  assert.equal(deriveTokens(BUILTIN_THEMES.find((x) => x.id === 'cyberpunk')).vars['--glow'], '1');
+  assert.equal(deriveTokens(BUILTIN_THEMES.find((x) => x.id === 'synthwave-84')).vars['--glow'], '1');
   assert.equal(rich['--glow'], '0');
   // Unknown modes (including prototype names) fall back to 'rich'.
   assert.deepEqual(deriveTokens(BUILTIN_THEMES[0], { glass: 'toString' }).vars, rich);

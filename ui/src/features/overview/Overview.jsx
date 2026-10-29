@@ -82,7 +82,7 @@ const Tile = memo(function Tile({ t, p, focused, onFocus }) {
   return (
     <article
       class={`tile glass-2 ${focused ? 'focused' : ''} ${blocked ? 'blocked' : ''} ${markOf(t)}`}
-      data-sheen
+     
       data-flip={t.id}
       data-task-id={t.id}
       data-testid="tile"
@@ -133,7 +133,7 @@ const Tile = memo(function Tile({ t, p, focused, onFocus }) {
           <>
             <div class="tl-now">
               <span class="breath" />
-              <span class="shimmer">{t.activity?.current || '생각하는 중'}</span>
+              <span class="what">{t.activity?.current || '생각하는 중'}</span>
               <span class="num el">{duration(now - (t.activity?.since || t.updatedAt))}</span>
             </div>
             {(t.activity?.feedTail || []).slice(-3).map((f) => (

@@ -1,11 +1,12 @@
-// Agent Desk's own themes: graphite neutrals, one cool blue-violet accent, an indigo/teal/violet aurora.
+// Agent Desk's own themes: graphite neutrals and ink. Color is left to meaning (waiting, done, failed)
+// and to each project's own mark; the backdrop is a barely-there cool/warm shift, not an aurora.
 export const deskGlassDark = {
   id: 'desk-glass-dark',
   name: 'Desk Glass Dark',
   kind: 'dark',
   author: 'Agent Desk',
   license: 'MIT',
-  base: { bg: '#16171d', fg: '#e6e8ef', accent: '#7c8cff', selection: '#7c8cff42', cursor: '#aab4ff' },
+  base: { bg: '#141517', fg: '#e8e8ea', accent: '#ededef', selection: '#ffffff26', cursor: '#e8e8ea' },
   ansi: [
     '#2a2c35', '#f2706b', '#4cc38a', '#f5b544', '#6e9eff', '#b392ff', '#4fd1d9', '#c5cad6',
     '#5d6270', '#ff8f8a', '#6fdba4', '#ffcb6b', '#93b7ff', '#cbb2ff', '#7fe3ea', '#f3f5fa',
@@ -14,7 +15,7 @@ export const deskGlassDark = {
     keyword: '#b9a3ff', string: '#8fd9b6', number: '#f2b57d', comment: '#6c7383', function: '#8cb4ff', type: '#72d3dc',
     tag: '#f48a8f', attr: '#f0c784', punct: '#9aa1b0', variable: '#e0e3ec', constant: '#ffb48a',
   },
-  ambient: { stops: ['#4f55e6', '#14a39a', '#8a57f0'], speed: 48 },
+  ambient: { stops: ['#3d424c', '#4a463f', '#3a3f47'], speed: 70 },
 };
 
 export const deskGlassLight = {
@@ -23,7 +24,7 @@ export const deskGlassLight = {
   kind: 'light',
   author: 'Agent Desk',
   license: 'MIT',
-  base: { bg: '#f7f8fa', fg: '#1c1e25', accent: '#5b5bd6', selection: '#5b5bd633', cursor: '#5b5bd6' },
+  base: { bg: '#f6f6f4', fg: '#1b1c1f', accent: '#1b1c1f', selection: '#1b1c1f1f', cursor: '#1b1c1f' },
   ansi: [
     '#1c1e25', '#d23f45', '#1d8b56', '#b7791f', '#2f66d0', '#7e4fd6', '#0f8790', '#a8adb8',
     '#6b7080', '#e5484d', '#2aa36b', '#d39b2f', '#4a83e8', '#9a6df0', '#20a5b0', '#d9dce3',
@@ -32,5 +33,5 @@ export const deskGlassLight = {
     keyword: '#6a48d7', string: '#1b7a50', number: '#b0540c', comment: '#8b909c', function: '#2c5fc9', type: '#0c7782',
     tag: '#c33a40', attr: '#94600f', punct: '#5c6271', variable: '#1c1e25', constant: '#b0540c',
   },
-  ambient: { stops: ['#a7abff', '#8fe0d6', '#d2b8ff'], speed: 52 },
+  ambient: { stops: ['#dfe3e8', '#ece6dc', '#e2e5e9'], speed: 70 },
 };
