@@ -98,8 +98,8 @@ test('the window loads the UI from app:// and the core pushes state', async () =
   await expect.poll(() => page.url()).toBe('app://desk/');
   expect(await page.evaluate(() => typeof require)).toBe('undefined');
   expect(await page.evaluate(() => typeof process)).toBe('undefined');
-  const st = await call('GET', '/api/state');
-  expect(st.version).toBeTruthy();
+  // The core starts beside the window (slower on Windows): ask until it answers.
+  await expect.poll(async () => (await call('GET', '/api/state').catch(() => ({}))).version, { timeout: 20_000 }).toBeTruthy();
   await expect(page.getByTestId('titlebar')).toBeVisible();
   await page.screenshot({ path: shots('empty') });
 });
