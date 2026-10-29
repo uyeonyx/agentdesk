@@ -4,11 +4,12 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api, updateAction } from '../../api.js';
 import { useStore, get, set, setSettings, toast, openModal, projectOf } from '../../store.js';
 import { isMac, mod } from '../../util.js';
-import { deriveTokens, detectAndImport, findTheme } from '../../theme/index.js';
+import { deriveTokens, detectAndImport, findTheme, ACCENTS } from '../../theme/index.js';
 import { themeList, chooseTheme, previewTheme, endPreview, savePref, saveUserTheme, removeUserTheme, currentThemeId } from '../../app/theme.js';
 import { sound } from '../../app/sounds.js';
 import { KEYS, keyLabel } from '../../app/keys.js';
 import { Glyph, I, roomVars } from '../../ui/bits.jsx';
+import { uploadLogo, pickLogo, clearLogo } from '../../logos.js';
 
 const TABS = [
   { key: 'theme', label: '테마', icon: 'palette' },
@@ -117,6 +118,22 @@ function ThemeTab() {
         <div class="gallery" onMouseLeave={leave}>
           {shown.map((t) => (
             <ThemeCard key={t.id} t={t} slot={slotOf(t)} onEnter={() => enter(t.id)} onPick={() => chooseTheme(t.id)} />
+          ))}
+        </div>
+      </Section>
+      <Section title="강조색" desc="누르는 버튼, 선택한 탭, 작업 중 표시의 색이에요. 어느 테마에서나 같은 색을 쓰거나 테마의 색을 따라요.">
+        <div class="accents" role="radiogroup" aria-label="강조색">
+          <button class={`acc theme ${!pref.accent || pref.accent === 'theme' ? 'on' : ''}`} role="radio" aria-checked={!pref.accent || pref.accent === 'theme'} onClick={() => savePref({ accent: 'theme' })} data-tip="테마의 색">
+            <span class="sw">
+              <I n="palette" />
+            </span>
+            <small>테마</small>
+          </button>
+          {ACCENTS.map((a) => (
+            <button key={a.id} class={`acc ${pref.accent === a.id ? 'on' : ''}`} role="radio" aria-checked={pref.accent === a.id} onClick={() => savePref({ accent: a.id })} aria-label={a.name}>
+              <span class="sw" style={{ background: `linear-gradient(135deg, ${a.dark} 50%, ${a.light} 50%)` }} />
+              <small>{a.name}</small>
+            </button>
           ))}
         </div>
       </Section>
@@ -530,8 +547,10 @@ function ProjectEditor({ id }) {
           <button key={c} class={`sw ${d.color === c ? 'on' : ''}`} style={{ background: c }} onClick={() => up('color', c)} aria-label={c} />
         ))}
       </div>
-      {s.p.logo && <Switch on={d.showLogo} onChange={(v) => up('showLogo', v)} label="저장소의 로고 쓰기" desc={`${s.p.logo}를 프로젝트 표시로 써요. 끄면 아이콘을 써요`} />}
-      <label class="lbl">아이콘</label>
+      <label class="lbl">로고</label>
+      <LogoPicker p={preview} />
+      {s.p.logo && !s.p.customLogo && <Switch on={d.showLogo} onChange={(v) => up('showLogo', v)} label="저장소의 로고 쓰기" desc={`${s.p.logo}를 프로젝트 표시로 써요. 끄면 아이콘을 써요`} />}
+      <label class="lbl">아이콘 · 로고가 없을 때 써요</label>
       <div class="icons">
         {icons.map((ic) => (
           <button key={ic} class={d.icon === ic ? 'on' : ''} onClick={() => up('icon', ic)} aria-label={ic}>
@@ -562,6 +581,46 @@ function ProjectEditor({ id }) {
         </button>
         <small class="muted">폴더와 파일은 그대로 남아요</small>
       </div>
+    </div>
+  );
+}
+
+/** The project's logo: pick or drop an image; it shows everywhere the project does. */
+function LogoPicker({ p }) {
+  const [over, setOver] = useState(false);
+  const done = () => toast('로고를 바꿨어요', { projectId: p.id });
+  const fail = (e) => toast(e.message, { kind: 'err' });
+  const drop = (e) => {
+    e.preventDefault();
+    setOver(false);
+    const f = [...(e.dataTransfer?.files || [])].find((x) => x.type.startsWith('image/'));
+    if (f) uploadLogo(p.id, f).then(done, fail);
+    else toast('이미지 파일을 놓아 주세요', { kind: 'err' });
+  };
+  const source = p.customLogo ? '직접 고른 이미지' : p.logo && p.showLogo !== false && p.kind !== 'group' ? `저장소의 ${p.logo}` : '아이콘';
+  return (
+    <div
+      class={`logo-pick ${over ? 'over' : ''}`}
+      onDragOver={(e) => {
+        e.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={drop}
+    >
+      <Glyph project={p} size={56} />
+      <span class="lp-m">
+        <b>{source}</b>
+        <small>이미지를 여기에 끌어다 놓거나 골라요 · PNG, JPG, WebP, SVG</small>
+      </span>
+      <button class="btn" onClick={() => pickLogo(p.id, { onDone: done, onError: fail })}>
+        <I n="photo" /> 이미지 고르기
+      </button>
+      {p.customLogo && (
+        <button class="btn ghost" onClick={() => clearLogo(p.id).then(() => toast('고른 로고를 지웠어요', { projectId: p.id }), fail)}>
+          지우기
+        </button>
+      )}
     </div>
   );
 }

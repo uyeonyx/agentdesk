@@ -61,6 +61,19 @@ export function markOf(t) {
   return 'done';
 }
 
+/**
+ * The word on a rail row or a tile, and its tone: 'warn' (stuck on me, drawn solid), 'info' (my
+ * reply), 'ok' (to review), 'muted'. Working tasks have none: the line under them says what's going on.
+ */
+export function tagOf(t) {
+  const ask = askOf(t);
+  if (ask) return { label: ask.short, tone: 'warn', solid: true };
+  if (t.state === 'needs_input') return { label: '답장', tone: 'info' };
+  if (t.state === 'review') return { label: '검토', tone: 'ok' };
+  if (t.state === 'waiting') return { label: '대기', tone: 'muted' };
+  return null;
+}
+
 export const STATE_LABEL = {
   starting: '시작하는 중',
   working: '작업 중',

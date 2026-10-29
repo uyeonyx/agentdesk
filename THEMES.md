@@ -7,6 +7,10 @@ text levels, status colors, diff, syntax, terminal, Monaco, glass, shadows) and 
 lightness until it passes WCAG against every surface it can land on, glass over the brightest
 aurora stop included.
 
+Settings > 강조색 lays one accent over any theme, the way macOS does (`ui/src/theme/accents.js`):
+blue, purple, pink, red, orange, green, teal or graphite, each with a dark-theme and a light-theme
+shade that carries white text on a filled button. "테마" keeps the theme's own accent.
+
 ## Built-in themes
 
 Palettes are each project's published colors. Where a project leaves something out, the gap is
@@ -14,8 +18,8 @@ filled as noted. Palettes are used under the licenses listed.
 
 | Theme | id | Kind | Source | License | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Desk Glass Dark | `desk-glass-dark` | dark | this repo | MIT | Original. Default dark theme. |
-| Desk Glass Light | `desk-glass-light` | light | this repo | MIT | Original. Default light theme. |
+| Desk Glass Dark | `desk-glass-dark` | dark | this repo | MIT | Original. Default dark theme: graphite with a blue accent. |
+| Desk Glass Light | `desk-glass-light` | light | this repo | MIT | Original. Default light theme: warm paper with a blue accent. |
 | Cyberpunk | `cyberpunk` | dark | https://github.com/prometheux-ar/cyberpunk | GPL-3.0 | Color values only. The theme has no terminal palette; the 16 colors come from its syntax colors, and its yellow stands in for "waiting on me". |
 | Cyberpunk Umbra | `cyberpunk-umbra` | dark | https://github.com/prometheux-ar/cyberpunk | GPL-3.0 | As above. |
 | Cyberpunk Scarlet | `cyberpunk-scarlet` | dark | https://github.com/prometheux-ar/cyberpunk | GPL-3.0 | As above. |

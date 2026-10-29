@@ -111,30 +111,49 @@
   justify-content: flex-end;
   gap: 6px;
 }
+/* What waits on me, counted: amber and solid when something is stuck, the accent otherwise. */
 .turnpill {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   height: 28px;
-  padding: 0 12px;
-  border-radius: var(--r-full);
-  font-weight: var(--w-3);
+  padding: 0 6px 0 11px;
+  border-radius: var(--r-2);
+  font-weight: var(--w-4);
   font-size: var(--fs-2);
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+  transition:
+    transform var(--dur-3) var(--ease-spring),
+    background var(--dur-2);
 }
-.turnpill .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-2);
+.turnpill:active {
+  transform: scale(0.96);
+}
+.turnpill b {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 5px;
+  color: var(--accent-ink);
+  background: var(--accent);
 }
 .turnpill.hot {
-  color: var(--warn-text);
+  color: var(--warn-fill-ink);
+  background: var(--warn-fill);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), inset 0 1px 0 rgb(255 255 255 / 0.25);
 }
-.turnpill.hot .dot {
-  background: var(--warn);
+.turnpill.hot b {
+  color: var(--warn-fill);
+  background: var(--warn-fill-ink);
 }
 .turnpill.on {
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  box-shadow:
+    0 0 0 2px var(--bg-app),
+    0 0 0 3px currentColor;
 }
 .upd {
   display: inline-flex;
@@ -291,38 +310,47 @@ button.chip:hover {
   animation: shimmer 1.6s linear infinite;
 }
 
+/* The task's state in its color: solid amber when it's stuck on me. */
 .state-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
   font-size: var(--fs-2);
-  font-weight: var(--w-2);
+  font-weight: var(--w-3);
   color: var(--text-2);
+  background: var(--bg-active);
   white-space: nowrap;
 }
 .state-pill .d {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--text-3);
+  color: inherit;
+  background: currentColor;
+}
+.state-pill.working,
+.state-pill.waiting {
+  color: var(--accent-text);
+  background: var(--accent-soft);
 }
 .state-pill.working .d,
 .state-pill.waiting .d {
-  background: var(--text-2);
   animation: pulse 1.6s var(--ease-in-out) infinite;
 }
 .state-pill.blocked {
-  color: var(--warn-text);
+  color: var(--warn-fill-ink);
+  background: var(--warn-fill);
 }
-.state-pill.blocked .d {
-  background: var(--warn);
+.state-pill.yours {
+  color: var(--accent-text);
+  background: var(--accent-soft);
 }
-.state-pill.yours .d {
-  background: var(--info);
-}
-.state-pill.review .d {
-  background: var(--ok);
+.state-pill.review {
+  color: var(--ok-text);
+  background: var(--ok-soft);
 }
 
 /* The task's facts under its title: quiet text, not a row of pills. */

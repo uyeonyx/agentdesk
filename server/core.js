@@ -6,7 +6,7 @@ import path from 'node:path';
 import { Auth } from './security.js';
 import { Store } from './store.js';
 import { Tasks } from './tasks.js';
-import { addProject, updateProject, removeProject, discoverRepos, listDirs, httpError, PALETTE, ICONS, autofill, backfill } from './projects.js';
+import { addProject, updateProject, removeProject, discoverRepos, listDirs, httpError, PALETTE, ICONS, autofill, backfill, setCustomLogo, clearCustomLogo, customLogoPath } from './projects.js';
 import { safeLogo } from './describe.js';
 import { availability, configureHooks } from './agents.js';
 import { listThemes, saveTheme, removeTheme } from './themes.js';
@@ -16,7 +16,7 @@ import { startHookServer } from './hookserver.js';
 import { VERSION, tilde } from './util.js';
 
 const BODY_LIMIT = 1_000_000;
-const IMAGE_TYPES = { '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon' };
+const IMAGE_TYPES = { '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.ico': 'image/x-icon' };
 
 /** A non-JSON answer (project logos). The window turns it into a blob URL for an <img>. */
 export class Binary {
@@ -118,9 +118,20 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
       }
       if (id && method === 'GET' && action === 'logo') {
         const p = store.project(id);
-        const abs = p && p.logo && p.showLogo !== false ? safeLogo(p.path, p.logo) : null;
+        // The one the person picked wins over the one found in the repo.
+        const abs = customLogoPath(p) || (p && p.kind !== 'group' && p.logo && p.showLogo !== false ? safeLogo(p.path, p.logo) : null);
         if (!abs) throw httpError(404, 'no logo');
         return new Binary(IMAGE_TYPES[path.extname(abs).toLowerCase()], fs.readFileSync(abs));
+      }
+      if (id && method === 'POST' && action === 'logo') {
+        const proj = setCustomLogo(store, id, body);
+        changed();
+        return proj;
+      }
+      if (id && method === 'DELETE' && action === 'logo') {
+        const proj = clearCustomLogo(store, id);
+        changed();
+        return proj;
       }
       if (id && method === 'POST' && action === 'autofill') {
         const proj = autofill(store, id, { force: true });

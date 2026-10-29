@@ -8,10 +8,10 @@
 }
 .th {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
-  gap: 16px;
-  padding: 14px 16px 12px 22px;
+  gap: 14px;
+  padding: 14px 16px 13px 20px;
   border-bottom: 1px solid var(--line);
 }
 .th-id {
@@ -19,10 +19,10 @@
 }
 .th-title {
   margin: 0;
-  font-size: 17px;
+  font-size: 19px;
   line-height: var(--lh-5);
-  font-weight: var(--w-3);
-  letter-spacing: -0.01em;
+  font-weight: var(--w-4);
+  letter-spacing: -0.015em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -31,9 +31,9 @@
   width: 100%;
   border: 0;
   padding: 0;
-  font-size: 17px;
+  font-size: 19px;
   line-height: var(--lh-5);
-  font-weight: var(--w-3);
+  font-weight: var(--w-4);
   background: transparent;
   box-shadow: 0 1px 0 var(--line-strong);
 }
@@ -41,8 +41,12 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 14px;
-  margin-top: 4px;
+  gap: 4px 12px;
+  margin-top: 5px;
+}
+.th-meta .meta-p {
+  color: var(--room-text);
+  font-weight: var(--w-3);
 }
 .th-act {
   display: flex;
@@ -231,10 +235,42 @@
 .run-h:hover {
   background: var(--bg-hover);
 }
+/* What kind of work the run was, in the theme's own code colors: commands, edits, reading, the web. */
 .run-icons {
-  display: inline-flex;
-  color: var(--text-3);
-  font-size: 14px;
+  --c: var(--text-2);
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--c);
+  background: color-mix(in oklab, var(--c) 16%, transparent);
+}
+.run-icons[data-cat='cmd'] {
+  --c: var(--syn-function);
+}
+.run-icons[data-cat='edit'],
+.run-icons[data-cat='code'] {
+  --c: var(--ok-text);
+}
+.run-icons[data-cat='read'] {
+  --c: var(--syn-type);
+}
+.run-icons[data-cat='search'] {
+  --c: var(--syn-keyword);
+}
+.run-icons[data-cat='web'] {
+  --c: var(--syn-string);
+}
+.run-icons[data-cat='mcp'],
+.run-icons[data-cat='agent'] {
+  --c: var(--syn-constant);
+}
+.run-icons[data-cat='ask'],
+.run-icons[data-cat='plan'] {
+  --c: var(--warn-text);
 }
 .run-icons .ti:not(:first-child) {
   display: none;
@@ -529,10 +565,10 @@
   background: var(--line-strong);
 }
 .ps-bar i.done {
-  background: var(--text-2);
+  background: var(--ok);
 }
 .ps-bar i.active {
-  background: var(--text-2);
+  background: var(--accent);
   animation: breathbar 1.6s var(--ease-in-out) infinite;
 }
 @keyframes breathbar {
@@ -570,10 +606,10 @@
   text-decoration: line-through;
 }
 .ps-list li.done .ti {
-  color: var(--text-3);
+  color: var(--ok-text);
 }
 .ps-list li.active .ti {
-  color: var(--text);
+  color: var(--accent-text);
 }
 
 .fresh {

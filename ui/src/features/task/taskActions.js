@@ -3,6 +3,7 @@ import { get, toast, openModal, projectOf, taskOf, set } from '../../store.js';
 import { vscodeLink, isMac } from '../../util.js';
 import { isLive, isBusy } from '../../core/status.js';
 import { keyLabel } from '../../app/keys.js';
+import { pickLogo } from '../../logos.js';
 import { stop, resume, setRemote, archive, archiveAsk, archiveMany, restore, resumeMany, clearPicks, interrupt, toggleDrawer, newTask, openTask } from '../../actions.js';
 
 function copy(text) {
@@ -57,6 +58,7 @@ export function projectItems(p) {
   return [
     { icon: 'plus', label: `${p.name}에 새 작업`, run: () => newTask(p.id) },
     { icon: 'settings', label: `${p.name} 설정`, run: () => set({ screen: 'settings', settingsTab: 'projects', settingsProject: p.id }) },
+    { icon: 'photo', label: '로고 바꾸기…', run: () => pickLogo(p.id, { onDone: () => toast('로고를 바꿨어요', { projectId: p.id }), onError: (e) => toast(e.message, { kind: 'err' }) }) },
     p.path && { icon: 'folder-open', label: isMac ? 'Finder에서 보기' : '탐색기에서 보기', run: () => window.desk.reveal(p.path) },
     '-',
     { icon: 'logout', label: 'Desk에서 빼기 (파일은 그대로)', danger: true, run: () => openModal('removeProject', { projectId: p.id }) },

@@ -1,11 +1,11 @@
 // The person's theme, live: picked by system light/dark (one theme for each) or fixed, applied as
 // CSS variables, and handed to xterm, Monaco and the window chrome. The choice lives in the main
 // process, so every window (the quick panel too) follows it.
-import { deriveTokens, applyTheme, findTheme, BUILTIN_THEMES, DEFAULT_DARK_ID, DEFAULT_LIGHT_ID } from '../theme/index.js';
+import { deriveTokens, applyTheme, findTheme, withAccent, BUILTIN_THEMES, DEFAULT_DARK_ID, DEFAULT_LIGHT_ID } from '../theme/index.js';
 import { api } from '../api.js';
 import { set } from '../store.js';
 
-export const DEFAULT_PREF = { mode: 'system', light: DEFAULT_LIGHT_ID, dark: DEFAULT_DARK_ID, fixed: DEFAULT_DARK_ID, glass: 'rich', vibrancy: true, ambient: true };
+export const DEFAULT_PREF = { mode: 'system', light: DEFAULT_LIGHT_ID, dark: DEFAULT_DARK_ID, fixed: DEFAULT_DARK_ID, accent: 'theme', glass: 'rich', vibrancy: true, ambient: true };
 
 let pref = { ...DEFAULT_PREF };
 let userThemes = [];
@@ -34,7 +34,7 @@ function resolveId() {
 
 function apply({ animate = false } = {}) {
   const id = resolveId();
-  const theme = findTheme(id, userThemes) || findTheme(systemDark ? DEFAULT_DARK_ID : DEFAULT_LIGHT_ID);
+  const theme = withAccent(findTheme(id, userThemes) || findTheme(systemDark ? DEFAULT_DARK_ID : DEFAULT_LIGHT_ID), pref.accent);
   const glass = clearMq?.matches ? 'off' : pref.glass || 'rich';
   derived = deriveTokens(theme, { glass });
   currentId = theme.id;

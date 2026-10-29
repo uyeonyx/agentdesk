@@ -1,13 +1,13 @@
 // The left rail: every session, grouped by what it needs from me. "내 차례" on top, most urgent
 // first; a row says in one line why it's there.
 import { memo } from 'preact/compat';
-import { useRef, useState } from 'preact/hooks';
+import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { useStore, get, set, projectOf } from '../../store.js';
 import { isMac } from '../../util.js';
-import { GROUPS, grouped, whyOf, askOf, isBlocked, labelOf } from '../../core/status.js';
+import { GROUPS, grouped, whyOf, tagOf, isBlocked, labelOf, groupOf } from '../../core/status.js';
 import { select, archive, archiveAsk, archiveMany, resumeMany, togglePick, pickRange, clearPicks, shelved, newTask, restore, startTriage } from '../../actions.js';
 import { openMenu } from '../../ui/Menu.jsx';
-import { Glyph, I, TimeAgo } from '../../ui/bits.jsx';
+import { Glyph, I, TimeAgo, useDismiss, useListNav, roomVars } from '../../ui/bits.jsx';
 import { useFlip } from '../../ui/useFlip.js';
 import { taskItems, pickedItems, projectItems } from '../task/taskActions.js';
 import { keyLabel } from '../../app/keys.js';
@@ -41,6 +41,7 @@ export function Rail() {
             const closed = !!s.collapsed[grp.key];
             const ids = items.map((t) => t.id);
             const hot = grp.key === 'yours' && items.some(isBlocked);
+            const tone = hot ? 'warn' : grp.key === 'yours' ? 'info' : '';
             const all = { icon: 'archive', label: `${items.length}개 모두 보관`, run: () => archiveMany(ids) };
             const fold = { icon: closed ? 'chevron-down' : 'chevron-up', label: closed ? '펼치기' : '접기', run: () => toggle(grp.key) };
             return (
@@ -49,7 +50,7 @@ export function Rail() {
                   <button class={`grp-t ${closed ? 'closed' : ''}`} onClick={() => toggle(grp.key)} aria-expanded={!closed}>
                     <I n="chevron-down" />
                     {grp.title}
-                    <span class={`count ${hot ? 'hot' : ''}`}>{items.length}</span>
+                    <span class={`count ${tone}`}>{items.length}</span>
                   </button>
                   {grp.key === 'yours' && items.length > 1 && (
                     <button class="grp-x" onClick={startTriage} data-tip="하나씩 차례로 처리" data-kbd={keyLabel('triage')}>
@@ -89,7 +90,7 @@ export function Rail() {
 
 const Row = memo(function Row({ t, p, sel, picked, group }) {
   const blocked = isBlocked(t);
-  const ask = askOf(t);
+  const tag = tagOf(t);
   const why = whyOf(t);
   const plan = t.activity?.plan || [];
   const done = plan.filter((x) => x.status === 'done').length;
@@ -105,7 +106,7 @@ const Row = memo(function Row({ t, p, sel, picked, group }) {
     openMenu(e, ids.length > 1 && ids.includes(t.id) ? pickedItems(ids) : taskItems(t, { group }));
   };
   return (
-    <div class="rrow-wrap" data-flip={t.id} onContextMenu={menu}>
+    <div class="rrow-wrap room-scope" style={roomVars(p?.color)} data-flip={t.id} onContextMenu={menu}>
       <button
         class={`rrow ${sel ? 'sel' : ''} ${picked ? 'picked' : ''} ${blocked ? 'blocked' : ''} ${finished ? 'finished' : ''}`}
         onClick={click}
@@ -116,7 +117,7 @@ const Row = memo(function Row({ t, p, sel, picked, group }) {
         data-task-id={t.id}
         data-state={blocked ? 'blocked' : t.state}
       >
-        <Glyph project={p} size={26} task={t} />
+        <Glyph project={p} size={30} task={t} />
         {picked && (
           <span class="pk">
             <I n="check" />
@@ -129,8 +130,8 @@ const Row = memo(function Row({ t, p, sel, picked, group }) {
             {t.title}
           </span>
           <span class="rr-s">
-            {ask && <span class="askchip">{ask.short}</span>}
-            <span class="why">{why.replace(/^(허락|질문|계획|선택) · /, '')}</span>
+            {tag && <span class={`tag ${tag.tone} ${tag.solid ? 'solid' : ''}`}>{tag.label}</span>}
+            <span class="why">{why.replace(/^(허락|질문|계획|선택|터미널) · /, '')}</span>
           </span>
           {plan.length > 0 && !finished && (
             <span class="rr-plan" aria-label={`할 일 ${done}/${plan.length}`}>
@@ -155,40 +156,116 @@ const Row = memo(function Row({ t, p, sel, picked, group }) {
   );
 });
 
+/** Which projects the rail shows: the current one by name, and a searchable list of all of them. */
 function ProjectFilter({ projects, tasks, filter }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef();
+  const live = tasks.filter((t) => !t.archived);
   const counts = (pid) => {
-    const mine = tasks.filter((t) => !t.archived && t.projectId === pid);
-    return { blocked: mine.filter(isBlocked).length, yours: mine.filter((t) => t.state === 'needs_input' || t.state === 'review').length };
+    const mine = pid ? live.filter((t) => t.projectId === pid) : live;
+    return { all: mine.length, yours: mine.filter((t) => t.state === 'needs_input' || t.state === 'review').length, blocked: mine.filter(isBlocked).length, busy: mine.filter((t) => groupOf(t) === 'working').length };
   };
-  const all = { blocked: tasks.filter((t) => !t.archived && isBlocked(t)).length };
+  const cur = filter ? projects.find((p) => p.id === filter) : null;
+  const c = counts(filter);
+  useDismiss(open, () => setOpen(false), box);
   return (
-    <div class="pfilter" role="toolbar" aria-label="프로젝트로 거르기">
-      <button class={`pf all ${!filter ? 'on' : ''}`} onClick={() => set({ filter: null })} data-tip="모든 프로젝트" data-kbd={isMac ? '⌥0' : 'Alt+0'} aria-pressed={!filter}>
-        <I n="layout-grid" />
-        {all.blocked > 0 && <span class="dot hot" />}
+    <div class="scope" ref={box}>
+      <button class={`scope-btn ${open ? 'on' : ''}`} onClick={() => setOpen(!open)} aria-haspopup="listbox" aria-expanded={open} aria-label={`프로젝트: ${cur ? cur.name : '모든 프로젝트'}`} data-testid="project-switch">
+        {cur ? <Glyph project={cur} size={30} /> : <span class="scope-all"><I n="stack-2" /></span>}
+        <span class="scope-m">
+          <b>{cur ? cur.name : '모든 프로젝트'}</b>
+          <small>{c.all ? `작업 ${c.all}${c.busy ? ` · 작업 중 ${c.busy}` : ''}` : cur?.desc || '작업 없음'}</small>
+        </span>
+        {c.yours > 0 && <span class={`badge ${c.blocked ? 'warn' : 'info'} num`}>{c.yours}</span>}
+        <I n="selector" class="scope-chev" />
       </button>
-      <span class="pf-sep" />
-      <div class="pf-list scroll">
-        {projects.map((p, i) => {
+      {open && <ProjectList projects={projects} filter={filter} counts={counts} close={() => setOpen(false)} />}
+    </div>
+  );
+}
+
+function ProjectList({ projects, filter, counts, close }) {
+  const [q, setQ] = useState('');
+  const shown = [{ id: null, name: '모든 프로젝트' }, ...projects].filter((p) => !q || !p.id || (p.name + ' ' + (p.desc || '') + ' ' + (p.display || '')).toLowerCase().includes(q.toLowerCase()));
+  const pick = (p) => {
+    set({ filter: p?.id || null });
+    close();
+  };
+  const [active, setActive, onKeyDown] = useListNav(shown.length, (i) => pick(shown[i]));
+  const list = useRef();
+  // Opens on the project already shown; the active row stays in view while arrowing.
+  useLayoutEffect(() => setActive(Math.max(0, shown.findIndex((p) => p.id === filter))), []);
+  useLayoutEffect(() => list.current?.querySelector('.scope-li.active')?.scrollIntoView({ block: 'nearest' }), [active]);
+  return (
+    <div class="scope-pop" role="dialog" aria-label="프로젝트 고르기">
+      <div class="scope-q">
+        <I n="search" />
+        <input
+          autoFocus
+          placeholder="프로젝트 찾기"
+          value={q}
+          onInput={(e) => {
+            setQ(e.currentTarget.value);
+            setActive(0);
+          }}
+          onKeyDown={onKeyDown}
+          aria-label="프로젝트 찾기"
+        />
+      </div>
+      <div class="scope-list scroll" role="listbox" aria-label="프로젝트" ref={list}>
+        {shown.map((p, i) => {
           const c = counts(p.id);
+          const n = p.id ? projects.indexOf(p) + 1 : 0;
           return (
             <button
-              key={p.id}
-              class={`pf ${filter === p.id ? 'on' : ''}`}
-              onClick={() => set({ filter: filter === p.id ? null : p.id })}
-              onContextMenu={(e) => openMenu(e, projectItems(p))}
-              data-tip={p.name}
-              data-kbd={i < 9 ? (isMac ? `⌥${i + 1}` : `Alt+${i + 1}`) : undefined}
-              aria-pressed={filter === p.id}
-              aria-label={p.name}
+              key={p.id || 'all'}
+              class={`scope-li ${i === active ? 'active' : ''} ${filter === p.id ? 'cur' : ''}`}
+              role="option"
+              aria-selected={filter === p.id}
+              onMouseMove={() => setActive(i)}
+              onClick={() => pick(p)}
+              onContextMenu={(e) => p.id && openMenu(e, projectItems(p))}
             >
-              <Glyph project={p} size={24} />
-              {c.blocked > 0 ? <span class="dot hot" /> : c.yours > 0 ? <span class="dot" /> : null}
+              {p.id ? <Glyph project={p} size={28} /> : <span class="scope-all sm"><I n="stack-2" /></span>}
+              <span class="scope-m">
+                <b>{p.name}</b>
+                <small>{p.id ? p.desc || p.display : `프로젝트 ${projects.length}개`}</small>
+              </span>
+              <span class="scope-c">
+                {c.busy > 0 && (
+                  <span class="busy num" data-tip={`작업 중 ${c.busy}`}>
+                    <span class="spin xs" />
+                    {c.busy}
+                  </span>
+                )}
+                {c.yours > 0 && <span class={`badge ${c.blocked ? 'warn' : 'info'} num`}>{c.yours}</span>}
+              </span>
+              {n <= 9 && <kbd>{isMac ? `⌥${n}` : `Alt+${n}`}</kbd>}
+              {filter === p.id && <I n="check" class="scope-ok" />}
             </button>
           );
         })}
-        <button class="pf add" onClick={() => openModal('addProject')} data-tip="프로젝트 추가" aria-label="프로젝트 추가">
-          <I n="plus" />
+        {!shown.length && <div class="empty">찾는 프로젝트가 없어요</div>}
+      </div>
+      <div class="scope-foot">
+        <button
+          class="btn sm ghost"
+          onClick={() => {
+            close();
+            openModal('addProject');
+          }}
+        >
+          <I n="folder-plus" /> 프로젝트 추가
+        </button>
+        <span class="sp" />
+        <button
+          class="btn sm ghost"
+          onClick={() => {
+            close();
+            set({ screen: 'settings', settingsTab: 'projects', settingsProject: filter || undefined });
+          }}
+        >
+          <I n="settings" /> 관리
         </button>
       </div>
     </div>
@@ -238,7 +315,7 @@ function Shelf({ tasks }) {
           const p = projectOf({ projects }, t.projectId);
           return (
             <div key={t.id} class="rrow shelved" onContextMenu={(e) => openMenu(e, taskItems(t))}>
-              <Glyph project={p} size={26} />
+              <Glyph project={p} size={30} />
               <span class="rr-main">
                 <span class="rr-t">{t.title}</span>
                 <span class="rr-s">

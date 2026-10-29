@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { randomId, tilde, realPath } from './util.js';
+import { randomId, tilde, realPath, dataDir } from './util.js';
 import { isRepo, repoRoot } from './git.js';
 import { describe } from './describe.js';
 
@@ -185,9 +185,61 @@ export function backfill(store) {
   if (n) store.save();
 }
 
+// A logo the person picked: copied into Desk's own folder, so it works for groups and for repos
+// that don't ship one, and never writes into the repo.
+const LOGO_TYPES = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'image/svg+xml': 'svg' };
+const CUSTOM_LOGO_MAX = 600 * 1024;
+const CUSTOM_LOGO_NAME = /^[a-z0-9]{1,40}-[a-z0-9]{1,16}\.(png|jpg|webp|gif|svg)$/;
+const logoDir = () => path.join(dataDir(), 'logos');
+
+export function setCustomLogo(store, id, { type, data } = {}) {
+  const p = store.project(id);
+  if (!p) throw httpError(404, 'project not found');
+  const ext = LOGO_TYPES[type];
+  if (!ext || typeof data !== 'string') throw httpError(400, 'PNG·JPG·WebP·GIF·SVG 이미지만 쓸 수 있어요');
+  const buf = Buffer.from(data, 'base64');
+  if (!buf.length || buf.length > CUSTOM_LOGO_MAX) throw httpError(413, '로고는 600KB까지 쓸 수 있어요');
+  if (ext === 'svg' && !/<svg[\s>]/i.test(buf.toString('utf8', 0, Math.min(buf.length, 4096)))) throw httpError(400, 'SVG 파일이 아니에요');
+  fs.mkdirSync(logoDir(), { recursive: true, mode: 0o700 });
+  // A new name each time, so every window's cached copy of the old one is dropped.
+  const name = `${id}-${Date.now().toString(36)}.${ext}`;
+  fs.writeFileSync(path.join(logoDir(), name), buf, { mode: 0o600 });
+  dropCustomLogo(p);
+  p.customLogo = name;
+  // An automatic color follows the new logo.
+  if (p.auto?.color !== false) delete p.logoColorDone;
+  store.save();
+  return p;
+}
+
+export function clearCustomLogo(store, id) {
+  const p = store.project(id);
+  if (!p) throw httpError(404, 'project not found');
+  dropCustomLogo(p);
+  delete p.customLogo;
+  store.save();
+  return p;
+}
+
+function dropCustomLogo(p) {
+  if (p.customLogo && CUSTOM_LOGO_NAME.test(p.customLogo)) fs.rmSync(path.join(logoDir(), p.customLogo), { force: true });
+}
+
+/** The picked logo's file, if the project has one and it's still there. */
+export function customLogoPath(p) {
+  if (!p?.customLogo || !CUSTOM_LOGO_NAME.test(p.customLogo)) return null;
+  const abs = path.join(logoDir(), p.customLogo);
+  try {
+    return fs.statSync(abs).isFile() ? abs : null;
+  } catch {
+    return null;
+  }
+}
+
 export function removeProject(store, id) {
   const live = store.tasks.some((t) => t.projectId === id && !['merged', 'discarded'].includes(t.state));
   if (live) throw httpError(409, '진행 중인 작업이 있어서 삭제할 수 없어요. 먼저 작업을 정리하세요.');
+  dropCustomLogo(store.project(id) || {});
   store.projects = store.projects.filter((p) => p.id !== id);
   store.tasks = store.tasks.filter((t) => t.projectId !== id);
   // A removed repo leaves its groups; a group that drops below two members dissolves.

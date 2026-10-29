@@ -15,7 +15,7 @@ import { Files } from '../files/Files.jsx';
 import { Drawer } from '../terminal/Drawer.jsx';
 import { TriageBar } from '../triage/TriageBar.jsx';
 import { openMenuAt } from '../../ui/Menu.jsx';
-import { I, Spinner, roomVars, useNow } from '../../ui/bits.jsx';
+import { Glyph, I, Spinner, roomVars, useNow } from '../../ui/bits.jsx';
 import { keyLabel } from '../../app/keys.js';
 import { taskItems } from './taskActions.js';
 
@@ -57,6 +57,7 @@ function Header({ task, project, view }) {
   const menuBtn = (e) => openMenuAt(e.currentTarget, taskItems(task));
   return (
     <header class="th">
+      <Glyph project={project} size={38} />
       <div class="th-id">
         {editing ? (
           <input
@@ -86,6 +87,7 @@ function Header({ task, project, view }) {
             <span class="d" />
             {labelOf(task)}
           </span>
+          {project && <span class="meta-i meta-p">{project.name}</span>}
           {task.branch && (
             <span class="meta-i mono" data-tip={task.worktree}>
               <I n="git-branch" /> {task.branch}

@@ -77,3 +77,39 @@ test('adding a project fills name, description, icon and logo; the logo is serve
   // "다시 채우기" is explicit, so it does refresh.
   assert.equal((await ctx.api('POST', `/api/projects/${p.id}/autofill`)).json.desc, 'Next.js · 바뀐 설명');
 });
+
+test('a logo the person picks is kept in the Desk folder, wins over the repo logo, and can be taken back', async () => {
+  const dir = makeRepo(path.join(ctx.tmp, 'pick-logo'), { 'README.md': '# Pick\n' });
+  fs.mkdirSync(path.join(dir, 'public'));
+  fs.writeFileSync(path.join(dir, 'public/logo.png'), PNG);
+  const p = (await ctx.api('POST', '/api/projects', { path: dir })).json;
+  assert.equal(p.logo, 'public/logo.png');
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><rect width="1" height="1"/></svg>');
+  const up = await ctx.api('POST', `/api/projects/${p.id}/logo`, { type: 'image/svg+xml', data: svg.toString('base64') });
+  assert.equal(up.status, 200);
+  assert.match(up.json.customLogo, /\.svg$/);
+  const file = path.join(process.env.AGENTDESK_HOME, 'logos', up.json.customLogo);
+  assert.ok(fs.existsSync(file));
+  // Nothing was written into the repo.
+  assert.deepEqual(fs.readdirSync(path.join(dir, 'public')), ['logo.png']);
+  let r = await ctx.api('GET', `/api/projects/${p.id}/logo`);
+  assert.equal(r.binary.type, 'image/svg+xml');
+  assert.equal(Buffer.compare(Buffer.from(r.binary.data), svg), 0);
+
+  // A new one replaces the old file (a fresh name, so every window drops its cached copy).
+  const again = await ctx.api('POST', `/api/projects/${p.id}/logo`, { type: 'image/png', data: PNG.toString('base64') });
+  assert.notEqual(again.json.customLogo, up.json.customLogo);
+  assert.ok(!fs.existsSync(file));
+
+  // Only images, only small ones, and an "SVG" has to be one.
+  assert.equal((await ctx.api('POST', `/api/projects/${p.id}/logo`, { type: 'text/html', data: 'PGI+' })).status, 400);
+  assert.equal((await ctx.api('POST', `/api/projects/${p.id}/logo`, { type: 'image/svg+xml', data: Buffer.from('<html>').toString('base64') })).status, 400);
+  assert.equal((await ctx.api('POST', `/api/projects/${p.id}/logo`, { type: 'image/png', data: Buffer.alloc(700 * 1024).toString('base64') })).status, 413);
+
+  // Taking it back shows the repo's own logo again.
+  const cleared = await ctx.api('DELETE', `/api/projects/${p.id}/logo`);
+  assert.equal(cleared.json.customLogo, undefined);
+  assert.equal(fs.readdirSync(path.join(process.env.AGENTDESK_HOME, 'logos')).length, 0);
+  r = await ctx.api('GET', `/api/projects/${p.id}/logo`);
+  assert.equal(r.binary.type, 'image/png');
+});

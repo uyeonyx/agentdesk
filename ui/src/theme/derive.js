@@ -171,6 +171,12 @@ export function deriveTokens(input, { glass = 'rich' } = {}) {
     set(`${name}-text`, ensureContrast(solid(ui(`${name}-text`, c), surface), onSurfaces([over(soft, surface)]), AA + MARGIN));
     set(`${name}-soft`, soft);
     set(`${name}-line`, ui(`${name}-line`, withAlpha(c, 0.5)));
+    // For a solid tag or badge: the same hue, bright enough on any theme to be seen from across the
+    // room (a light theme's amber is dark so that it reads as text, which turns brown as a fill).
+    const o = toOklch(c);
+    const fill = solid(ui(`${name}-fill`, o.L >= 0.74 ? c : fromOklch({ ...o, L: 0.78, C: Math.max(o.C, 0.12) })), surface);
+    set(`${name}-fill`, fill);
+    set(`${name}-fill-ink`, inkOn(fill, bg, fg, ui(`${name}-fill-ink`)));
   }
 
   // Diff: line tint, a stronger word-level mark on top of it, and +/- text that reads on both.

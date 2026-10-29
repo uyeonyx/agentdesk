@@ -59,6 +59,7 @@ function assertComplete(d, label) {
   for (const s of ['ok', 'warn', 'danger', 'info']) {
     assert.ok(contrast(c(`--${s}-text`), c('--bg-surface')) >= 4.5, `${label}: ${s}-text`);
     assert.ok(contrast(c(`--${s}-ink`), c(`--${s}`)) >= 4.5, `${label}: ${s}-ink`);
+    assert.ok(contrast(c(`--${s}-fill-ink`), c(`--${s}-fill`)) >= 4.5, `${label}: ${s}-fill-ink`);
   }
   for (const k of ['add', 'del']) {
     const under = over(c(`--diff-${k}-bg`), c('--bg-surface'));
@@ -141,6 +142,26 @@ for (const t of BUILTIN_THEMES) {
     for (const glass of GLASS) assertComplete(deriveTokens(t, { glass }), `${t.id}/${glass}`);
   });
 }
+
+test('accents: every accent on every built-in keeps the contract; unknown ids change nothing', () => {
+  for (const t of BUILTIN_THEMES) {
+    for (const a of themeApi.ACCENTS) {
+      const d = deriveTokens(themeApi.withAccent(t, a.id));
+      assertComplete(d, `${t.id}+${a.id}`);
+      // The accent is the picked one (contrast correction only touches text colors).
+      assert.equal(d.vars['--accent'], t.kind === 'light' ? a.light : a.dark, `${t.id}+${a.id}: accent`);
+    }
+  }
+  const cp = themeApi.findTheme('cyberpunk');
+  assert.equal(themeApi.withAccent(cp, 'theme'), cp);
+  assert.equal(themeApi.withAccent(cp, 'nope'), cp);
+  // A theme's own accent tokens give way to the picked accent.
+  const own = { ...cp, ui: { ...(cp.ui || {}), accent: '#ff0000', 'accent-text': '#ff0000', 'bg-raised': '#222233' } };
+  const d = deriveTokens(themeApi.withAccent(own, 'teal'));
+  assert.equal(d.vars['--accent'], '#0f766e');
+  assert.notEqual(d.vars['--accent-text'], '#ff0000');
+  assert.equal(d.vars['--bg-raised'], '#222233');
+});
 
 test('derive: glass modes differ the way the controls promise', () => {
   const rich = deriveTokens(BUILTIN_THEMES[0], { glass: 'rich' }).vars;

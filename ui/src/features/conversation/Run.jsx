@@ -23,7 +23,7 @@ export function Run({ tools, task, live, waiting }) {
   return (
     <div class={`run ${isOpen ? 'open' : ''} ${sum.fail ? 'failed' : ''} ${running ? 'live' : ''}`} data-kind="run">
       <button class="run-h" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen}>
-        <span class="run-icons">
+        <span class="run-icons" data-cat={cats[0] || 'tool'}>
           {cats.map((c) => (
             <I key={c} n={CAT_ICON[c] || 'tool'} />
           ))}

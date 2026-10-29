@@ -6,8 +6,15 @@ import { hexToRgb } from './util.js';
 /** projectId|logo -> Promise<url|null>; one fetch per logo for the life of the page. */
 const cache = new Map();
 
+/** Which logo a project shows: one the person picked, else the repo's own (unless turned off). */
+function logoKey(project) {
+  if (!project) return null;
+  if (project.customLogo) return `${project.id}|${project.customLogo}`;
+  return project.logo && project.showLogo !== false && project.kind !== 'group' ? `${project.id}|${project.logo}` : null;
+}
+
 export function useLogo(project) {
-  const key = project && project.logo && project.showLogo !== false && project.kind !== 'group' ? `${project.id}|${project.logo}` : null;
+  const key = logoKey(project);
   const [url, setUrl] = useState(() => (key && cache.get(key)?.url) || null);
   useEffect(() => {
     if (!key) return setUrl(null);
@@ -27,6 +34,57 @@ export function useLogo(project) {
     };
   }, [key]);
   return url;
+}
+
+const SIDE = 256;
+
+/**
+ * Use an image file as the project's logo. Pictures are scaled down to fit 256px (a logo never
+ * shows bigger), SVG goes as it is.
+ */
+export async function uploadLogo(projectId, file) {
+  if (!file) return;
+  let type = file.type;
+  let data;
+  if (type === 'image/svg+xml') {
+    if (file.size > 600 * 1024) throw new Error('SVG 로고는 600KB까지 쓸 수 있어요');
+    data = await base64(file);
+  } else if (/^image\/(png|jpeg|webp|gif)$/.test(type)) {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, SIDE / Math.max(bmp.width, bmp.height));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(bmp.width * k));
+    c.height = Math.max(1, Math.round(bmp.height * k));
+    c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close?.();
+    const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));
+    type = 'image/png';
+    data = await base64(blob);
+  } else throw new Error('PNG·JPG·WebP·GIF·SVG 이미지만 쓸 수 있어요');
+  return api('POST', `/api/projects/${projectId}/logo`, { type, data });
+}
+
+/** Ask for an image file, then use it as the project's logo. */
+export function pickLogo(projectId, { onDone, onError } = {}) {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/webp,image/gif,image/svg+xml';
+  input.onchange = () => {
+    const f = input.files?.[0];
+    if (f) uploadLogo(projectId, f).then(onDone, onError);
+  };
+  input.click();
+}
+
+export const clearLogo = (projectId) => api('DELETE', `/api/projects/${projectId}/logo`);
+
+function base64(blob) {
+  return new Promise((ok, fail) => {
+    const r = new FileReader();
+    r.onload = () => ok(String(r.result).split(',')[1] || '');
+    r.onerror = () => fail(r.error);
+    r.readAsDataURL(blob);
+  });
 }
 
 /**

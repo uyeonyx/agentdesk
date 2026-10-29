@@ -24,72 +24,171 @@
   -webkit-app-region: no-drag;
 }
 
-/* Project filter: a row of glyphs. */
-.pfilter {
+/* Project switch: which project the rail shows, by name; a searchable list below it. */
+.scope {
+  position: relative;
+  padding: 10px 10px 4px;
+}
+.scope-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 10px 10px 6px;
-}
-.pf-list {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 3px;
-  margin: -3px;
-  scrollbar-width: none;
-}
-.pf {
-  position: relative;
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 11px;
-  color: var(--text-2);
-  font-size: 16px;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px 7px 7px;
+  border-radius: var(--r-3);
+  text-align: left;
+  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px var(--line);
   transition:
     background var(--dur-2),
-    transform var(--dur-3) var(--ease-spring),
-    box-shadow var(--dur-2);
+    box-shadow var(--dur-2),
+    transform var(--dur-3) var(--ease-spring);
 }
-.pf:hover {
-  background: var(--bg-hover);
-}
-.pf:active {
-  transform: scale(0.92);
-}
-.pf.on {
+.scope-btn:hover,
+.scope-btn.on {
   background: var(--bg-active);
   box-shadow: inset 0 0 0 1px var(--line-strong);
 }
-.pf.add {
-  color: var(--text-3);
-  border: 1px dashed var(--line-strong);
+.scope-btn:active {
+  transform: scale(0.985);
+}
+.scope-all {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  font-size: 17px;
+  color: var(--text);
+  background: var(--bg-active);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+.scope-all.sm {
   width: 28px;
   height: 28px;
-  margin: 2px;
+  font-size: 16px;
+  border-radius: 8px;
 }
-.pf .dot {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-2);
-  box-shadow: 0 0 0 2px var(--mark-ring);
+.scope-m {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
 }
-.pf .dot.hot {
-  background: var(--warn);
+.scope-m b {
+  font-size: 14px;
+  line-height: 19px;
+  font-weight: var(--w-4);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.pf-sep {
-  width: 1px;
-  height: 18px;
-  background: var(--line-strong);
+.scope-m small {
+  font-size: 11.5px;
+  line-height: 15px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scope-chev {
   flex: none;
+  font-size: 15px;
+  color: var(--text-3);
+}
+.scope-pop {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 8px;
+  right: 8px;
+  z-index: var(--z-pop);
+  display: flex;
+  flex-direction: column;
+  max-height: min(540px, 72vh);
+  border-radius: var(--r-4);
+  overflow: hidden;
+  /* Solid: rows of the rail right under it would otherwise read through. */
+  background: var(--bg-overlay);
+  box-shadow:
+    0 0 0 1px var(--line-strong),
+    inset 0 1px 0 var(--glass-edge),
+    var(--shadow-3);
+  animation: pop var(--dur-2) var(--ease-out);
+}
+.scope-q {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  height: 40px;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-3);
+}
+.scope-q input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  font: inherit;
+  font-size: var(--fs-3);
+  color: var(--text);
+}
+.scope-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 6px;
+}
+.scope-li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border-radius: var(--r-2);
+  text-align: left;
+}
+.scope-li.active {
+  background: var(--bg-active);
+}
+.scope-li .scope-m b {
+  font-size: 13.5px;
+  font-weight: var(--w-3);
+}
+.scope-li.cur .scope-m b {
+  font-weight: var(--w-4);
+}
+.scope-li kbd {
+  flex: none;
+}
+.scope-c {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.scope-c .busy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-1);
+  font-weight: var(--w-3);
+  color: var(--accent-text);
+}
+.scope-ok {
+  flex: none;
+  font-size: 15px;
+  color: var(--accent-text);
+}
+.scope-foot {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border-top: 1px solid var(--line);
 }
 
 /* Groups. */
@@ -105,9 +204,9 @@
   gap: 6px;
   flex: 1;
   min-width: 0;
-  font-size: var(--fs-2);
-  font-weight: var(--w-3);
-  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: var(--w-4);
+  color: var(--text);
 }
 .grp-t .ti {
   font-size: 13px;
@@ -151,8 +250,8 @@ section[data-group='yours'] .grp-x {
 .rrow {
   position: relative;
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  gap: 11px;
   align-items: start;
   width: 100%;
   padding: 9px 10px;
@@ -165,12 +264,13 @@ section[data-group='yours'] .grp-x {
 .rrow:hover {
   background: var(--bg-hover);
 }
+/* The open task takes on its project's color, faintly: you can tell where you are at a glance. */
 .rrow.sel {
-  background: color-mix(in oklab, var(--bg-surface) 82%, transparent);
+  background: color-mix(in oklab, var(--room) 14%, var(--bg-surface));
   box-shadow:
-    inset 0 0 0 1px var(--line),
+    inset 0 0 0 1px color-mix(in oklab, var(--room) 42%, transparent),
     inset 0 1px 0 var(--glass-edge),
-    0 4px 14px -8px var(--glass-shadow);
+    0 6px 18px -10px color-mix(in oklab, var(--room) 60%, transparent);
 }
 .rrow.picked {
   box-shadow: inset 0 0 0 1px var(--line-strong);
@@ -201,9 +301,9 @@ section[data-group='yours'] .grp-x {
   gap: 2px;
 }
 .rr-t {
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: var(--w-3);
-  line-height: 19px;
+  line-height: 20px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -231,10 +331,8 @@ section[data-group='yours'] .grp-x {
   line-height: 18px;
   color: var(--text-2);
 }
-.askchip {
+.rr-s .tag {
   margin-right: 6px;
-  font-weight: var(--w-3);
-  color: var(--warn-text);
 }
 .rrow.blocked .why {
   color: var(--text);
@@ -249,7 +347,7 @@ section[data-group='yours'] .grp-x {
 .rr-plan i {
   display: block;
   height: 100%;
-  background: var(--text-3);
+  background: var(--accent);
   border-radius: inherit;
   transition: width var(--dur-4) var(--ease-out);
 }
@@ -354,6 +452,6 @@ section[data-group='yours'] .grp-x {
   font-weight: var(--w-3);
 }
 .rrow.shelved {
-  grid-template-columns: 26px minmax(0, 1fr) auto auto;
+  grid-template-columns: 30px minmax(0, 1fr) auto auto;
   align-items: center;
 }

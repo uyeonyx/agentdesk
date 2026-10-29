@@ -188,8 +188,11 @@ test('plan approval shows the plan; approving starts the work', async () => {
 test('⌘K starts a task inline: Tab picks the project, Enter sends', async () => {
   const a = await project('repo-k1');
   const b = await project('repo-k2');
-  // Wait until the new project has reached the window, as a person would see it in the rail.
-  await expect(page.getByRole('toolbar', { name: '프로젝트로 거르기' }).getByRole('button', { name: 'repo-k2' })).toBeVisible();
+  // Wait until the new project has reached the window, as a person would see it in the project list.
+  await page.getByTestId('project-switch').click();
+  await expect(page.getByRole('option', { name: /repo-k2/ })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('listbox', { name: '프로젝트' })).toBeHidden();
   await page.keyboard.press(`${MOD}+n`);
   const bar = page.getByTestId('command-bar');
   await expect(bar).toBeVisible();

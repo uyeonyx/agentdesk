@@ -39,7 +39,7 @@ export function Titlebar() {
           )}
         </nav>
       </div>
-      <button class="cmdpill glass lens" data-sheen onClick={() => openCommand('all')} data-tip="찾기·명령·새 작업" data-kbd={keyLabel('command')}>
+      <button class="cmdpill glass lens" onClick={() => openCommand('all')} data-tip="찾기·명령·새 작업" data-kbd={keyLabel('command')}>
         <I n="search" />
         <span>찾거나 새 작업 시작…</span>
         <kbd>{isMac ? '⌘K' : 'Ctrl K'}</kbd>
@@ -52,8 +52,7 @@ export function Titlebar() {
         )}
         <UpdatePill u={s.update} />
         {yours > 0 && (
-          <button class={`turnpill glass ${blocked ? 'hot' : ''} ${s.triage ? 'on' : ''}`} data-sheen onClick={startTriage} data-tip={blocked ? `${blocked}개가 허락이나 선택을 기다려요 · 차례로 처리` : '차례로 처리'} data-kbd={keyLabel('triage')} data-testid="yours">
-            <span class="dot" />
+          <button class={`turnpill ${blocked ? 'hot' : ''} ${s.triage ? 'on' : ''}`} onClick={startTriage} data-tip={blocked ? `${blocked}개가 허락이나 선택을 기다려요 · 차례로 처리` : '차례로 처리'} data-kbd={keyLabel('triage')} data-testid="yours">
             내 차례 <b class="num">{yours}</b>
           </button>
         )}

@@ -18,7 +18,7 @@ export const COLOR_TOKENS = [
   'bg-app', 'bg-surface', 'bg-raised', 'bg-overlay', 'bg-hover', 'bg-active', 'bg-inset',
   'line', 'line-strong', 'text', 'text-2', 'text-3', 'selection', 'focus',
   'accent', 'accent-ink', 'accent-soft', 'accent-line', 'accent-text',
-  ...SEMANTIC.flatMap((s) => [s, `${s}-ink`, `${s}-text`, `${s}-soft`, `${s}-line`]),
+  ...SEMANTIC.flatMap((s) => [s, `${s}-ink`, `${s}-text`, `${s}-soft`, `${s}-line`, `${s}-fill`, `${s}-fill-ink`]),
   'diff-add-bg', 'diff-add-text', 'diff-add-mark', 'diff-del-bg', 'diff-del-text', 'diff-del-mark',
   ...SYNTAX_KEYS.map((k) => `syn-${k}`),
   'term-bg', 'term-fg', 'term-cursor', 'term-selection', ...ANSI_NAMES.map((_, i) => `term-${i}`),
