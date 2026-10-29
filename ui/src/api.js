@@ -65,6 +65,40 @@ export function detachTerm(task) {
   wsSend({ t: 'detach', task });
 }
 
+const convoListeners = new Set();
+/** Conversation snapshots and deltas (core/conversation.js). */
+export function onConvo(fn) {
+  convoListeners.add(fn);
+  return () => convoListeners.delete(fn);
+}
+const reconnectListeners = new Set();
+/** Called each time the core channel comes (back) up, to resubscribe. */
+export function onReconnect(fn) {
+  reconnectListeners.add(fn);
+  return () => reconnectListeners.delete(fn);
+}
+
+/**
+ * The new task list, reusing the old objects for tasks that didn't change: rows and tiles are
+ * memoized on identity, so a push about one task repaints only that task.
+ */
+export function mergeTasks(prev, next) {
+  if (!prev?.length) return next;
+  const old = new Map(prev.map((t) => [t.id, t]));
+  let same = prev.length === next.length;
+  const out = next.map((t, i) => {
+    const o = old.get(t.id);
+    if (o && sameTask(o, t)) {
+      if (prev[i] !== o) same = false;
+      return o;
+    }
+    same = false;
+    return t;
+  });
+  return same ? prev : out;
+}
+const sameTask = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
 const stateHandlers = new Set();
 export function onState(fn) {
   stateHandlers.add(fn);
@@ -80,6 +114,7 @@ export function connect() {
     for (const a of Object.values(lastAttach)) desk().send(JSON.stringify(a));
     for (const m of pending) desk().send(JSON.stringify(m));
     pending = [];
+    for (const fn of reconnectListeners) fn();
   });
   desk().onPush((data) => {
     let m;
@@ -101,9 +136,10 @@ export function connect() {
         icons: m.icons,
         prefs: m.prefs || {},
         projects: m.projects,
-        tasks: m.tasks,
+        tasks: mergeTasks(prev.tasks, m.tasks),
       });
-    } else for (const l of termListeners) l(m);
+    } else if (m.t === 'convo') for (const l of convoListeners) l(m);
+    else for (const l of termListeners) l(m);
   });
 }
 

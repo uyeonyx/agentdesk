@@ -1,0 +1,104 @@
+/* Everything that isn't a color. Colors come from the theme engine (ui/src/theme), which sets them
+   on :root before the first frame; the values below only cover the moment before that. */
+
+:root {
+  /* Type: six sizes, four weights. 13 is the UI, 15 is for reading and writing. */
+  --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, 'Desk Mono', monospace;
+  /* The terminal needs Hangul exactly two cells wide. */
+  --font-term: 'Desk Mono', 'D2Coding', ui-monospace, Menlo, monospace;
+  --fs-1: 11px;
+  --lh-1: 16px;
+  --fs-2: 12px;
+  --lh-2: 18px;
+  --fs-3: 13px;
+  --lh-3: 20px;
+  --fs-4: 15px;
+  --lh-4: 26px;
+  --fs-5: 18px;
+  --lh-5: 26px;
+  --fs-6: 24px;
+  --lh-6: 32px;
+  --w-1: 400;
+  --w-2: 520;
+  --w-3: 620;
+  --w-4: 720;
+
+  --s-1: 2px;
+  --s-2: 4px;
+  --s-3: 6px;
+  --s-4: 8px;
+  --s-5: 12px;
+  --s-6: 16px;
+  --s-7: 20px;
+  --s-8: 24px;
+  --s-9: 32px;
+  --s-10: 40px;
+  --s-11: 56px;
+
+  /* Concentric: each level inset by its padding keeps the same center of curvature. */
+  --r-1: 6px;
+  --r-2: 10px;
+  --r-3: 14px;
+  --r-4: 20px;
+  --r-5: 28px;
+  --r-full: 999px;
+
+  --dur-1: 90ms;
+  --dur-2: 160ms;
+  --dur-3: 240ms;
+  --dur-4: 320ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* A soft spring: overshoots a little and settles. */
+  --ease-spring: linear(0, 0.18 7%, 0.52 16%, 0.84 27%, 1.02 40%, 1.04 47%, 1.01 62%, 1);
+
+  --z-drawer: 10;
+  --z-sticky: 20;
+  --z-pop: 50;
+  --z-sheet: 100;
+  --z-toast: 200;
+  --z-menu: 300;
+
+  --bar-h: 44px;
+  --rail-w: 300px;
+  --gap: 8px;
+  --col: 760px;
+
+  /* Before the theme arrives: Desk Glass Dark. */
+  --bg-app: #121318;
+  --bg-surface: #17181d;
+  --bg-raised: #1e1f25;
+  --bg-overlay: #24262d;
+  --bg-hover: rgba(255, 255, 255, 0.05);
+  --bg-active: rgba(255, 255, 255, 0.08);
+  --bg-inset: #111216;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.12);
+  --text: #ececf1;
+  --text-2: #a5a7b2;
+  --text-3: #80828d;
+  --accent: #7c8cff;
+  --accent-ink: #0b0d1c;
+  --accent-soft: rgba(124, 140, 255, 0.14);
+  --accent-line: rgba(124, 140, 255, 0.45);
+  --accent-text: #a3aeff;
+  --focus: #7c8cff;
+  --glass-tint: rgba(23, 24, 29, 0.6);
+  --glass-tint-strong: rgba(30, 31, 37, 0.82);
+  --glass-blur: 28px;
+  --glass-sat: 180%;
+  --glass-edge: rgba(255, 255, 255, 0.14);
+  --glass-shadow: rgba(0, 0, 0, 0.45);
+  --glow: 0;
+  --glow-color: transparent;
+  --amb-1: #3b3f9e;
+  --amb-2: #1f6f78;
+  --amb-3: #6a3c9c;
+  --amb-4: #2a2d6b;
+  --amb-speed: 60s;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 24px 64px rgba(0, 0, 0, 0.5);
+  color-scheme: dark;
+}

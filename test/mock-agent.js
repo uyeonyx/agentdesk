@@ -85,6 +85,46 @@ const transcriptPath = () => {
 const W = (s) => process.stdout.write(s);
 let n = 0;
 let tid = 0;
+const codexNew = process.env.MOCK_CODEX_FORMAT === 'new';
+
+// Transcript lines the way Claude Code writes them: a uuid chain with timestamps. A subagent's
+// lines go to <session>/subagents/agent-<id>.jsonl, with a meta file naming the Agent call.
+const last = {};
+const agentCalls = []; // Agent tool calls not yet matched to a subagent, oldest first
+const subFiles = {};
+function tline(obj, sub) {
+  if (kind !== 'claude') return;
+  let file = transcriptPath();
+  if (sub) {
+    if (!subFiles[sub]) {
+      const dir = path.join(path.dirname(file), sid, 'subagents');
+      fs.mkdirSync(dir, { recursive: true });
+      subFiles[sub] = path.join(dir, `agent-${sub}.jsonl`);
+      const call = agentCalls.shift() || {};
+      fs.writeFileSync(path.join(dir, `agent-${sub}.meta.json`), JSON.stringify({ agentType: call.type || 'general-purpose', description: call.desc || '', toolUseId: call.id || '' }));
+      fs.writeFileSync(subFiles[sub], '');
+      tline({ type: 'user', message: { role: 'user', content: call.prompt || '' } }, sub);
+    }
+    file = subFiles[sub];
+  }
+  const uuid = randomUUID();
+  const key = sub || '';
+  fs.appendFileSync(file, JSON.stringify({ parentUuid: last[key] || null, isSidechain: !!sub, ...(sub ? { agentId: sub } : {}), uuid, timestamp: new Date().toISOString(), cwd: process.cwd(), sessionId: sid, ...obj }) + '\n');
+  last[key] = uuid;
+}
+const userLine = (text) => tline({ type: 'user', message: { role: 'user', content: text } });
+const replyLine = (text) => tline({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text }] } });
+const thinkLine = (text) => tline({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'thinking', thinking: text, signature: 'mock' }] } });
+
+/** What Claude Code keeps about a finished tool call (toolUseResult), close enough to the real shapes. */
+function richResult(name, input, res) {
+  if (name === 'Bash') return { stdout: res.stdout || '', stderr: res.stderr || '', interrupted: false, isImage: false };
+  if (name === 'Write' || name === 'Edit') return { filePath: input.file_path, ...res };
+  if (name === 'Read') return { type: 'text', file: { filePath: input.file_path, content: '', numLines: 3, startLine: 1, totalLines: 3 } };
+  if (name === 'Agent') return { agentId: res.agentId || '', content: [{ type: 'text', text: res.text || '' }] };
+  return res;
+}
+const REJECTED = "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.";
 
 function hook(event, extra = {}) {
   if (kind !== 'claude') return;
@@ -96,9 +136,16 @@ function hook(event, extra = {}) {
   p.stdin.end(JSON.stringify({ hook_event_name: event, session_id: sid, transcript_path: transcriptPath(), cwd: process.cwd(), ...extra }));
 }
 const tool = (name, input, extra = {}) => {
-  const id = `tu_${++tid}`;
+  const id = `toolu_mock${String(++tid).padStart(4, '0')}`;
+  const sub = extra.agent_id;
+  if (name === 'Agent') agentCalls.push({ id, type: input.subagent_type, desc: input.description, prompt: input.prompt });
+  tline({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id, name, input }] } }, sub);
   hook('PreToolUse', { tool_name: name, tool_input: input, tool_use_id: id, ...extra });
-  return (response = {}, failed = false) => hook(failed ? 'PostToolUseFailure' : 'PostToolUse', { tool_name: name, tool_input: input, tool_use_id: id, tool_response: response, ...extra });
+  return (response = {}, failed = false, rich) => {
+    const text = failed === 'rejected' ? REJECTED : failed ? `Exit code 1\n${response.stdout || ''}` : response.stdout || response.text || 'ok';
+    tline({ type: 'user', message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: id, content: text, ...(failed ? { is_error: true } : {}) }] }, toolUseResult: failed === 'rejected' ? `Error: ${REJECTED}` : rich || richResult(name, input, response) }, sub);
+    hook(failed ? 'PostToolUseFailure' : 'PostToolUse', { tool_name: name, tool_input: input, tool_use_id: id, tool_response: response, ...extra });
+  };
 };
 
 // Codex writes a session log; the daemon follows it.
@@ -113,11 +160,27 @@ function codexLog(obj) {
   }
   fs.appendFileSync(rollout, JSON.stringify(obj) + '\n');
 }
+const ts = () => new Date().toISOString();
 const codexCall = (name, args) => {
   const id = `call_${++tid}`;
-  codexLog({ type: 'response_item', payload: { type: 'function_call', name, arguments: JSON.stringify(args), call_id: id } });
+  if (codexNew && (name === 'exec_command' || name === 'shell')) {
+    // Newer Codex: commands run inside a JS `exec` wrapper; the command shows up when it's done.
+    codexLog({ timestamp: ts(), type: 'response_item', payload: { type: 'custom_tool_call', name: 'exec', input: `await tools.exec_command({ cmd: ${JSON.stringify(args.cmd)} })`, call_id: id } });
+    return { id, cmd: args.cmd };
+  }
+  codexLog({ timestamp: ts(), type: 'response_item', payload: { type: 'function_call', name, arguments: JSON.stringify(args), call_id: id } });
   return id;
 };
+function codexDone(call, output, exit = 0) {
+  if (call && typeof call === 'object') {
+    codexLog({ timestamp: ts(), type: 'event_msg', payload: { type: 'item_completed', item: { type: 'CommandExecution', id: `exec-${call.id}`, command: ['/bin/zsh', '-lc', call.cmd], cwd: process.cwd(), aggregated_output: output, exit_code: exit, duration: { secs: 0, nanos: 300000000 } } } });
+    codexLog({ timestamp: ts(), type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: call.id, output: [{ type: 'input_text', text: output }] } });
+  } else if (call) codexLog({ timestamp: ts(), type: 'response_item', payload: { type: 'function_call_output', call_id: call, output: `Exit code: ${exit}\nOutput:\n${output}` } });
+}
+function codexSay(role, text) {
+  if (codexNew) codexLog({ timestamp: ts(), type: 'event_msg', payload: { type: 'item_completed', item: role === 'user' ? { type: 'UserMessage', content: [{ type: 'text', text }] } : { type: 'AgentMessage', id: `msg_${++tid}`, content: [{ type: 'text', text }], phase: 'final_answer' } } });
+  else codexLog({ timestamp: ts(), type: 'event_msg', payload: role === 'user' ? { type: 'user_message', message: text } : { type: 'agent_message', message: text } });
+}
 const notifyCodex = (obj) => kind === 'codex' && notify && spawn(notify[0], [...notify.slice(1), JSON.stringify(obj)], { stdio: 'ignore' });
 
 let busy = null;
@@ -133,27 +196,33 @@ function finish(text) {
     const m = text.match(/create (\S+)/i);
     let file = m ? m[1] : `notes/change-${n}.md`;
     for (const [re, f] of JSON.parse(process.env.MOCK_FILES || '[]')) if (new RegExp(re, 'i').test(text)) file = f;
-    const done = tool('Write', { file_path: path.resolve(file), content: '...' });
-    const cdone = codexCall('apply_patch', { input: `*** Begin Patch\n*** Update File: ${file}\n*** End Patch` });
-    fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
-    if (fs.existsSync(file)) {
-      const src = fs.readFileSync(file, 'utf8').split('\n');
+    const existed = fs.existsSync(file);
+    const before = existed ? fs.readFileSync(file, 'utf8') : '';
+    let after;
+    if (existed) {
+      const src = before.split('\n');
       src.splice(Math.min(3, src.length), 0, `// ${text}`, `const urgentWithinHours = 24;`);
-      fs.writeFileSync(file, src.join('\n').replace('fontSize: 22', 'fontSize: 24, fontWeight: "700"'));
+      after = src.join('\n').replace('fontSize: 22', 'fontSize: 24, fontWeight: "700"');
     } else {
-      fs.writeFileSync(file, `# ${text.replace(/^create \S+\s*/, '')}\n\n- 로테이션 주기: 90일 이하\n- 만료 7일 전 알림\n- 이전 키는 30일간 복호화 전용으로 유지\n`);
+      after = `# ${text.replace(/^create \S+\s*/, '')}\n\n- 로테이션 주기: 90일 이하\n- 만료 7일 전 알림\n- 이전 키는 30일간 복호화 전용으로 유지\n`;
     }
+    const done = tool('Write', { file_path: path.resolve(file), content: after });
+    const cdone = codexCall('apply_patch', { input: `*** Begin Patch\n*** ${existed ? 'Update' : 'Add'} File: ${file}\n${(existed ? before.split('\n').map((l) => '-' + l) : []).concat(after.split('\n').map((l) => '+' + l)).join('\n')}\n*** End Patch` });
+    fs.mkdirSync(path.dirname(path.resolve(file)), { recursive: true });
+    fs.writeFileSync(file, after);
+    const patch = [{ oldStart: existed ? 1 : 0, oldLines: existed ? before.split('\n').length : 0, newStart: 1, newLines: after.split('\n').length, lines: (existed ? before.split('\n').map((l) => '-' + l) : []).concat(after.split('\n').map((l) => '+' + l)) }];
     // Multi-repo task folders: touch a file in every repo folder we can see.
     if (/every repo|모든 저장소/.test(text)) {
       for (const d of fs.readdirSync('.', { withFileTypes: true })) if (d.isDirectory() && fs.existsSync(path.join(d.name, '.git'))) fs.appendFileSync(path.join(d.name, 'CHANGES.md'), `- ${text}\n`);
     }
     if (fs.existsSync('README.md')) fs.appendFileSync('README.md', `\n- ${text.replace(/^create \S+\s*/, '')}\n`);
-    done({ success: true });
-    codexLog({ type: 'response_item', payload: { type: 'function_call_output', call_id: cdone, output: 'Done' } });
+    done({ success: true }, false, { type: existed ? 'update' : 'create', filePath: path.resolve(file), content: after, structuredPatch: patch, originalFile: existed ? before : null });
+    codexLog({ timestamp: ts(), type: 'response_item', payload: { type: 'function_call_output', call_id: cdone, output: 'Done' } });
     reply = `${file}를 업데이트했어요. ${text.replace(/^create \S+\s*/, '')} 반영 완료.`;
   }
-  fs.appendFileSync(transcriptPath(), JSON.stringify({ type: 'assistant', cwd: process.cwd(), sessionId: sid, message: { content: [{ type: 'text', text: reply }] } }) + '\n');
-  codexLog({ type: 'event_msg', timestamp: new Date().toISOString(), payload: { type: 'agent_message', message: reply } });
+  replyLine(/markdown|마크다운/i.test(text) ? `${reply}\n\n## 정리\n\n- **굵게** 쓴 항목\n- \`src/app.ts:12\` 참고\n\n\`\`\`ts\nconst x: number = 1;\n\`\`\`\n\n<b>태그는 글자로</b>` : reply);
+  codexSay('assistant', reply);
+  if (codexNew) codexLog({ timestamp: ts(), type: 'event_msg', payload: { type: 'task_complete', duration_ms: 900, last_agent_message: reply } });
   W(`\r\x1b[2K\x1b[32m⏺\x1b[0m ${reply}\r\n\r\n> `);
   if (/background|백그라운드/i.test(text) && kind === 'claude') {
     // Like a build left running with run_in_background: the turn ends, then its finish wakes Claude.
@@ -161,13 +230,14 @@ function finish(text) {
     setTimeout(() => {
       tool('Bash', { command: 'tail build.log' })({ stdout: 'built' });
       setTimeout(() => {
-        fs.appendFileSync(transcriptPath(), JSON.stringify({ type: 'assistant', cwd: process.cwd(), sessionId: sid, message: { content: [{ type: 'text', text: '빌드가 끝났어요' }] } }) + '\n');
+        replyLine('빌드가 끝났어요');
         W(`\r\x1b[2K\x1b[32m⏺\x1b[0m 빌드가 끝났어요\r\n\r\n> `);
         hook('Stop', { last_assistant_message: '빌드가 끝났어요', background_tasks: [], session_crons: [] });
       }, 400);
     }, +(process.env.MOCK_BG_MS || 1500));
     return;
   }
+  tline({ type: 'system', subtype: 'turn_duration', durationMs: 900, isMeta: false });
   hook('Stop', { last_assistant_message: reply });
   notifyCodex({ type: 'agent-turn-complete', 'last-assistant-message': reply });
 }
@@ -182,8 +252,10 @@ function work(text) {
   }
   hook('UserPromptSubmit', { prompt: text });
   // Both agents keep the conversation on disk, prompt and reply, the way the real ones do.
-  if (kind === 'claude') fs.appendFileSync(transcriptPath(), JSON.stringify({ type: 'user', cwd: process.cwd(), sessionId: sid, timestamp: new Date().toISOString(), message: { role: 'user', content: text } }) + '\n');
-  codexLog({ type: 'event_msg', timestamp: new Date().toISOString(), payload: { type: 'user_message', message: text } });
+  userLine(text);
+  thinkLine('요청을 살펴보는 중');
+  if (codexNew) codexLog({ timestamp: ts(), type: 'event_msg', payload: { type: 'task_started', turn_id: `turn_${++tid}` } });
+  codexSay('user', text);
   W(`\r\n\x1b[36m⏺\x1b[0m ${text}\r\n`);
   if (/plan|계획/i.test(text)) {
     const todos = [
@@ -201,7 +273,7 @@ function work(text) {
     setTimeout(() => tool('Bash', { command: 'npm test -- --watch=false' }, { agent_id: 'sub-1', agent_type: 'general-purpose' })({ stdout: 'ok' }), 160);
     setTimeout(() => {
       hook('SubagentStop', { agent_id: 'sub-1', agent_type: 'general-purpose', last_assistant_message: '테스트 3개를 추가했어요' });
-      end({});
+      end({ agentId: 'sub-1', text: '테스트 3개를 추가했어요' });
     }, /slow|천천히/i.test(text) ? 600000 : 300);
     if (/slow|천천히/i.test(text)) {
       const end2 = tool('Agent', { description: '서브넷 모듈 문서 조사', subagent_type: 'Explore', prompt: 'read docs' });
@@ -223,8 +295,11 @@ function work(text) {
       if (!busy) return;
       clearInterval(busy);
       busy = null;
-      bash?.({ exit_code: 0 });
-      if (ccall) codexLog({ type: 'response_item', payload: { type: 'function_call_output', call_id: ccall, output: 'Exit code: 0' } });
+      bash?.({ exit_code: 0, stdout: 'Tests: 3 passed' });
+      if (ccall) codexDone(ccall, 'Tests: 3 passed', 0);
+      if (/askedit/i.test(text)) return askEdit(text);
+      if (/askq2/i.test(text)) return askQuestions(text);
+      if (/planmode/i.test(text)) return planMode(text);
       if (/askq/i.test(text)) {
         // Claude Code's AskUserQuestion form: tabs, descriptions under options, a separator.
         W(
@@ -269,6 +344,126 @@ function work(text) {
   );
 }
 
+// ---------------------------------------------------------------- prompts that wait on a person
+// Each one draws the CLI's screen and takes over the keyboard until it's answered.
+let form = null; // (key) => void while a form owns stdin
+
+/** An Edit that needs permission: the permission box, then the edit applied (or rejected). */
+function askEdit(text) {
+  const file = path.resolve('README.md');
+  const before = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '# readme\n';
+  const old = before.split('\n')[0];
+  const input = { file_path: file, old_string: old, new_string: '# 바뀐 제목' };
+  const done = tool('Edit', input);
+  W('\r\n\x1b[2K' + '─'.repeat(60) + '\r\n Edit file\r\n README.md\r\n  1 -' + old + '\r\n  1 +# 바뀐 제목\r\n Do you want to make this edit to README.md?\r\n ❯ 1. Yes\r\n   2. Yes, allow all edits during this session (shift+tab)\r\n   3. No, and tell Claude what to do differently (esc)\r\n');
+  hook('PermissionRequest', { tool_name: 'Edit', tool_input: input });
+  form = (k) => {
+    if (!/^[123]$/.test(k)) return;
+    form = null;
+    if (k === '3') {
+      done({}, 'rejected');
+      W('\r\n\x1b[31m  ⎿  거절됨\x1b[0m\r\n\r\n> ');
+      hook('Stop', {});
+      return;
+    }
+    const after = before.replace(old, '# 바뀐 제목');
+    fs.writeFileSync(file, after);
+    done({ success: true }, false, { filePath: file, oldString: old, newString: '# 바뀐 제목', originalFile: before, replaceAll: false, structuredPatch: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, lines: ['-' + old, '+# 바뀐 제목'] }] });
+    finish('just answer: 제목을 바꿨어요');
+  };
+}
+
+/** AskUserQuestion with two questions (one multi-select), a free-text option, and a review step. */
+function askQuestions(text) {
+  const questions = [
+    { question: '어떤 주제로 할까요?', header: '주제', multiSelect: false, options: [{ label: '누름 깊이 테스트', description: '버튼이 눌리는 깊이' }, { label: '토큰 정리', description: '안 쓰는 토큰 지우기' }] },
+    { question: '어디까지 바꿀까요?', header: '범위', multiSelect: true, options: [{ label: '버튼' }, { label: '입력창' }, { label: '카드' }] },
+  ];
+  const done = tool('AskUserQuestion', { questions });
+  const answers = {};
+  const checked = new Set();
+  let typing = null;
+  const tabs = (i) => '←  ' + questions.map((q, k) => `${k < i ? '✔' : '☐'} ${q.header}`).join('  ') + `  ${i >= questions.length ? '✔' : '☐'} Submit  →`;
+  const draw = (i) => {
+    W('\x1b[2J\x1b[H');
+    if (i >= questions.length) {
+      W(`${tabs(i)}\r\n\r\nReview your answers\r\n\r\n` + questions.map((q) => ` ● ${q.header} → ${answers[q.question]}\r\n`).join('') + '\r\nReady to submit your answers?\r\n\r\n❯ 1. Submit answers\r\n  2. Cancel\r\n');
+      return;
+    }
+    const q = questions[i];
+    const opts = q.options.map((o, k) => `  ${k + 1}. ${q.multiSelect ? `[${checked.has(o.label) ? '✔' : ' '}] ` : ''}${o.label}\r\n${o.description ? `     ${o.description}\r\n` : ''}`).join('');
+    const n = q.options.length;
+    W(`${tabs(i)}\r\n\r\n${q.question}\r\n\r\n${opts}  ${n + 1}. Type something.${typing !== null ? ' ' + typing : ''}\r\n${q.multiSelect ? `  ${n + 2}. Next\r\n` : ''}\r\nEnter to select · Esc to cancel\r\n`);
+  };
+  let i = 0;
+  const next = (answer) => {
+    answers[questions[i].question] = answer;
+    i++;
+    checked.clear();
+    draw(i);
+  };
+  draw(0);
+  form = (k) => {
+    if (typing !== null) {
+      if (k === '\r') {
+        const t = typing;
+        typing = null;
+        return next(t.trim());
+      }
+      typing += k.replace(/[\r\n]/g, '');
+      return draw(i);
+    }
+    if (i >= questions.length) {
+      if (k === '1') {
+        form = null;
+        done({}, false, { questions, answers, annotations: {} });
+        return finish('just answer: 답을 받았어요');
+      }
+      if (k === '2') {
+        form = null;
+        done({}, 'rejected');
+        W('\r\n> ');
+        hook('Stop', {});
+      }
+      return;
+    }
+    const q = questions[i];
+    const n = q.options.length;
+    const d = Number(k);
+    if (d >= 1 && d <= n) {
+      if (!q.multiSelect) return next(q.options[d - 1].label);
+      const l = q.options[d - 1].label;
+      checked.has(l) ? checked.delete(l) : checked.add(l);
+      return draw(i);
+    }
+    if (d === n + 1) {
+      typing = '';
+      return draw(i);
+    }
+    if ((q.multiSelect && d === n + 2) || k === '\x1b[C') return next(q.options.map((o) => o.label).filter((l) => checked.has(l)).join(', '));
+  };
+}
+
+/** ExitPlanMode: the plan, then the approval menu. */
+function planMode(text) {
+  const plan = '# 계획\n\n1. 버튼 크기를 키운다\n2. 테스트를 추가한다';
+  const done = tool('ExitPlanMode', { plan });
+  W('\r\n\x1b[2K' + plan.replace(/\n/g, '\r\n') + '\r\n\r\n Would you like to proceed?\r\n\r\n ❯ 1. Yes, and auto-accept edits\r\n   2. Yes, and manually approve edits\r\n   3. No, keep planning\r\n');
+  hook('PermissionRequest', { tool_name: 'ExitPlanMode', tool_input: { plan } });
+  form = (k) => {
+    if (!/^[123]$/.test(k)) return;
+    form = null;
+    if (k === '3') {
+      done({}, 'rejected');
+      W('\r\n> ');
+      hook('Stop', {});
+      return;
+    }
+    done({}, false, { plan, filePath: '', isAgent: false });
+    finish('create notes/plan.md 계획대로 진행');
+  };
+}
+
 const remoteLine = () => W(`\r\n\x1b[2m/remote-control is active · Continue on your phone: https://claude.ai/code/session_mock${String(process.pid)}\x1b[0m\r\n> `);
 W(`\x1b[1mMock ${kind}\x1b[0m ${resume ? `(resumed${resumeId ? ' ' + resumeId : ''}${fork ? ' as fork' : ''})` : ''} session ${sid} ${name ? `"${name}"` : ''} in ${process.cwd()}\r\n> `);
 if (remote) setTimeout(remoteLine, 50);
@@ -299,6 +494,12 @@ process.stdin.on('data', (d) => {
     return;
   }
   if (s === '\x03') process.exit(0);
+  if (form) {
+    // Keys typed into a form arrive one at a time or as a burst; arrow keys as one sequence.
+    if (s.startsWith('\x1b[')) return form(s);
+    for (const ch of s) form?.(ch);
+    return;
+  }
   if (menuOpen && new RegExp(`^[1-${menuOpen === 6 ? 6 : 3}]$`).test(s)) {
     menuOpen = false;
     W(`\r\n선택: ${s}\r\n`);

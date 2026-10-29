@@ -1,6 +1,6 @@
 // Agent Desk's main process: the window, the app:// page, menus and lifecycle. The Desk itself
 // runs in a separate core process (core-host.js); this process only connects windows to it.
-import { app, BrowserWindow, Menu, MessageChannelMain, clipboard, dialog, ipcMain, nativeTheme, net, protocol, session, shell, utilityProcess } from 'electron';
+import { app, BrowserWindow, Menu, MessageChannelMain, Tray, clipboard, dialog, globalShortcut, ipcMain, nativeImage, nativeTheme, net, protocol, screen, session, shell, utilityProcess } from 'electron';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,8 +39,13 @@ async function runApp() {
 
   const DIST = path.join(app.getAppPath(), 'ui', 'dist');
   const mac = process.platform === 'darwin';
+  const { panelBounds, shouldToggle, normalizeAccel, PANEL_W } = await import('./panel.js');
   let win = null;
+  let panel = null;
+  let tray = null;
   let quitting = false;
+  /** Every window that talks to the core: the main one and the quick panel. */
+  const windows = () => [win, panel].filter((w) => w && !w.isDestroyed());
 
   if (process.platform === 'win32') app.setAppUserModelId('dev.uyeon.agentdesk');
   app.on('second-instance', () => showWindow());
@@ -93,13 +98,14 @@ async function runApp() {
         if (m?.t === 'ready') {
           core = child;
           resolve(true);
-          if (win) connectWindow(win);
+          for (const w of windows()) connectWindow(w);
         } else if (m?.t === 'error') {
           resolve(false);
           await dialog.showMessageBox({ type: 'error', message: 'Agent Desk를 시작하지 못했어요', detail: m.message });
           app.exit(1);
         } else if (m?.t === 'badge') {
           app.setBadgeCount(m.n);
+          setTrayCount(m.n, m.blocked || 0);
         } else if (m?.t === 'attention') {
           attention();
         } else if (m?.t === 'status' || m?.t === 'bye') {
@@ -111,7 +117,7 @@ async function runApp() {
       if (core === child) core = null;
       while (asks.length) asks.shift()({ t: 'gone' });
       if (quitting) return;
-      win?.webContents.send('desk:core-down');
+      for (const w of windows()) w.webContents.send('desk:core-down');
       // A crash (a native terminal error, say) shouldn't end the app: start over, unless it keeps dying.
       const now = Date.now();
       restarts.push(now);
@@ -140,42 +146,104 @@ async function runApp() {
     w.webContents.postMessage('desk:port', null, [port2]);
   }
 
-  // ------------------------------------------------------------ window chrome
+  // ------------------------------------------------------------ window chrome & theme
 
   // The title bar is the page's own top bar: macOS keeps only the traffic lights, Windows overlays
-  // its caption buttons. Their colors, the window background and the native theme (menus, dialogs)
-  // follow whatever the page's top bar looks like; the page reports it on load and whenever its
-  // theme changes, and the last report is kept so the next launch opens in the same colors.
-  const BAR_H = 48;
+  // its caption buttons. The page reports the colors of each theme it shows (light and dark kept
+  // apart), so the next launch opens in the right colors before the page has loaded.
+  const BAR_H = 44;
   const chromeFile = path.join(app.getPath('userData'), 'chrome.json');
-  let chrome = { bg: '#1a1c21', fg: '#e7e9ed', dark: true };
+  const themeFile = path.join(app.getPath('userData'), 'theme.json');
+  let chrome = { dark: { bg: '#121318', fg: '#ececf1' }, light: { bg: '#f3f3f5', fg: '#1a1b1f' } };
   try {
     const saved = JSON.parse(fs.readFileSync(chromeFile, 'utf8'));
-    if (isHex(saved.bg) && isHex(saved.fg)) chrome = { bg: saved.bg, fg: saved.fg, dark: !!saved.dark };
+    for (const k of ['dark', 'light']) if (isHex(saved[k]?.bg) && isHex(saved[k]?.fg)) chrome[k] = { bg: saved[k].bg, fg: saved[k].fg };
   } catch {}
-  nativeTheme.themeSource = chrome.dark ? 'dark' : 'light';
+  // The person's theme choice (see ui/src/app/theme.js); only its shape is checked here.
+  let themePrefs = { mode: 'system', glass: 'rich', vibrancy: true, ambient: true };
+  try {
+    themePrefs = { ...themePrefs, ...cleanPrefs(JSON.parse(fs.readFileSync(themeFile, 'utf8'))) };
+  } catch {}
+  nativeTheme.themeSource = themePrefs.mode === 'fixed' && ['light', 'dark'].includes(themePrefs.fixedKind) ? themePrefs.fixedKind : 'system';
 
   function isHex(c) {
     return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
   }
+  function cleanPrefs(p) {
+    const out = {};
+    for (const [k, v] of Object.entries(p || {})) {
+      if (!/^[a-zA-Z]{1,24}$/.test(k)) continue;
+      if (typeof v === 'boolean' || (typeof v === 'string' && v.length <= 120 && /^[\w.-]*$/.test(v))) out[k] = v;
+    }
+    return out;
+  }
+  const scheme = () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
+  // macOS: the desktop shows faintly through the window (the page draws its own tint over it).
+  const seeThrough = () => mac && themePrefs.vibrancy !== false && themePrefs.glass !== 'off';
 
   function applyChrome(w) {
-    nativeTheme.themeSource = chrome.dark ? 'dark' : 'light';
     if (!w || w.isDestroyed()) return;
-    w.setBackgroundColor(chrome.bg);
-    if (!mac) w.setTitleBarOverlay({ color: chrome.bg, symbolColor: chrome.fg, height: BAR_H - 1 });
+    const c = chrome[scheme()];
+    if (w === win) {
+      if (mac) {
+        w.setVibrancy(seeThrough() ? 'under-window' : null);
+        w.setBackgroundColor(seeThrough() ? '#00000000' : c.bg);
+      } else {
+        w.setBackgroundColor(c.bg);
+        w.setTitleBarOverlay({ color: c.bg, symbolColor: c.fg, height: BAR_H - 1 });
+      }
+    }
   }
+  nativeTheme.on('updated', () => applyChrome(win));
 
   ipcMain.on('desk:chrome', (e, c) => {
-    if (!isTrustedFrame(e.senderFrame) || !isHex(c?.bg) || !isHex(c?.fg)) return;
-    const next = { bg: c.bg.toLowerCase(), fg: c.fg.toLowerCase(), dark: !!c.dark };
-    if (next.bg === chrome.bg && next.fg === chrome.fg && next.dark === chrome.dark) return;
-    chrome = next;
+    if (!isTrustedFrame(e.senderFrame) || !isHex(c?.bg) || !isHex(c?.fg) || !['dark', 'light'].includes(c?.scheme)) return;
+    const next = { bg: c.bg.toLowerCase(), fg: c.fg.toLowerCase() };
+    if (next.bg === chrome[c.scheme].bg && next.fg === chrome[c.scheme].fg) return;
+    chrome[c.scheme] = next;
     applyChrome(win);
     try {
       fs.writeFileSync(chromeFile, JSON.stringify(chrome));
     } catch {}
   });
+
+  ipcMain.handle('desk:theme-prefs', (e) => (isTrustedFrame(e.senderFrame) ? themePrefs : null));
+  ipcMain.on('desk:theme-set', (e, p) => {
+    if (!isTrustedFrame(e.senderFrame) || !p || typeof p !== 'object') return;
+    themePrefs = { ...themePrefs, ...cleanPrefs(p) };
+    nativeTheme.themeSource = themePrefs.mode === 'fixed' && ['light', 'dark'].includes(themePrefs.fixedKind) ? themePrefs.fixedKind : 'system';
+    try {
+      fs.writeFileSync(themeFile, JSON.stringify(themePrefs));
+    } catch {}
+    applyChrome(win);
+    for (const w of windows()) if (w.webContents !== e.sender) w.webContents.send('desk:theme-prefs', themePrefs);
+  });
+
+  /** What every page window gets: links leave the app, nothing navigates, our own context menus. */
+  function harden(w) {
+    const wc = w.webContents;
+    wc.setWindowOpenHandler(({ url }) => {
+      if (isExternalAllowed(url)) shell.openExternal(url);
+      return { action: 'deny' };
+    });
+    // The page never navigates; links (PRs, vscode://) go to the OS instead.
+    wc.on('will-navigate', (e, url) => {
+      e.preventDefault();
+      if (isExternalAllowed(url)) shell.openExternal(url);
+    });
+    wc.on('did-finish-load', () => connectWindow(w));
+    // The page shows its own menus for tasks and terminals; this one is for text, links and images.
+    wc.on('context-menu', (_e, params) => contextMenu(params, wc)?.popup({ window: w }));
+  }
+
+  const webPreferences = {
+    preload: path.join(here, 'preload.cjs'),
+    contextIsolation: true,
+    sandbox: true,
+    nodeIntegration: false,
+    webSecurity: true,
+    spellcheck: false,
+  };
 
   // ------------------------------------------------------------ window
 
@@ -186,34 +254,20 @@ async function runApp() {
       minWidth: 860,
       minHeight: 560,
       show: false,
-      backgroundColor: chrome.bg,
+      backgroundColor: seeThrough() ? '#00000000' : chrome[scheme()].bg,
       title: 'Agent Desk',
       ...(mac
-        ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 17 } }
-        : { titleBarStyle: 'hidden', titleBarOverlay: { color: chrome.bg, symbolColor: chrome.fg, height: BAR_H - 1 } }),
-      webPreferences: {
-        preload: path.join(here, 'preload.cjs'),
-        contextIsolation: true,
-        sandbox: true,
-        nodeIntegration: false,
-        webSecurity: true,
-        spellcheck: false,
-      },
+        ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 16, y: 15 }, ...(seeThrough() ? { vibrancy: 'under-window', visualEffectState: 'followWindow' } : {}) }
+        : { titleBarStyle: 'hidden', titleBarOverlay: { color: chrome[scheme()].bg, symbolColor: chrome[scheme()].fg, height: BAR_H - 1 } }),
+      webPreferences,
     });
     const wc = win.webContents;
-    wc.setWindowOpenHandler(({ url }) => {
-      if (isExternalAllowed(url)) shell.openExternal(url);
-      return { action: 'deny' };
+    harden(win);
+    win.once('ready-to-show', () => {
+      win.show();
+      // The quick panel is made ahead, hidden, so it appears the instant it's called.
+      setTimeout(createPanel, 1500);
     });
-    // The page never navigates; links (PRs, vscode://) go to the OS instead.
-    wc.on('will-navigate', (e, url) => {
-      e.preventDefault();
-      if (isExternalAllowed(url)) shell.openExternal(url);
-    });
-    wc.on('did-finish-load', () => connectWindow(win));
-    // The page shows its own menus for tasks and terminals; this one is for text, links and images.
-    wc.on('context-menu', (_e, params) => contextMenu(params, wc)?.popup({ window: win }));
-    win.once('ready-to-show', () => win.show());
     // Full screen hides the traffic lights: the top bar can use that space again.
     win.on('enter-full-screen', () => wc.send('desk:fullscreen', true));
     win.on('leave-full-screen', () => wc.send('desk:fullscreen', false));
@@ -248,6 +302,142 @@ async function runApp() {
   ipcMain.on('desk:focus', (e) => {
     if (isTrustedFrame(e.senderFrame)) showWindow();
   });
+
+  // ------------------------------------------------------------ quick panel, tray, shortcut
+
+  let panelHiddenAt = 0;
+  let panelFrom = 'shortcut';
+  function createPanel() {
+    if (panel && !panel.isDestroyed()) return panel;
+    panel = new BrowserWindow({
+      width: PANEL_W,
+      height: 360,
+      show: false,
+      frame: false,
+      resizable: false,
+      fullscreenable: false,
+      minimizable: false,
+      maximizable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      hasShadow: true,
+      title: 'Agent Desk',
+      ...(mac ? { type: 'panel', vibrancy: 'popover', visualEffectState: 'active', transparent: true, backgroundColor: '#00000000', roundedCorners: true } : { backgroundColor: chrome[scheme()].bg }),
+      webPreferences,
+    });
+    if (mac) panel.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    harden(panel);
+    panel.on('blur', () => {
+      if (panel.webContents.isDevToolsOpened()) return;
+      panelHiddenAt = Date.now();
+      panel.hide();
+    });
+    panel.on('closed', () => (panel = null));
+    panel.loadURL(`${ORIGIN}/panel.html`);
+    return panel;
+  }
+
+  function placePanel(height) {
+    const p = createPanel();
+    const cursor = screen.getCursorScreenPoint();
+    const trayB = tray?.getBounds();
+    const display = panelFrom === 'tray' && trayB ? screen.getDisplayMatching(trayB) : screen.getDisplayNearestPoint(cursor);
+    p.setBounds(panelBounds({ from: panelFrom, tray: trayB, display, height: height || p.getBounds().height, platform: process.platform }));
+  }
+
+  function togglePanel(from = 'shortcut') {
+    const p = createPanel();
+    if (p.isVisible()) return p.hide();
+    if (from === 'tray' && !shouldToggle(panelHiddenAt)) return;
+    panelFrom = from;
+    placePanel();
+    p.show();
+    p.focus();
+    p.webContents.send('desk:panel-shown');
+  }
+
+  ipcMain.on('desk:panel', (e, action, arg) => {
+    if (!isTrustedFrame(e.senderFrame)) return;
+    if (action === 'toggle') togglePanel('shortcut');
+    else if (action === 'hide') panel?.hide();
+    else if (action === 'resize' && panel && Number.isFinite(arg)) placePanel(arg);
+  });
+  // "Open this in the app": from the panel (or a notification) to the main window, on that task.
+  ipcMain.on('desk:open', (e, target) => {
+    if (!isTrustedFrame(e.senderFrame) || typeof target?.taskId !== 'string' || target.taskId.length > 64) return;
+    panel?.hide();
+    showWindow();
+    win?.webContents.send('desk:navigate', { taskId: target.taskId, view: ['chat', 'review', 'files'].includes(target.view) ? target.view : undefined });
+  });
+
+  function trayIcon(hot) {
+    const name = mac ? 'trayTemplate.png' : hot ? 'trayHot.png' : 'tray.png';
+    const img = nativeImage.createFromPath(path.join(here, 'assets', name));
+    if (mac) img.setTemplateImage(true);
+    return img;
+  }
+  function createTray() {
+    if (tray) return;
+    tray = new Tray(trayIcon(false));
+    tray.setToolTip('Agent Desk');
+    tray.on('click', () => togglePanel('tray'));
+    tray.on('right-click', () =>
+      tray.popUpContextMenu(
+        Menu.buildFromTemplate([
+          { label: 'Agent Desk 열기', click: () => showWindow() },
+          { label: '빠른 창', accelerator: shortcutAccel, click: () => togglePanel('tray') },
+          { type: 'separator' },
+          { label: '종료', click: () => requestQuit() },
+        ])
+      )
+    );
+  }
+  let trayState = '';
+  function setTrayCount(n, blocked) {
+    if (!tray) return;
+    const key = `${n}|${blocked}`;
+    if (key === trayState) return;
+    trayState = key;
+    if (mac) tray.setTitle(n ? String(n) : '', { fontType: 'monospacedDigit' });
+    else tray.setImage(trayIcon(blocked > 0));
+    tray.setToolTip(n ? `Agent Desk · 기다리는 작업 ${n}개${blocked ? ` · 허락·선택 ${blocked}개` : ''}` : 'Agent Desk');
+  }
+
+  // The global shortcut for the panel: ⌥Space unless the person picked another.
+  const uiFile = path.join(app.getPath('userData'), 'ui.json');
+  let shortcutAccel = 'Alt+Space';
+  let shortcutOk = false;
+  try {
+    const saved = JSON.parse(fs.readFileSync(uiFile, 'utf8'));
+    if (normalizeAccel(saved.shortcut)) shortcutAccel = normalizeAccel(saved.shortcut);
+  } catch {}
+  function registerShortcut(accel) {
+    try {
+      return globalShortcut.register(accel, () => togglePanel('shortcut'));
+    } catch {
+      return false;
+    }
+  }
+  ipcMain.handle('desk:shortcut', (e, action, accel) => {
+    if (!isTrustedFrame(e.senderFrame)) return null;
+    if (action === 'set') {
+      const next = normalizeAccel(accel);
+      if (!next) return { ok: false, accel: shortcutAccel, reason: '이 조합은 쓸 수 없어요 · 수정 키와 다른 키 하나를 같이 눌러 주세요' };
+      if (shortcutOk) globalShortcut.unregister(shortcutAccel);
+      if (registerShortcut(next)) {
+        shortcutAccel = next;
+        shortcutOk = true;
+        try {
+          fs.writeFileSync(uiFile, JSON.stringify({ shortcut: next }));
+        } catch {}
+        return { ok: true, accel: next };
+      }
+      shortcutOk = registerShortcut(shortcutAccel);
+      return { ok: false, accel: shortcutAccel, reason: '다른 앱이 이 단축키를 쓰고 있어요' };
+    }
+    return { ok: shortcutOk, accel: shortcutAccel, reason: shortcutOk ? '' : '등록하지 못했어요 · 다른 앱(Claude, ChatGPT, Raycast, Alfred 등)이 쓰고 있을 수 있어요' };
+  });
+  app.on('will-quit', () => globalShortcut.unregisterAll());
 
   // For the page's own menus. The page can write the clipboard but never read it: a paste goes
   // into whatever has focus, the same as ⌘V.
@@ -406,6 +596,8 @@ async function runApp() {
 
   startCore();
   createWindow();
+  createTray();
+  shortcutOk = registerShortcut(shortcutAccel);
   updater.start();
   if (!(await coreReady)) return;
 }

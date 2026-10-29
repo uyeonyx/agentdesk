@@ -120,22 +120,30 @@ function transcriptRoots() {
   return roots;
 }
 
-export function lastAssistantText(transcriptPath) {
+/** A transcript path an agent reported, if it really is one of Claude Code's (else null). */
+export function trustedTranscript(p) {
   try {
-    if (typeof transcriptPath !== 'string' || !transcriptPath.endsWith('.jsonl')) return undefined;
-    // Only read real Claude Code transcripts, never an arbitrary path an agent reports.
-    const real = realPath(transcriptPath);
+    if (typeof p !== 'string' || !p.endsWith('.jsonl')) return null;
+    const real = realPath(p);
     const ok = transcriptRoots().some((r) => {
       try {
-        const rr = realPath(r);
-        return real.startsWith(rr + path.sep);
+        return real.startsWith(realPath(r) + path.sep);
       } catch {
         return false;
       }
     });
-    if (!ok) return undefined;
+    return ok && fs.lstatSync(real).isFile() ? real : null;
+  } catch {
+    return null;
+  }
+}
+
+export function lastAssistantText(transcriptPath) {
+  try {
+    // Only read real Claude Code transcripts, never an arbitrary path an agent reports.
+    const real = trustedTranscript(transcriptPath);
+    if (!real) return undefined;
     const st = fs.lstatSync(real);
-    if (!st.isFile()) return undefined;
     transcriptPath = real;
     const len = Math.min(st.size, 512 * 1024);
     const fd = fs.openSync(transcriptPath, 'r');

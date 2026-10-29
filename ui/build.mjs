@@ -9,10 +9,11 @@ const watch = process.argv.includes('--watch');
 fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'assets'), { recursive: true });
 fs.copyFileSync(path.join(here, 'index.html'), path.join(out, 'index.html'));
+fs.copyFileSync(path.join(here, 'panel.html'), path.join(out, 'panel.html'));
 
 const common = {
   bundle: true,
-  minify: !watch,
+  minify: !watch && !process.env.DESK_DEBUG,
   sourcemap: false,
   logLevel: 'warning',
   legalComments: 'none',
@@ -22,7 +23,7 @@ const common = {
 
 const app = {
   ...common,
-  entryPoints: { app: path.join(here, 'src', 'main.jsx') },
+  entryPoints: { app: path.join(here, 'src', 'main.jsx'), panel: path.join(here, 'src', 'panel.jsx') },
   outdir: path.join(out, 'assets'),
   format: 'esm',
   splitting: true,
@@ -30,7 +31,7 @@ const app = {
   assetNames: 'f/[name]-[hash]',
   jsx: 'automatic',
   jsxImportSource: 'preact',
-  target: ['chrome115', 'safari16', 'firefox115'],
+  target: ['chrome140'],
 };
 
 const worker = {
@@ -38,7 +39,7 @@ const worker = {
   entryPoints: { 'editor.worker': 'monaco-editor/editor/editor.worker.js' },
   outdir: path.join(out, 'assets'),
   format: 'iife',
-  target: ['chrome115', 'safari16', 'firefox115'],
+  target: ['chrome140'],
 };
 
 if (watch) {

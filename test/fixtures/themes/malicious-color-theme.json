@@ -1,0 +1,23 @@
+{
+  "name": "Evil‮ Theme\u0007 <img src=x onerror=alert(1)>",
+  "type": "dark",
+  "colors": {
+    "editor.background": "#101010",
+    "editor.foreground": "red;}body{background:url(x)",
+    "focusBorder": "expression(alert(1))",
+    "sideBar.background": "url(javascript:alert(1))",
+    "editorWidget.background": "#fff;}*{color:red",
+    "terminal.ansiRed": "#ff0000; --x: url(x)",
+    "terminal.ansiGreen": "rgb(0, 255, 0) !important",
+    "terminal.ansiBlue": "var(--evil)",
+    "terminal.ansiCyan": "rgb(0, 300, 0)",
+    "descriptionForeground": "#abc\n}",
+    "textLink.foreground": "#12345g"
+  },
+  "tokenColors": [
+    { "scope": "comment", "settings": { "foreground": "red;}body{background:url(x)" } },
+    { "scope": "keyword", "settings": { "foreground": "expression(alert(1))" } },
+    { "scope": "string", "settings": { "foreground": "#00ff00" } }
+  ],
+  "__proto__": { "polluted": true }
+}

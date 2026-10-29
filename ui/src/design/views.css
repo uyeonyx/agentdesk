@@ -1,0 +1,70 @@
+/* Review (Monaco diff with comments) and Files (tree, viewer): carried over, on the new tokens. */
+.split { position: absolute; inset: 0; display: grid; grid-template-columns: 250px 1fr; }
+.split.notree { grid-template-columns: 0 1fr; }
+.filelist { border-right: 1px solid var(--line); padding: 8px 6px; background: var(--bg-raised); overflow: auto; }
+.frow {
+  display: grid; grid-template-columns: 16px 1fr auto; gap: 8px; align-items: center;
+  width: 100%; text-align: left; padding: 5px 8px; border-radius: 7px; border: 0; background: none;
+  font-size: 12.5px; color: var(--text);
+}
+.frow:hover { background: var(--bg-hover); }
+.frow.sel { background: var(--room-soft); box-shadow: inset 0 0 0 1px var(--room-line); }
+.frow .k { font-weight: 750; font-size: 11px; text-align: center; color: var(--text-2); }
+.frow .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.frow .n span { direction: ltr; unicode-bidi: plaintext; }
+.frow .c { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--room); margin-left: 4px; }
+.editor-col { display: grid; grid-template-rows: auto 1fr; min-width: 0; min-height: 0; }
+.editor-bar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--line); background: var(--bg-raised); min-width: 0; }
+.editor-bar .path { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+.editor-bar .path b { color: var(--text); font-weight: 600; }
+.monaco-host { position: relative; min-height: 0; }
+.monaco-host > div { position: absolute; inset: 0; }
+.float-act {
+  position: absolute; z-index: 15;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 28px; padding: 0 10px; border-radius: 8px;
+  background: var(--room); color: var(--room-ink); border: 0; font-weight: 650; font-size: 12.5px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  animation: pop 0.14s var(--ease-out);
+}
+.comment-pop {
+  position: absolute; z-index: 16; width: 340px;
+  background: var(--bg-overlay); border: 1px solid var(--room-line); border-radius: 12px; padding: 10px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+}
+.comment-pop .lbl { font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
+.comment-pop textarea { width: 100%; min-height: 64px; resize: vertical; background: var(--bg-inset); border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px; outline: 0; }
+.comment-pop textarea:focus { border-color: var(--room); }
+.comment-pop .row2 { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
+.cmt-line { background: var(--room-softer); }
+.cmt-add { cursor: pointer; }
+.cmt-add::before { content: '+'; display: grid; place-items: center; width: 16px; height: 16px; margin: 2px 0 0 2px; border-radius: 5px; background: var(--room); color: var(--room-ink); font: 700 13px/1 var(--font); }
+.cmt-glyph::before { content: ''; display: block; width: 8px; height: 8px; margin: 6px 0 0 6px; border-radius: 50%; background: var(--room); }
+.tree .dir { color: var(--text-2); }
+.tree .frow { grid-template-columns: 16px 1fr; }
+.repo-h { display: flex; align-items: center; gap: 6px; padding: 10px 8px 4px; font-size: 11.5px; font-weight: 700; color: var(--room-text); }
+.repo-h span { color: var(--text-3); font-weight: 550; margin-left: auto; }
+.stat { font-size: 11.5px; font-weight: 600; white-space: nowrap; }
+.stat .a { color: var(--ok-text); }
+.stat .d { color: var(--danger-text); margin-left: 4px; }
+
+.room-body {
+  position: absolute;
+  inset: 0;
+}
+.overlay-msg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  color: var(--text-2);
+}
+.overlay-msg h3 {
+  margin: 0 0 6px;
+  color: var(--text);
+  font-size: var(--fs-5);
+}
+.filelist .frow {
+  font-size: var(--fs-2);
+}

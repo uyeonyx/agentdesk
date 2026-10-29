@@ -1,0 +1,383 @@
+/* The window: a title bar of glass capsules, the rail and the content pane floating over the light. */
+
+.app {
+  height: 100vh;
+  display: grid;
+  grid-template-rows: var(--bar-h) minmax(0, 1fr);
+}
+.stage {
+  display: flex;
+  gap: var(--gap);
+  min-height: 0;
+  padding: 0 var(--gap) var(--gap);
+}
+.pane {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  border-radius: var(--r-4);
+  background: var(--bg-surface);
+  box-shadow:
+    0 0 0 1px var(--line),
+    inset 0 1px 0 var(--glass-edge),
+    0 18px 50px -24px var(--glass-shadow);
+  overflow: hidden;
+}
+:root.resizing,
+:root.resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
+}
+
+/* Project color, only where it's a mark: derived per element so it fits light and dark. */
+.room-scope {
+  --room-soft: color-mix(in oklab, var(--room) 12%, transparent);
+  --room-softer: color-mix(in oklab, var(--room) 6%, transparent);
+  --room-line: color-mix(in oklab, var(--room) 50%, transparent);
+  --room-text: color-mix(in oklab, var(--room) 72%, var(--text));
+}
+
+/* ---------------------------------------------------------------- title bar */
+.titlebar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  padding: 0 12px 0 16px;
+  -webkit-app-region: drag;
+}
+.titlebar button,
+.titlebar a,
+.titlebar input {
+  -webkit-app-region: no-drag;
+}
+:root.os-darwin:not(.fullscreen) .titlebar {
+  padding-left: 84px;
+}
+:root.os-win32 .titlebar {
+  padding-right: 148px;
+}
+.tb-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.brand {
+  position: relative;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, var(--amb-1), var(--accent), var(--amb-2), var(--amb-3), var(--amb-1));
+  box-shadow:
+    inset 0 1px 1px rgb(255 255 255 / 0.5),
+    0 0 12px color-mix(in oklab, var(--accent) 45%, transparent);
+  animation: turn 24s linear infinite;
+}
+.brand i {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--bg-app);
+  box-shadow: inset 0 0 4px color-mix(in oklab, var(--accent) 60%, transparent);
+}
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-weight: var(--w-3);
+  white-space: nowrap;
+}
+.crumbs .cr-p {
+  color: var(--text);
+}
+.crumbs .cr-sep {
+  color: var(--text-3);
+  font-size: 13px;
+}
+.crumbs .cr-t {
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 34vw;
+}
+.cmdpill {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: clamp(240px, 30vw, 440px);
+  height: 30px;
+  padding: 0 6px 0 12px;
+  border-radius: var(--r-full);
+  color: var(--text-3);
+  transition: transform var(--dur-3) var(--ease-spring);
+}
+.cmdpill span {
+  flex: 1;
+  text-align: left;
+}
+.cmdpill kbd {
+  background: transparent;
+}
+.cmdpill:active {
+  transform: scale(0.985);
+}
+.tb-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.yours {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--r-full);
+  font-weight: var(--w-3);
+  font-size: var(--fs-2);
+}
+.yours .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--info);
+}
+.yours.hot {
+  color: var(--warn-text);
+}
+.yours.hot .dot {
+  background: var(--warn);
+  box-shadow: 0 0 10px var(--warn);
+  animation: beat 2.4s var(--ease-in-out) infinite;
+}
+.yours.on {
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.upd {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-2);
+  font-weight: var(--w-3);
+}
+.upd.ok {
+  color: var(--ok-text);
+}
+.conn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-2);
+  color: var(--text-2);
+}
+@keyframes beat {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.35);
+  }
+}
+
+/* ---------------------------------------------------------------- shared bits */
+.sp {
+  flex: 1;
+}
+.muted {
+  color: var(--text-2);
+}
+.dim {
+  color: var(--text-3);
+}
+.rel {
+  position: relative;
+}
+.row-gap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.row-end {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+.lbl {
+  display: block;
+  margin: 16px 0 6px;
+  font-size: var(--fs-2);
+  font-weight: var(--w-3);
+  color: var(--text-2);
+}
+.a {
+  color: var(--ok-text);
+  font-weight: var(--w-3);
+}
+.d {
+  color: var(--danger-text);
+  font-weight: var(--w-3);
+}
+b.a,
+b.d {
+  font-variant-numeric: tabular-nums;
+}
+.lnk {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-text);
+  font-size: var(--fs-2);
+  font-weight: var(--w-3);
+  cursor: pointer;
+}
+.lnk:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-2);
+  color: var(--text-2);
+  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px var(--line);
+  white-space: nowrap;
+}
+button.chip:hover {
+  color: var(--text);
+  background: var(--bg-active);
+}
+.chip .ti {
+  font-size: 13px;
+}
+.chip.warn {
+  color: var(--warn-text);
+  background: var(--warn-soft);
+  box-shadow: inset 0 0 0 1px var(--warn-line);
+}
+.chip.mono {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.chip button {
+  margin-right: -4px;
+  color: var(--text-3);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.li.static {
+  cursor: default;
+}
+
+/* Something alive: a soft breathing light. */
+.breath {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 50%, transparent);
+  animation: breath 1.8s var(--ease-in-out) infinite;
+}
+@keyframes breath {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--accent) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+/* Text being worked on: a band of light passes over it. */
+.shimmer {
+  background: linear-gradient(90deg, var(--text-2) 0%, var(--text-2) 40%, var(--text) 50%, var(--text-2) 60%, var(--text-2) 100%);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.6s linear infinite;
+}
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+.skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 0;
+}
+.skeleton i {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--bg-hover), var(--bg-active), var(--bg-hover));
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+.state-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 9px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-2);
+  font-weight: var(--w-3);
+  color: var(--text-2);
+  background: var(--bg-hover);
+  white-space: nowrap;
+}
+.state-pill .d {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.state-pill.working .d,
+.state-pill.waiting .d {
+  background: var(--accent);
+  animation: breath 1.8s var(--ease-in-out) infinite;
+}
+.state-pill.blocked {
+  color: var(--warn-text);
+  background: var(--warn-soft);
+}
+.state-pill.blocked .d {
+  background: var(--warn);
+  box-shadow: 0 0 8px var(--warn);
+}
+.state-pill.yours .d {
+  background: var(--info);
+}
+.state-pill.review .d {
+  background: var(--ok);
+}

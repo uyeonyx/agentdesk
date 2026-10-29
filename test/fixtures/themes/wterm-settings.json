@@ -1,0 +1,8 @@
+// Windows Terminal settings.json excerpt with two schemes
+{
+  "profiles": { "defaults": {} },
+  "schemes": [
+    { "name": "First Scheme", "background": "#fdf6e3", "foreground": "#657b83", "black": "#073642", "purple": "#d33682", "brightBlack": "#002b36" },
+    { "name": "Second Scheme", "background": "#000000", "foreground": "#ffffff" },
+  ],
+}

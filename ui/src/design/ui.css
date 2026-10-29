@@ -1,0 +1,537 @@
+/* Primitives: buttons, fields, menus, sheets, toasts, marks. */
+
+/* ---------------------------------------------------------------- buttons */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--r-2);
+  font: var(--w-3) var(--fs-3) / 1 var(--font);
+  color: var(--text);
+  background: var(--bg-hover);
+  box-shadow: inset 0 0 0 1px var(--line);
+  white-space: nowrap;
+  transition:
+    background var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out),
+    transform var(--dur-3) var(--ease-spring),
+    opacity var(--dur-2);
+}
+.btn:hover {
+  background: var(--bg-active);
+}
+.btn:active {
+  transform: scale(0.97);
+  transition-duration: var(--dur-1);
+}
+.btn:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.btn .ti {
+  font-size: 15px;
+}
+.btn kbd {
+  margin-left: 2px;
+  background: rgb(0 0 0 / 0.12);
+  box-shadow: none;
+  color: inherit;
+  opacity: 0.7;
+}
+.btn.primary {
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    0 1px 2px rgb(0 0 0 / 0.2),
+    0 0 calc(var(--glow) * 18px) var(--glow-color);
+}
+.btn.primary:hover {
+  background: color-mix(in oklab, var(--accent) 88%, white);
+}
+.btn.warn {
+  color: var(--warn-ink);
+  background: var(--warn);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.25);
+}
+.btn.danger {
+  color: var(--danger-text);
+  background: var(--danger-soft);
+  box-shadow: inset 0 0 0 1px var(--danger-line);
+}
+.btn.danger.solid {
+  color: var(--danger-ink);
+  background: var(--danger);
+}
+.btn.ghost {
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-2);
+}
+.btn.ghost:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.btn.sm {
+  height: 26px;
+  padding: 0 9px;
+  font-size: var(--fs-2);
+  border-radius: var(--r-1);
+}
+.btn.lg {
+  height: 38px;
+  padding: 0 16px;
+  font-size: var(--fs-4);
+  border-radius: var(--r-3);
+}
+.btn.pill {
+  border-radius: var(--r-full);
+}
+/* A careful project's first press only arms the button. */
+.btn.armed {
+  animation: armed 1.2s var(--ease-in-out) infinite;
+}
+@keyframes armed {
+  50% {
+    box-shadow: 0 0 0 3px var(--warn-line);
+  }
+}
+
+.ibtn {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-2);
+  color: var(--text-2);
+  font-size: 17px;
+  transition:
+    background var(--dur-2),
+    color var(--dur-2),
+    transform var(--dur-3) var(--ease-spring);
+}
+.ibtn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.ibtn:active {
+  transform: scale(0.92);
+}
+.ibtn.on {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+.ibtn.sm {
+  width: 26px;
+  height: 26px;
+  font-size: 15px;
+  border-radius: var(--r-1);
+}
+
+/* ---------------------------------------------------------------- fields */
+.field {
+  width: 100%;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--r-2);
+  border: 0;
+  background: var(--bg-inset);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: box-shadow var(--dur-2);
+}
+textarea.field {
+  height: auto;
+  padding: 10px 12px;
+  resize: none;
+  line-height: var(--lh-3);
+}
+.field::placeholder {
+  color: var(--text-3);
+}
+.field:focus {
+  box-shadow:
+    inset 0 0 0 1px var(--accent-line),
+    0 0 0 3px var(--accent-soft);
+}
+
+/* Segmented control: the chosen one sits on a raised plate. */
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--r-2);
+  background: var(--bg-inset);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 7px;
+  font-size: var(--fs-2);
+  font-weight: var(--w-3);
+  color: var(--text-2);
+  transition:
+    background var(--dur-2),
+    color var(--dur-2),
+    box-shadow var(--dur-2);
+}
+.seg button:hover {
+  color: var(--text);
+}
+.seg button[aria-pressed='true'],
+.seg button[aria-selected='true'] {
+  color: var(--text);
+  background: var(--bg-overlay);
+  box-shadow:
+    inset 0 1px 0 var(--glass-edge),
+    0 1px 3px rgb(0 0 0 / 0.18);
+}
+.seg .n {
+  color: var(--text-3);
+  font-weight: var(--w-2);
+}
+
+.switch {
+  position: relative;
+  width: 34px;
+  height: 20px;
+  flex: none;
+  border-radius: var(--r-full);
+  background: var(--bg-active);
+  box-shadow: inset 0 0 0 1px var(--line);
+  transition: background var(--dur-2);
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
+  transition: transform var(--dur-3) var(--ease-spring);
+}
+.switch[aria-checked='true'] {
+  background: var(--accent);
+}
+.switch[aria-checked='true']::after {
+  transform: translateX(14px);
+}
+
+/* ---------------------------------------------------------------- menus & popovers */
+.menu {
+  min-width: 236px;
+  padding: 5px;
+  border-radius: var(--r-3);
+  z-index: var(--z-menu);
+}
+.menu.ctx {
+  position: fixed;
+  max-height: calc(100vh - 12px);
+  overflow-y: auto;
+  animation: pop var(--dur-2) var(--ease-out);
+}
+.li {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  padding: 0 9px;
+  border-radius: 9px;
+  text-align: left;
+  font-size: var(--fs-3);
+  color: var(--text);
+}
+.li .ti {
+  font-size: 16px;
+  color: var(--text-2);
+}
+.li:hover,
+.li.on,
+.li:focus-visible {
+  background: var(--bg-active);
+  box-shadow: none;
+}
+.li[disabled] {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.li.danger,
+.li.danger .ti {
+  color: var(--danger-text);
+}
+.li kbd {
+  background: none;
+  box-shadow: none;
+  color: var(--text-3);
+}
+.li .m {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.li small {
+  color: var(--text-3);
+  margin-left: 6px;
+}
+.menu hr {
+  border: 0;
+  height: 1px;
+  background: var(--line);
+  margin: 5px 6px;
+}
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-2px);
+  }
+}
+
+.tip {
+  position: fixed;
+  z-index: var(--z-menu);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 320px;
+  padding: 6px 9px;
+  border-radius: var(--r-2);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+  pointer-events: none;
+  animation: fadein var(--dur-2) var(--ease-out);
+}
+@keyframes fadein {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------------------------------------------------------------- sheets */
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-sheet);
+  display: grid;
+  place-items: start center;
+  padding-top: 12vh;
+  background: rgb(0 0 0 / 0.26);
+  backdrop-filter: blur(2px);
+  animation: fadein var(--dur-2) var(--ease-out);
+}
+:root[data-theme-kind='light'] .scrim {
+  background: rgb(20 22 30 / 0.12);
+}
+.sheet {
+  width: min(560px, calc(100vw - 48px));
+  max-height: 76vh;
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--r-4);
+  animation: rise var(--dur-3) var(--ease-spring);
+}
+.sheet.wide {
+  width: min(720px, calc(100vw - 48px));
+}
+.sheet-h {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 20px 6px;
+}
+.sheet-h h2 {
+  margin: 0;
+  font-size: var(--fs-5);
+  line-height: var(--lh-5);
+  font-weight: var(--w-4);
+  letter-spacing: -0.01em;
+}
+.sheet-h .sub {
+  color: var(--text-2);
+  font-size: var(--fs-2);
+}
+.sheet-b {
+  padding: 10px 20px 16px;
+  overflow: auto;
+  font-size: var(--fs-4);
+  line-height: var(--lh-4);
+}
+.sheet-f {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+.sheet-f .sp {
+  flex: 1;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+}
+
+/* ---------------------------------------------------------------- toasts */
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 18px;
+  z-index: var(--z-toast);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, 90vw);
+  min-height: 40px;
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--r-full);
+  font-size: var(--fs-3);
+  pointer-events: auto;
+  animation: rise var(--dur-3) var(--ease-spring);
+}
+.toast > .ti {
+  font-size: 16px;
+  color: var(--text-2);
+}
+.toast.err > .ti {
+  color: var(--danger-text);
+}
+.toast .msg {
+  padding-right: 8px;
+}
+.toast .btn {
+  height: 28px;
+  border-radius: var(--r-full);
+}
+
+/* ---------------------------------------------------------------- marks */
+.glyph {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  font-size: 13px;
+  color: var(--room-ink, #fff);
+  background: var(--room);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.25),
+    inset 0 0 0 1px rgb(0 0 0 / 0.08);
+}
+.glyph img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+.glyph.has-logo {
+  background: var(--bg-raised);
+}
+
+/* Status, at the corner of a project glyph: a turning ring while working, amber when stuck. */
+.mark {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-3);
+  box-shadow: 0 0 0 2px var(--mark-ring, var(--bg-app));
+}
+.mark.working {
+  background: conic-gradient(var(--accent) 0 70%, transparent 70%);
+  animation: turn 1s linear infinite;
+}
+.mark.waiting {
+  background: conic-gradient(var(--accent) 0 30%, transparent 30% 50%, var(--accent) 50% 80%, transparent 80%);
+  animation: turn 3s linear infinite;
+}
+.mark.blocked {
+  background: var(--warn);
+  box-shadow:
+    0 0 0 2px var(--mark-ring, var(--bg-app)),
+    0 0 8px var(--warn);
+}
+.mark.yours {
+  background: var(--info);
+}
+.mark.review {
+  background: var(--ok);
+}
+.mark.stopped {
+  background: transparent;
+  box-shadow:
+    0 0 0 2px var(--mark-ring, var(--bg-app)),
+    inset 0 0 0 1.5px var(--text-3);
+}
+@keyframes turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.spin {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--accent);
+  animation: turn 0.8s linear infinite;
+}
+
+.count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--r-full);
+  font: var(--w-3) var(--fs-1) / 1 var(--font);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  background: var(--bg-active);
+}
+.count.hot {
+  color: var(--warn-ink);
+  background: var(--warn);
+  box-shadow: 0 0 calc(6px + var(--glow) * 8px) color-mix(in oklab, var(--warn) 50%, transparent);
+}
+
+.empty {
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-2);
+}
+.empty h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-5);
+  font-weight: var(--w-3);
+}

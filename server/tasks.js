@@ -5,10 +5,14 @@ import { randomUUID } from 'node:crypto';
 import pty from '@lydell/node-pty';
 import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, realPath } from './util.js';
 import * as G from './git.js';
-import { AGENTS, lastAssistantText, summarize } from './agents.js';
+import { AGENTS, lastAssistantText, summarize, trustedTranscript } from './agents.js';
+import { ConvoHub, legacyEntries } from './convo.js';
 import { httpError, addProject } from './projects.js';
 import { findSession, liveClaude, stopClaude, queueCodex, claudeTranscriptOf } from './sessions.js';
-import { Watcher, readHistory } from './watch.js';
+import { Watcher } from './watch.js';
+import { menuFromLines, promptTextFromLines } from './screen.js';
+import { buildPrompt, promptView, replyExcerpt } from './prompt.js';
+import { drive, answerLine, Fallback } from './answer.js';
 import { commandsIn } from './shells.js';
 import { ActivityTracker, activityView, emptyActivity, findRollout } from './activity.js';
 
@@ -43,7 +47,9 @@ export class Tasks {
     /** peer (a window's connection) -> taskId */
     this.viewers = new Map();
     this.watchers = new Map();
-    this.pastLogs = new Map(); // task id -> { key, entries }: a stopped session's transcript, read once
+    this.prompts = new Map(); // task id -> what its agent waits on (prompt.js), while needs_input
+    this.convos = new ConvoHub(this); // the conversations windows are looking at (convo.js)
+    this.replies = new Map(); // task id -> { of, excerpt }: lastReply excerpt, made once per reply
     for (const t of store.tasks) {
       migrate(t);
       if (t.watch) continue; // followed again by the watch poll
@@ -132,28 +138,21 @@ export class Tasks {
     const task = this.need(id);
     const w = this.watchers.get(id);
     if (w) return { entries: w.entries.slice(-150), status: w.status || null };
-    return { entries: this.history(task).slice(-150), status: null };
+    const c = this.convos.get(task);
+    c.tail();
+    return { entries: legacyEntries(c.list()), status: null };
   }
 
-  /** What was said in a task's own session, so a stopped one still shows what it was about. */
-  history(task) {
-    const file =
-      task.agent === 'claude'
-        ? [task.sessionId, ...(task.pastSessionIds || []).slice().reverse()].map((sid) => sid && claudeTranscriptOf(sid)).find(Boolean)
-        : task.watch?.file || (task.cwd && findRollout(task.cwd, 0));
-    if (!file) return [];
-    let key;
-    try {
-      const st = fs.statSync(file);
-      key = `${file}:${st.size}:${st.mtimeMs}`;
-    } catch {
-      return [];
-    }
-    const hit = this.pastLogs.get(task.id);
-    if (hit?.key === key) return hit.entries;
-    const entries = readHistory(task.agent, file, task.cwd);
-    this.pastLogs.set(task.id, { key, entries });
-    return entries;
+  convoPage(id, before, limit) {
+    const c = this.convos.get(this.need(id));
+    c.tail();
+    return c.page({ before: before == null ? null : Number(before), limit: Math.min(500, limit) });
+  }
+
+  entry(id, entryId) {
+    const e = this.convos.get(this.need(id)).full(entryId);
+    if (!e) throw httpError(410, '다시 불러와 주세요');
+    return { entry: e };
   }
 
   setWatch(id, patch) {
@@ -218,9 +217,26 @@ export class Tasks {
       remoteUrl: t.remote || t.watch ? t.remoteUrl || '' : '',
       activity: activityView(t.activity),
       menu,
+      prompt: t.state === 'needs_input' && r ? promptView(this.prompts.get(t.id), menu, { careful: !!this.store.project(t.projectId)?.careful }) : null,
+      reply: t.archived ? null : this.replyOf(t),
+      // Every task goes out on every change: only the recent messages ride along (all: GET …/messages).
       // Put-away tasks can pile up; their history comes back with them when they're taken out.
-      messages: (t.archived ? [] : t.messages || []).map((m) => ({ id: m.id, text: m.text, at: m.at, undone: !!m.undone, canUndo: !!m.snap && !m.undone, source: m.source })),
+      messages: (t.archived ? [] : (t.messages || []).slice(-50)).map(messageView),
     };
+  }
+
+  /** The start of the last reply, made once per reply (every task is pushed on every change). */
+  replyOf(t) {
+    if (!t.lastReply) return null;
+    const hit = this.replies.get(t.id);
+    if (hit?.of === t.lastReply) return hit.excerpt;
+    const excerpt = replyExcerpt(t.lastReply);
+    this.replies.set(t.id, { of: t.lastReply, excerpt });
+    return excerpt;
+  }
+
+  messages(id) {
+    return { messages: (this.need(id).messages || []).map(messageView) };
   }
 
   // ------------------------------------------------------------ lifecycle
@@ -346,7 +362,7 @@ export class Tasks {
       AGENTDESK_TASK: task.id,
     });
     const cols = task.cols || 120;
-    const rows = task.rows || 34;
+    const rows = task.rows || 40; // tall enough for a four-question form
     this.tracker(task).restart();
     const args = ad.args({
       prompt,
@@ -406,6 +422,7 @@ export class Tasks {
     task.ask = state === 'needs_input' ? extra.ask || '' : '';
     const r = this.rt.get(task.id);
     if (r) r.askTool = null;
+    if (state !== 'needs_input') this.prompts.delete(task.id);
     task.updatedAt = Date.now();
     this.store.save();
     this.changed();
@@ -414,6 +431,7 @@ export class Tasks {
   onOutput(task, r, n) {
     const now = Date.now();
     r.lastOut = now;
+    this.convos.poke(task.id, 500);
     if (now - r.burstAt > 2000) {
       r.burst = 0;
       r.burstAt = now;
@@ -467,6 +485,11 @@ export class Tasks {
     }
     this.setState(task, 'needs_input', reason, { ask });
     if (r && p.tool_name) r.askTool = { name: p.tool_name, input: JSON.stringify(p.tool_input ?? null) };
+    const kind = p.tool_name === 'AskUserQuestion' ? 'question' : p.tool_name === 'ExitPlanMode' ? 'plan' : ask === 'question' ? 'elicitation' : 'permission';
+    const feed = task.activity?.feed || [];
+    const running = [...feed].reverse().find((f) => f.st === 'run' && !f.by);
+    this.prompts.set(task.id, buildPrompt({ task, kind, tool: p.tool_name || '', input: p.tool_input, message: p.tool_name ? '' : reason, by: p.agent_id ? { agentId: p.agent_id, type: p.agent_type } : null, running }));
+    this.changed();
   }
 
   markInput(task) {
@@ -484,8 +507,14 @@ export class Tasks {
     if (!task || task.archived) return;
     const r = this.rt.get(task.id);
     const p = body.payload && typeof body.payload === 'object' ? body.payload : {};
+    // Whatever happened, the conversation on screen may have grown.
+    this.convos.poke(task.id);
     if (body.agent === 'claude') {
       const ev = p.hook_event_name;
+      if (p.transcript_path && p.transcript_path !== task.transcriptPath) {
+        const real = trustedTranscript(p.transcript_path);
+        if (real) task.transcriptPath = real;
+      }
       // Forks and /clear start a new conversation id; follow it so resume reopens the right one.
       if (typeof p.session_id === 'string' && /^[0-9a-f-]{36}$/i.test(p.session_id) && p.session_id !== task.sessionId && transcriptBelongs(p.session_id, task.cwd)) {
         if (task.sessionId) task.pastSessionIds = [...new Set([...(task.pastSessionIds || []), task.sessionId])].slice(-20);
@@ -669,86 +698,14 @@ export class Tasks {
     return out;
   }
 
-  /**
-   * The text in the agent's input box, if the cursor is in one. Recognizes Claude Code's
-   * "> " / "│ > " box and Codex's "› ". Placeholder hints are dim, so they're ignored.
-   */
+  /** The text in the agent's input box, if the cursor is in one (see screen.js). */
   promptText(r) {
-    // A choice menu on screen means Enter picks an option; that's never a message.
-    if (this.menuOf(r)) return null;
-    const b = r.term.buffer.active;
-    const lines = this.screenLines(r, { skipDim: true });
-    const cy = b.cursorY;
-    const border = (l) => /^[\s╭╮╰╯┌┐└┘─━═]*$/.test(l) && /[─━═]/.test(l);
-    const strip = (l) => l.replace(/^\s*[│┃|]\s?/, '').replace(/\s*[│┃|]\s*$/, '');
-    let top = cy;
-    while (top > 0 && cy - top < 12 && !border(lines[top - 1]) && lines[top - 1].trim() && !/^\s*[>›❯]/.test(strip(lines[top]))) top--;
-    const first = strip(lines[top] || '');
-    const m = first.match(/^\s*([>›❯])\s?(.*)$/);
-    if (!m || /^\d[.)]\s/.test(m[2])) return null;
-    const body = [m[2]];
-    for (let y = top + 1; y <= Math.min(lines.length - 1, cy + 12); y++) {
-      if (border(lines[y]) || (!lines[y].trim() && y > cy)) break;
-      body.push(strip(lines[y]).replace(/^\s{0,2}/, ''));
-    }
-    const text = body.join('\n').replace(/\s+$/g, '').trim();
-    return text || '';
+    return promptTextFromLines(this.screenLines(r, { skipDim: true }), r.term.buffer.active.cursorY, !!this.menuOf(r));
   }
 
-  /**
-   * A numbered choice menu on screen: permission prompts, and AskUserQuestion forms where each
-   * option has description lines under it and the last ones sit below a separator.
-   * Returns { question, options:[{key,label,desc,selected}] } or null.
-   */
+  /** A numbered choice menu on screen, or null (see screen.js). */
   menuOf(r) {
-    const lines = this.screenLines(r);
-    let end = lines.length;
-    while (end > 0 && !lines[end - 1].trim()) end--;
-    const OPT = /^\s*[│┃|]?\s*(❯|>|›)?\s*(\d{1,2})[.)]\s+(.+?)\s*[│┃|]?\s*$/;
-    const PROMPT = /^\s*[│┃|]?\s*[>›❯](\s|$)/;
-    const strip = (l) => l.replace(/^\s*[│┃|╭╰─]+/, '').replace(/[│┃|╮╯─]+\s*$/, '').trim();
-    // The bottom-most option, then upwards through 1: each step must be exactly one lower,
-    // with at most a few description / separator lines in between.
-    let y = end - 1;
-    let last = -1;
-    for (; y >= Math.max(0, end - 40); y--) {
-      if (OPT.test(lines[y])) {
-        last = y;
-        break;
-      }
-    }
-    if (last < 0) return null;
-    // An input prompt below the options means the menu was already answered.
-    for (let k = last + 1; k < end; k++) if (PROMPT.test(lines[k]) && !OPT.test(lines[k])) return null;
-    const opts = [];
-    let want = Number(lines[last].match(OPT)[2]);
-    let gap = 0;
-    let desc = [];
-    let firstIdx = last;
-    for (y = last; y >= Math.max(0, end - 60) && want >= 1; y--) {
-      const m = lines[y].match(OPT);
-      if (m && Number(m[2]) === want) {
-        opts.unshift({ key: m[2], label: m[3].trim().slice(0, 90), desc: desc.reverse().join(' ').slice(0, 160), selected: !!m[1] });
-        firstIdx = y;
-        want--;
-        gap = 0;
-        desc = [];
-      } else {
-        if (m || ++gap > 6) break;
-        const t = strip(lines[y]);
-        if (t && !/^[─━═\s]+$/.test(t)) desc.push(t);
-      }
-    }
-    if (want !== 0 || opts.length < 2 || opts.length > 9) return null;
-    let question = '';
-    for (let k = firstIdx - 1; k >= 0 && k >= firstIdx - 6; k--) {
-      const t = strip(lines[k]);
-      if (t && !/^[─━═\s]+$/.test(t)) {
-        question = t.slice(0, 160);
-        break;
-      }
-    }
-    return { question, options: opts };
+    return menuFromLines(this.screenLines(r));
   }
 
   screen(id, n = 10) {
@@ -841,15 +798,83 @@ export class Tasks {
     r.proc.write('\x1b[200~' + clean.replace(/\n/g, '\r') + '\x1b[201~');
   }
 
-  /** Answer a menu by its number (from a widget button). Only digits 1-9. */
-  choose(id, key) {
+  /**
+   * Answer a menu by its number. Only digits 1-9. With `label`, the option under that key must
+   * still say the same (the menu may have changed since the button was drawn).
+   */
+  choose(id, key, { label } = {}) {
     const r = this.rt.get(id);
     const task = this.store.task(id);
     if (!r || !task || !/^[1-9]$/.test(String(key))) return;
     const menu = this.menuOf(r);
-    if (!menu || !menu.options.some((o) => o.key === String(key))) throw httpError(409, '선택지가 화면에서 사라졌어요');
+    const opt = menu?.options.find((o) => o.key === String(key));
+    if (!opt || (typeof label === 'string' && label && opt.label !== label)) throw httpError(409, '선택지가 화면에서 사라졌어요');
     r.proc.write(String(key));
     this.markInput(task);
+  }
+
+  /**
+   * A button on a prompt card (prompt.js): keystrokes into the CLI, each checked against the screen
+   * (answer.js). When the screen isn't what we expect, nothing more is pressed and the window is
+   * told to send the person to the terminal.
+   */
+  async answer(id, body = {}) {
+    const task = this.need(id);
+    const r = this.rt.get(id);
+    if (!r) throw httpError(409, '세션이 멈춰 있어요. 먼저 재개하세요.');
+    const careful = !!this.store.project(task.projectId)?.careful;
+    await new Promise((res) => r.term.write('', res));
+    const prompt = promptView(this.prompts.get(id), this.menuOf(r), { careful });
+    if (task.state !== 'needs_input' || !prompt || (body.promptId && body.promptId !== prompt.id)) throw httpError(409, '이미 답했거나 사라진 질문이에요');
+    const yes = ['yes', 'always', 'approve', 'answer', 'key'].includes(body.action) || (prompt.kind === 'question' && body.action !== 'no');
+    if (careful && yes && !body.confirm) throw httpError(412, '신중 모드예요 · 한 번 더 확인해 주세요');
+    if (r.answering) throw httpError(409, '다른 답을 보내는 중이에요');
+    // Approving a plan or submitting answers starts the agent on new work: a point to undo back to.
+    const turning = (prompt.kind === 'plan' && body.action === 'approve') || prompt.kind === 'question';
+    const snap = turning ? await this.snapshotAll(task, answerLine({ ...prompt }, body).slice(0, 60)) : null;
+    const io = { menu: () => this.menuOf(r), promptText: () => this.promptText(r), flush: () => new Promise((res) => r.term.write('', res)), key: (k) => r.proc.write(k) };
+    r.answering = true;
+    const run = (r.chain || Promise.resolve()).then(() => drive(io, prompt, body));
+    r.chain = run.catch(() => {});
+    let res;
+    try {
+      res = await run;
+    } catch (e) {
+      if (e instanceof Fallback) return { ok: false, fallback: 'terminal', error: e.message, step: e.step };
+      throw e;
+    } finally {
+      r.answering = false;
+    }
+    if (turning) {
+      task.messages.push({ id: randomId('m'), text: answerLine(prompt, body), at: Date.now(), snap, source: 'answer' });
+      if (task.messages.length > 300) task.messages.splice(1, task.messages.length - 300);
+    }
+    this.markInput(task);
+    const message = res.thenSend ? await this.send(id, res.thenSend, 'answer') : null;
+    this.store.save();
+    this.changed();
+    return { ok: true, steps: res.steps, message: message && { id: message.id, text: message.text }, reasonPending: !!res.reasonPending };
+  }
+
+  /** Stop the current turn (Esc), keeping the session. */
+  interrupt(id) {
+    const r = this.rt.get(id);
+    if (!r) throw httpError(409, '세션이 멈춰 있어요');
+    r.proc.write('\x1b');
+  }
+
+  /** A pasted image, saved where the agent can read it; the message refers to it by path. */
+  addAttachment(id, { type, data } = {}) {
+    this.need(id);
+    const ext = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }[type];
+    if (!ext || typeof data !== 'string') throw httpError(400, '이미지만 붙일 수 있어요');
+    const buf = Buffer.from(data, 'base64');
+    if (!buf.length || buf.length > 5_000_000) throw httpError(413, '이미지는 5MB까지 붙일 수 있어요');
+    const dir = path.join(dataDir(), 'attachments', id);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    const file = path.join(dir, `${new Date().toISOString().replace(/[:.]/g, '-')}-${randomId().slice(-4)}.${ext}`);
+    fs.writeFileSync(file, buf, { mode: 0o600 });
+    return { path: file };
   }
 
   broadcast(id, msg) {
@@ -885,7 +910,7 @@ export class Tasks {
   // ------------------------------------------------------------ messages
 
   /** Send from the narrow-screen composer or a widget's quick reply. */
-  async send(id, text) {
+  async send(id, text, source = 'composer') {
     const task = this.need(id);
     text = safeTyped(text || '').trim();
     if (!text) throw httpError(400, '보낼 내용이 없어요');
@@ -905,7 +930,7 @@ export class Tasks {
     const r = this.rt.get(id);
     if (!r) throw httpError(409, '세션이 멈춰 있어요. 먼저 재개하세요.');
     const snap = await this.snapshotAll(task, text.slice(0, 60));
-    const msg = { id: randomId('m'), text, at: Date.now(), snap, source: 'composer' };
+    const msg = { id: randomId('m'), text, at: Date.now(), snap, source };
     task.messages.push(msg);
     await this.writeText(r, text);
     this.store.save();
@@ -957,7 +982,9 @@ export class Tasks {
       const short = msg.text.length > 40 ? msg.text.slice(0, 40) + '…' : msg.text;
       await this.writeText(
         r,
-        `[취소] 방금 보낸 "${short.replace(/\n/g, ' ')}" 지시는 실수로 보낸 거야. 실행하지 말고 완전히 무시해. 파일은 내가 그 이전 상태로 이미 되돌렸어. 아무것도 하지 말고 다음 지시를 기다려줘.`
+        msg.source === 'answer'
+          ? `[취소] 방금 한 "${short.replace(/\n/g, ' ')}" 답은 실수였어. 그 뒤 바뀐 파일은 내가 되돌렸어. 아무것도 하지 말고 다음 지시를 기다려줘.`
+          : `[취소] 방금 보낸 "${short.replace(/\n/g, ' ')}" 지시는 실수로 보낸 거야. 실행하지 말고 완전히 무시해. 파일은 내가 그 이전 상태로 이미 되돌렸어. 아무것도 하지 말고 다음 지시를 기다려줘.`
       );
     } else if (msg.source === 'start' || msg.source === 'import') {
       this.setState(task, 'needs_input', '처음 상태로 되돌렸어요');
@@ -1323,6 +1350,7 @@ export class Tasks {
 
   /** Stops every agent; resolves once their terminals have closed (Windows needs a moment for ConPTY). */
   shutdown() {
+    this.convos.stop();
     clearTimeout(this.recountTimer);
     clearInterval(this.changesTimer);
     clearInterval(this.codexTimer);
@@ -1344,6 +1372,8 @@ export class Tasks {
  */
 /** Tools whose whole job is to ask the person something; the agent waits on the answer. */
 const ASKS_PERSON = new Set(['AskUserQuestion', 'ExitPlanMode']);
+
+const messageView = (m) => ({ id: m.id, text: m.text, at: m.at, undone: !!m.undone, canUndo: !!m.snap && !m.undone, source: m.source });
 
 /** A menu on screen is a permission prompt ("Do you want to proceed?") or some other choice. */
 function askOfMenu(menu) {

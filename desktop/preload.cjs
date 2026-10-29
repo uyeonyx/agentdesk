@@ -1,6 +1,6 @@
 // The window's only door to the core. Main sends a MessagePort once the page is loaded (and again
 // if the core restarts); everything the page can do goes through the few functions exposed here.
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 let port = null;
 let seq = 0;
@@ -92,9 +92,52 @@ contextBridge.exposeInMainWorld('desk', {
   reveal(p) {
     ipcRenderer.send('desk:reveal', String(p));
   },
-  /** The top bar's colors, so the window's title bar area, background and native menus match. */
-  setChrome({ bg, fg, dark }) {
-    ipcRenderer.send('desk:chrome', { bg: String(bg), fg: String(fg), dark: !!dark });
+  /** The path of a file dropped on the page (the composer turns it into a reference). */
+  pathOf(file) {
+    try {
+      return webUtils.getPathForFile(file) || '';
+    } catch {
+      return '';
+    }
+  },
+  /** The theme choice, kept by the app so every window follows it. */
+  themePrefs() {
+    return ipcRenderer.invoke('desk:theme-prefs');
+  },
+  setThemePrefs(p) {
+    ipcRenderer.send('desk:theme-set', JSON.parse(JSON.stringify(p || {})));
+  },
+  onThemePrefs(fn) {
+    const h = (_e, p) => fn(p);
+    ipcRenderer.on('desk:theme-prefs', h);
+    return () => ipcRenderer.off('desk:theme-prefs', h);
+  },
+  /** The quick panel: 'toggle' | 'hide' | 'resize' (height). */
+  panel(action, arg) {
+    ipcRenderer.send('desk:panel', String(action), typeof arg === 'number' ? arg : undefined);
+  },
+  onPanelShown(fn) {
+    const h = () => fn();
+    ipcRenderer.on('desk:panel-shown', h);
+    return () => ipcRenderer.off('desk:panel-shown', h);
+  },
+  /** Open a task in the main window (from the panel). */
+  open(taskId, view) {
+    ipcRenderer.send('desk:open', { taskId: String(taskId), view: view ? String(view) : undefined });
+  },
+  onNavigate(fn) {
+    const h = (_e, t) => fn(t);
+    ipcRenderer.on('desk:navigate', h);
+    return () => ipcRenderer.off('desk:navigate', h);
+  },
+  /** The global shortcut for the panel: 'state' | 'set' (accelerator). */
+  shortcut(action, accel) {
+    return ipcRenderer.invoke('desk:shortcut', String(action), accel == null ? undefined : String(accel));
+  },
+  isPanel: location.pathname === '/panel.html',
+  /** The theme's title bar colors for its scheme, so the window and its title bar area match. */
+  setChrome({ scheme, bg, fg }) {
+    ipcRenderer.send('desk:chrome', { scheme: String(scheme), bg: String(bg), fg: String(fg) });
   },
   onFullscreen(fn) {
     const h = (_e, on) => fn(!!on);

@@ -1,0 +1,387 @@
+/* The rail: sessions grouped by what they need from me. */
+
+.rail {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-radius: var(--r-4);
+  --mark-ring: color-mix(in oklab, var(--bg-app) 85%, var(--bg-raised));
+}
+.rail-list {
+  flex: 1;
+  min-height: 0;
+  padding: 2px 8px 10px;
+}
+.rail-resize {
+  position: absolute;
+  top: 16px;
+  bottom: 16px;
+  right: -6px;
+  width: 8px;
+  cursor: col-resize;
+  -webkit-app-region: no-drag;
+}
+
+/* Project filter: a row of glyphs. */
+.pfilter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 10px 6px;
+}
+.pf-list {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 3px;
+  margin: -3px;
+  scrollbar-width: none;
+}
+.pf {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  color: var(--text-2);
+  font-size: 16px;
+  transition:
+    background var(--dur-2),
+    transform var(--dur-3) var(--ease-spring),
+    box-shadow var(--dur-2);
+}
+.pf:hover {
+  background: var(--bg-hover);
+}
+.pf:active {
+  transform: scale(0.92);
+}
+.pf.on {
+  background: var(--bg-active);
+  box-shadow:
+    inset 0 0 0 1.5px var(--accent-line),
+    0 0 calc(var(--glow) * 12px) var(--glow-color);
+}
+.pf.add {
+  color: var(--text-3);
+  border: 1px dashed var(--line-strong);
+  width: 28px;
+  height: 28px;
+  margin: 2px;
+}
+.pf .dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--info);
+  box-shadow: 0 0 0 2px var(--mark-ring);
+}
+.pf .dot.hot {
+  background: var(--warn);
+  box-shadow:
+    0 0 0 2px var(--mark-ring),
+    0 0 8px var(--warn);
+}
+.pf-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--line-strong);
+  flex: none;
+}
+
+/* Groups. */
+.grp-h {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 4px 4px 6px;
+}
+.grp-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--fs-2);
+  font-weight: var(--w-3);
+  color: var(--text-2);
+}
+.grp-t .ti {
+  font-size: 13px;
+  color: var(--text-3);
+  transition: transform var(--dur-2) var(--ease-out);
+}
+.grp-t.closed .ti {
+  transform: rotate(-90deg);
+}
+.grp-x {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 7px;
+  font-size: var(--fs-1);
+  font-weight: var(--w-3);
+  color: var(--text-3);
+  opacity: 0;
+  transition: opacity var(--dur-2);
+}
+.grp-x .ti {
+  font-size: 13px;
+}
+.grp-h:hover .grp-x,
+.grp-x:focus-visible,
+section[data-group='yours'] .grp-x {
+  opacity: 1;
+}
+.grp-x:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+section[data-group='yours'] .grp-x {
+  color: var(--accent-text);
+}
+
+/* Rows. */
+.rrow-wrap {
+  position: relative;
+}
+.rrow {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: var(--r-3);
+  text-align: left;
+  transition:
+    background var(--dur-2),
+    box-shadow var(--dur-2);
+}
+.rrow:hover {
+  background: var(--bg-hover);
+}
+.rrow.sel {
+  background: color-mix(in oklab, var(--bg-surface) 82%, transparent);
+  box-shadow:
+    inset 0 0 0 1px var(--line),
+    inset 0 1px 0 var(--glass-edge),
+    0 4px 14px -8px var(--glass-shadow);
+}
+.rrow.picked {
+  box-shadow: inset 0 0 0 1.5px var(--accent-line);
+  background: var(--accent-soft);
+}
+.rrow.finished {
+  opacity: 0.55;
+}
+/* Stuck on me: a warm edge that can't be missed. */
+.rrow.blocked::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--warn);
+  box-shadow: 0 0 10px var(--warn);
+}
+.rrow.blocked {
+  background: linear-gradient(90deg, var(--warn-soft), transparent 70%);
+}
+.rrow .pk {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  font-size: 11px;
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: 0 0 0 2px var(--mark-ring);
+}
+.rr-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.rr-t {
+  font-size: 13.5px;
+  font-weight: var(--w-3);
+  line-height: 19px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rr-t .rm {
+  color: var(--ok-text);
+  font-size: 12px;
+  margin-right: 4px;
+}
+.rr-t .where {
+  margin-right: 5px;
+  padding: 0 5px;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: var(--w-3);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+.rr-s {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 18px;
+  color: var(--text-2);
+}
+.askchip {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: var(--w-4);
+  line-height: 17px;
+  color: var(--warn-ink);
+  background: var(--warn);
+  vertical-align: 1px;
+}
+.rrow.blocked .why {
+  color: var(--text);
+}
+.rr-plan {
+  height: 2px;
+  margin-top: 5px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.rr-plan i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width var(--dur-4) var(--ease-out);
+}
+.rr-meta {
+  font-size: var(--fs-1);
+  color: var(--text-3);
+  padding-top: 2px;
+  white-space: nowrap;
+}
+.diffstat b {
+  font-size: var(--fs-1);
+}
+.rrow-x {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: var(--text-2);
+  background: var(--bg-overlay);
+  box-shadow:
+    0 0 0 1px var(--line-strong),
+    var(--shadow-1);
+  font-size: 15px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.9);
+  transition:
+    opacity var(--dur-2),
+    transform var(--dur-3) var(--ease-spring);
+}
+.rrow-wrap:hover .rrow-x,
+.rrow-x:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+.rrow-wrap:hover .rr-meta {
+  visibility: hidden;
+}
+.rrow-x:hover {
+  color: var(--text);
+}
+
+.rail-foot {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px;
+  border-top: 1px solid var(--line);
+}
+.rail-foot .btn.on {
+  color: var(--text);
+  background: var(--bg-active);
+}
+.rail-foot .n {
+  color: var(--text-3);
+  margin-left: 2px;
+}
+.rail-empty {
+  padding: 40px 16px;
+  font-size: var(--fs-3);
+}
+.rail-empty p {
+  margin: 0;
+}
+
+.pickbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 8px 4px;
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--r-3);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+  font-size: var(--fs-2);
+  font-weight: var(--w-3);
+  animation: rise var(--dur-3) var(--ease-spring);
+}
+.pickbar .n {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  padding: 2px 8px 0;
+}
+.shelf-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: var(--w-3);
+}
+.rrow.shelved {
+  grid-template-columns: 26px minmax(0, 1fr) auto auto;
+  align-items: center;
+}

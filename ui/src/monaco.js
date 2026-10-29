@@ -1,4 +1,5 @@
 // Monaco is big; load it only when a diff or file view first opens.
+import { monacoTheme, onTheme } from './app/theme.js';
 let ready;
 
 export function loadMonaco() {
@@ -17,27 +18,11 @@ export function loadMonaco() {
       quiet(m.json?.jsonDefaults);
       for (const k of ['cssDefaults', 'scssDefaults', 'lessDefaults']) quiet(m.css?.[k]);
       for (const k of ['htmlDefaults', 'handlebarDefaults', 'razorDefaults']) quiet(m.html?.[k]);
-      m.editor.defineTheme('desk', {
-        base: 'vs-dark',
-        inherit: true,
-        rules: [{ token: 'comment', foreground: '7a8190', fontStyle: 'italic' }],
-        colors: {
-          'editor.background': '#1a1c21',
-          'editor.lineHighlightBackground': '#22252b',
-          'editorLineNumber.foreground': '#4d535e',
-          'editorLineNumber.activeForeground': '#a3a9b4',
-          'editorGutter.background': '#1a1c21',
-          'editorIndentGuide.background1': '#262a31',
-          'diffEditor.insertedTextBackground': '#4cc38a24',
-          'diffEditor.removedTextBackground': '#f2706b22',
-          'diffEditor.insertedLineBackground': '#4cc38a14',
-          'diffEditor.removedLineBackground': '#f2706b12',
-          'diffEditorGutter.insertedLineBackground': '#4cc38a22',
-          'diffEditorGutter.removedLineBackground': '#f2706b20',
-          'scrollbarSlider.background': '#3b404a80',
-          'editorWidget.background': '#272a31',
-          'editorOverviewRuler.border': '#00000000',
-        },
+      // Colors come from the theme engine, and follow it when the theme changes.
+      m.editor.defineTheme('desk', monacoTheme() || { base: 'vs-dark', inherit: true, rules: [], colors: {} });
+      onTheme(() => {
+        m.editor.defineTheme('desk', monacoTheme());
+        m.editor.setTheme('desk');
       });
       return m;
     });
@@ -48,7 +33,7 @@ export function loadMonaco() {
 export const editorOptions = {
   theme: 'desk',
   readOnly: true,
-  fontFamily: "'SF Mono', ui-monospace, Menlo, 'JetBrains Mono', D2Coding, 'Sarasa Mono K', 'Noto Sans Mono CJK KR', monospace",
+  fontFamily: "ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, 'Desk Mono', monospace",
   fontSize: 13,
   lineHeight: 20,
   minimap: { enabled: false },

@@ -1,0 +1,5 @@
+{
+  "name": "Child Theme",
+  "type": "dark",
+  "include": "./base-color-theme.json"
+}

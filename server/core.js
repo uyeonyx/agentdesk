@@ -9,6 +9,7 @@ import { Tasks } from './tasks.js';
 import { addProject, updateProject, removeProject, discoverRepos, listDirs, httpError, PALETTE, ICONS, autofill, backfill } from './projects.js';
 import { safeLogo } from './describe.js';
 import { availability, configureHooks } from './agents.js';
+import { listThemes, saveTheme, removeTheme } from './themes.js';
 import { listSessions } from './sessions.js';
 import { Shells, isShellId, needShellTask } from './shells.js';
 import { startHookServer } from './hookserver.js';
@@ -91,6 +92,11 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
     if (a === 'discover' && method === 'GET') return { repos: discoverRepos(store.projects) };
     if (a === 'sessions' && method === 'GET') return { sessions: (await listSessions(store, { fresh: url.searchParams.get('fresh') === '1' })).map(({ file, ...x }) => x) };
     if (a === 'dirs' && method === 'GET') return { dirs: listDirs(url.searchParams.get('q')) };
+    if (a === 'themes') {
+      if (!id && method === 'GET') return { themes: listThemes() };
+      if (id && method === 'POST') return saveTheme(id, body);
+      if (id && method === 'DELETE') return removeTheme(id);
+    }
     if (a === 'prefs' && method === 'PATCH') {
       for (const [k, v] of Object.entries(body)) if (/^[a-zA-Z]{1,40}$/.test(k) && ['string', 'boolean', 'number'].includes(typeof v)) store.prefs[k] = v;
       store.save();
@@ -135,6 +141,9 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
         if (action === 'file') return await tasks.file(id, url.searchParams.get('path') || '', url.searchParams.get('ref') || 'work');
         if (action === 'activity') return tasks.activity(id);
         if (action === 'transcript') return tasks.transcript(id);
+        if (action === 'messages') return tasks.messages(id);
+        if (action === 'convo') return tasks.convoPage(id, url.searchParams.get('before'), Number(url.searchParams.get('limit')) || 200);
+        if (action === 'entry') return tasks.entry(id, url.searchParams.get('id') || '');
         if (action === 'screen') return tasks.screen(id, Number(url.searchParams.get('lines')) || 10);
       }
       if (id && method === 'POST') {
@@ -185,8 +194,15 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
           case 'remote':
             return await tasks.remote(id, body.on !== false);
           case 'choose':
-            tasks.choose(id, body.key);
+            tasks.choose(id, body.key, body);
             return { ok: true };
+          case 'answer':
+            return await tasks.answer(id, body);
+          case 'interrupt':
+            tasks.interrupt(id);
+            return { ok: true };
+          case 'attachments':
+            return tasks.addAttachment(id, body);
         }
       }
     }
@@ -213,6 +229,7 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
         else if (m.t === 'in' && typeof m.task === 'string') tasks.input(m.task, m.d);
         else if (m.t === 'resize' && isShellId(m.task)) shells.resize(m.task, m.cols, m.rows);
         else if (m.t === 'resize' && typeof m.task === 'string') tasks.resize(m.task, m.cols, m.rows);
+        else if (m.t === 'convo' && typeof m.task === 'string') m.op === 'unsub' ? tasks.convos.unsub(peer, m.task) : tasks.convos.sub(peer, m.task);
         else if (m.t === 'submit' && typeof m.task === 'string') {
           tasks
             .submit(m.task)
@@ -224,6 +241,7 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
         peers.delete(peer);
         tasks.detach(peer);
         shells.detach(peer);
+        tasks.convos.dropPeer(peer);
       },
     };
   }

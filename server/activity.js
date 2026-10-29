@@ -59,6 +59,10 @@ export function describeTool(name, input = {}, cwd = '') {
       return { kind: 'web', text: `웹 ${clip(safeHost(i.url), 60)}` };
     case 'WebSearch':
       return { kind: 'web', text: `검색 "${clip(i.query, 60)}"` };
+    case 'AskUserQuestion':
+      return { kind: 'ask', text: '질문하기' };
+    case 'ExitPlanMode':
+      return { kind: 'plan', text: '계획 승인 요청' };
     case 'Agent':
     case 'Task':
       return { kind: 'agent', text: `서브에이전트: ${clip(i.description || i.subagent_type || '작업', 80)}` };
@@ -169,7 +173,10 @@ export class ActivityTracker {
             push(owner.feed, item, SUB_FEED_MAX);
             owner.last = d.text;
             owner.tools++;
-          } else if (item.st === 'run') this.a.current = d.text;
+          } else if (item.st === 'run') {
+            this.a.current = d.text;
+            this.a.currentAt = Date.now();
+          }
           push(this.a.feed, item, FEED_MAX);
         }
       } else {
@@ -394,6 +401,7 @@ export function activityView(a) {
     plan: a.plan.slice(0, 30),
     subagents: a.subagents.slice(-12).map((s) => ({ id: s.id, type: s.type || 'agent', desc: s.desc, status: s.status, last: s.last, tools: s.tools, startedAt: s.startedAt, endedAt: s.endedAt, plan: s.plan.slice(0, 12) })),
     current: a.current,
+    since: a.current ? a.currentAt || 0 : 0,
     feedTail: a.feed.slice(-5),
   };
 }

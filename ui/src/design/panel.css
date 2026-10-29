@@ -1,0 +1,146 @@
+/* The quick panel: the window itself is the glass (macOS popover material), drawn edge to edge. */
+@import 'pretendard/dist/web/variable/pretendardvariable.css';
+@import '@tabler/icons-webfont/dist/tabler-icons.min.css';
+@import './tokens.css';
+@import './base.css';
+@import './glass.css';
+@import './ui.css';
+@import './md.css';
+@import './layout.css';
+@import './rail.css';
+@import './task.css';
+
+:root.os-darwin body {
+  background: color-mix(in oklab, var(--bg-app) 72%, transparent);
+}
+:root:not(.os-darwin) body {
+  background: var(--bg-app);
+}
+body {
+  overflow: hidden;
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  max-height: 640px;
+  --mark-ring: var(--bg-app);
+}
+.pn-h {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 10px 8px 14px;
+  font-weight: var(--w-3);
+}
+.pn-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 10px 8px;
+  overflow: auto;
+  scrollbar-width: thin;
+}
+.pn-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--r-3);
+  background: color-mix(in oklab, var(--bg-raised) 70%, transparent);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.pn-item.focused {
+  box-shadow: inset 0 0 0 1.5px var(--accent-line);
+}
+.pn-item.blocked {
+  box-shadow:
+    inset 0 0 0 1px var(--warn-line),
+    0 0 24px -12px var(--warn);
+}
+.pn-ih {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+}
+.pn-id {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pn-p {
+  font-size: var(--fs-1);
+  color: var(--text-3);
+}
+.pn-t {
+  text-align: left;
+  font-weight: var(--w-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pn-tag {
+  font-size: var(--fs-1);
+  color: var(--text-2);
+}
+.pn-b p {
+  margin: 0 0 8px;
+  font-size: var(--fs-2);
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.pn-item .pcard {
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  animation: none;
+}
+.pn-item .pcard::after {
+  display: none;
+}
+.pn-item .pc-h {
+  display: none;
+}
+.pn-item .pc-b {
+  margin-top: 0;
+}
+.qr .field {
+  height: 32px;
+  border-radius: var(--r-full);
+  padding: 0 14px;
+}
+.pn-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 28px 0 32px;
+  color: var(--text-2);
+}
+.pn-empty .ti {
+  font-size: 20px;
+  color: var(--ok-text);
+}
+.pn-f {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 10px 14px;
+  border-top: 1px solid var(--line);
+  font-size: var(--fs-2);
+  color: var(--text-2);
+}
+.pn-toast {
+  margin: 0 10px 8px;
+  padding: 8px 12px;
+  border-radius: var(--r-2);
+  font-size: var(--fs-2);
+  background: var(--bg-active);
+}
+.pn-toast.err {
+  color: var(--danger-text);
+}

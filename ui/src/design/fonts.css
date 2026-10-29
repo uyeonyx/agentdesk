@@ -1,0 +1,14 @@
+/* Terminal font: D2Coding's Hangul is exactly two Latin cells wide, so Korean in the agent's
+   terminal lines up instead of being spread out with gaps. Bundled (OFL); a local copy wins. */
+@font-face {
+  font-family: 'Desk Mono';
+  font-weight: 400;
+  font-display: block;
+  src: local('D2Coding'), local('D2Coding Regular'), url('../../../node_modules/d2coding/fonts/d2coding-full.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Desk Mono';
+  font-weight: 700;
+  font-display: block;
+  src: local('D2Coding Bold'), url('../../../node_modules/d2coding/fonts/d2coding-bold-full.woff2') format('woff2');
+}
