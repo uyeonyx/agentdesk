@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useReducer, useRef } from 'preact/hooks';
 import { useLogo } from '../logos.js';
 import { markOf } from '../core/status.js';
 
@@ -70,7 +70,8 @@ export function TimeAgo({ at }) {
 
 /** Element for an effect that runs while `open`: closes on Esc and on a press outside. */
 export function useDismiss(open, close, ref) {
-  useEffect(() => {
+  // Listening starts with the first paint: an Esc pressed the moment the popover shows must close it.
+  useLayoutEffect(() => {
     if (!open) return;
     const key = (e) => {
       if (e.key === 'Escape') {
