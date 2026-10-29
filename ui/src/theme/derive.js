@@ -60,12 +60,13 @@ function autoAmbient(accent, ansi) {
   return picked;
 }
 
-// The aurora is a backdrop: muted on dark themes, pastel on light ones.
+// The aurora is a backdrop: muted on dark themes, airy pastel on light ones (a mid-tone wash on a
+// light theme only grays it).
 function tameAmbient(c, dark) {
   const o = toOklch(c);
   return dark
     ? fromOklch({ ...o, L: clamp(o.L, 0.4, 0.6) })
-    : fromOklch({ ...o, L: clamp(o.L, 0.8, 0.92), C: Math.min(o.C, 0.13) });
+    : fromOklch({ ...o, L: clamp(o.L, 0.88, 0.95), C: Math.min(o.C, 0.1) });
 }
 
 function shadow(layers, color) {
@@ -108,12 +109,18 @@ export function deriveTokens(input, { glass = 'rich' } = {}) {
 
   // Text has to read on panels, cards, menus, hover rows and on glass over the brightest aurora stop.
   const text0 = solid(ui('text', fg), surface);
-  const text20 = solid(ui('text-2', mix(fg, surface, 0.3)), surface);
-  const text30 = solid(ui('text-3', mix(fg, surface, 0.52)), surface);
+  // Secondary text stays close to the primary: gray-on-gray is what makes a screen look dull.
+  const text20 = solid(ui('text-2', mix(fg, surface, 0.24)), surface);
+  const text30 = solid(ui('text-3', mix(fg, surface, 0.44)), surface);
+  // Light glass is frosted white, not a veil of the (grayer) window background.
+  const glassBase = dark ? app : mix(app, WHITE, 0.6);
   const solve = (alpha) => {
-    const tint = withAlpha(app, alpha);
-    const strong = withAlpha(raised, Math.min(1, alpha + 0.14));
-    const glassBgs = [app, ...amb].flatMap((b) => [over(tint, b), over(strong, b)]);
+    const tint = withAlpha(glassBase, alpha);
+    // Cards floating over the conversation, and menus/sheets/popovers floating over everything:
+    // blurred behind, but nearly solid, so what they say reads at once.
+    const strong = withAlpha(raised, Math.min(1, Math.max(alpha + 0.24, 0.86)));
+    const float = withAlpha(overlay, Math.min(1, Math.max(alpha + 0.3, 0.92)));
+    const glassBgs = [app, ...amb].flatMap((b) => [over(tint, b), over(strong, b), over(float, b)]);
     const bgs = [
       surface, raised, overlay, inset, over(hover, surface), over(hover, raised), over(active, surface),
       ...glassBgs, ...glassBgs.map((b) => over(hover, b)),
@@ -122,7 +129,7 @@ export function deriveTokens(input, { glass = 'rich' } = {}) {
     const text2 = ensureContrast(text20, bgs, AA + MARGIN);
     const text3 = ensureContrast(text30, bgs, LARGE + MARGIN);
     const ok = worst(text, bgs) >= AA && worst(text2, bgs) >= AA && worst(text3, bgs) >= LARGE;
-    return { alpha, tint, strong, text, text2, text3, ok };
+    return { alpha, tint, strong, float, text, text2, text3, ok };
   };
   // If no text color can win on the aurora, thicken the glass rather than give up readability.
   let s = solve(baseAlpha);
@@ -174,7 +181,7 @@ export function deriveTokens(input, { glass = 'rich' } = {}) {
     // For a solid tag or badge: the same hue, bright enough on any theme to be seen from across the
     // room (a light theme's amber is dark so that it reads as text, which turns brown as a fill).
     const o = toOklch(c);
-    const fill = solid(ui(`${name}-fill`, o.L >= 0.74 ? c : fromOklch({ ...o, L: 0.78, C: Math.max(o.C, 0.12) })), surface);
+    const fill = solid(ui(`${name}-fill`, o.L >= 0.74 ? c : fromOklch({ ...o, L: 0.8, C: o.C < 0.04 ? o.C : Math.max(o.C, 0.16) })), surface);
     set(`${name}-fill`, fill);
     set(`${name}-fill-ink`, inkOn(fill, bg, fg, ui(`${name}-fill-ink`)));
   }
@@ -221,6 +228,7 @@ export function deriveTokens(input, { glass = 'rich' } = {}) {
   const shade = dark ? BLACK : fromOklch({ L: 0.28, C: Math.min(so.C, 0.05), h: so.h });
   vars['--glass-tint'] = toRgba(s.tint);
   vars['--glass-tint-strong'] = toRgba(s.strong);
+  vars['--glass-float'] = toRgba(s.float);
   vars['--glass-blur'] = `${blur}px`;
   vars['--glass-sat'] = `${sat}%`;
   vars['--glass-edge'] = toRgba(withAlpha(WHITE, dark ? (g ? 0.09 : 0.05) : g ? 0.7 : 0.5));

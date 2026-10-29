@@ -22,7 +22,7 @@ export const COLOR_TOKENS = [
   'diff-add-bg', 'diff-add-text', 'diff-add-mark', 'diff-del-bg', 'diff-del-text', 'diff-del-mark',
   ...SYNTAX_KEYS.map((k) => `syn-${k}`),
   'term-bg', 'term-fg', 'term-cursor', 'term-selection', ...ANSI_NAMES.map((_, i) => `term-${i}`),
-  'glass-tint', 'glass-tint-strong', 'glass-edge', 'glass-shadow', 'glow-color',
+  'glass-tint', 'glass-tint-strong', 'glass-float', 'glass-edge', 'glass-shadow', 'glow-color',
   'amb-1', 'amb-2', 'amb-3', 'amb-4',
 ];
 export const VALUE_TOKENS = ['glass-blur', 'glass-sat', 'glow', 'amb-speed'];

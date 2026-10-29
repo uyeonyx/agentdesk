@@ -86,7 +86,8 @@
   --accent-text: #a3aeff;
   --focus: #7c8cff;
   --glass-tint: rgba(23, 24, 29, 0.6);
-  --glass-tint-strong: rgba(30, 31, 37, 0.82);
+  --glass-tint-strong: rgba(30, 31, 37, 0.88);
+  --glass-float: rgba(36, 38, 45, 0.94);
   --glass-blur: 28px;
   --glass-sat: 180%;
   --glass-edge: rgba(255, 255, 255, 0.14);

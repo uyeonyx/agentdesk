@@ -44,8 +44,9 @@ function apply({ animate = false } = {}) {
     root.dataset.glass = glass;
     root.dataset.ambient = pref.ambient === false ? 'still' : 'on';
     root.dataset.glow = theme.glass?.glow ? 'on' : 'off';
-    // macOS shows the desktop faintly through the window; elsewhere the backdrop is solid.
-    root.style.setProperty('--app-alpha', window.desk?.platform === 'darwin' && pref.vibrancy !== false && glass !== 'off' ? '0.86' : '1');
+    // macOS shows the desktop faintly through the window (only faintly: more of it muddies every
+    // theme's colors); elsewhere the backdrop is solid.
+    root.style.setProperty('--app-alpha', window.desk?.platform === 'darwin' && pref.vibrancy !== false && glass !== 'off' ? '0.93' : '1');
     for (const fn of listeners) fn(derived);
   };
   // A soft cross-fade between themes; previews switch at once so arrowing through stays quick.

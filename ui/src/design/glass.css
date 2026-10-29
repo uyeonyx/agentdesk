@@ -22,10 +22,10 @@
     0 18px 48px -16px var(--glass-shadow);
 }
 .glass-3 {
-  background: var(--glass-tint-strong);
+  background: var(--glass-float);
   box-shadow:
     inset 0 1px 0 var(--glass-edge),
-    0 0 0 1px var(--line),
+    0 0 0 1px var(--line-strong),
     var(--shadow-3);
 }
 

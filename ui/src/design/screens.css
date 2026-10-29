@@ -33,7 +33,7 @@
 .tile.blocked {
   box-shadow:
     inset 0 1px 0 var(--glass-edge),
-    0 0 0 1px var(--warn-line),
+    0 0 0 1.5px color-mix(in oklab, var(--warn-fill) 85%, transparent),
     0 16px 40px -20px var(--glass-shadow);
 }
 .tl-h {
@@ -837,8 +837,8 @@ input[type='range'] {
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .home-turn.hot {
-  background: color-mix(in oklab, var(--warn) 8%, var(--bg-raised));
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--warn) 45%, transparent);
+  background: color-mix(in oklab, var(--warn-fill) 12%, var(--bg-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--warn-fill) 70%, transparent);
 }
 .home-turn .dim {
   font-size: var(--fs-2);
@@ -879,12 +879,12 @@ input[type='range'] {
 }
 
 /* Project cards. */
-.pcards {
+.projcards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 12px;
 }
-.pcard {
+.projcard {
   position: relative;
   border-radius: var(--r-4);
   background:
@@ -897,14 +897,14 @@ input[type='range'] {
     box-shadow var(--dur-2),
     transform var(--dur-3) var(--ease-spring);
 }
-.pcard:hover {
+.projcard:hover {
   transform: translateY(-2px);
   box-shadow:
     inset 0 0 0 1px color-mix(in oklab, var(--room) 45%, transparent),
     inset 0 1px 0 var(--glass-edge),
     0 12px 28px -14px color-mix(in oklab, var(--room) 70%, transparent);
 }
-.pcard.on {
+.projcard.on {
   box-shadow:
     inset 0 0 0 2px var(--room),
     0 12px 28px -14px color-mix(in oklab, var(--room) 70%, transparent);
@@ -965,7 +965,7 @@ input[type='range'] {
   opacity: 0;
   transition: opacity var(--dur-2);
 }
-.pcard:hover .pc-new,
+.projcard:hover .pc-new,
 .pc-new:focus-visible {
   opacity: 1;
 }

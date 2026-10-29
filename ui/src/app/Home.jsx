@@ -78,7 +78,7 @@ export function Home() {
               <I n="folder-plus" /> 프로젝트 추가
             </button>
           </header>
-          <div class="pcards">
+          <div class="projcards">
             {projects.map((p) => (
               <ProjectCard key={p.id} p={p} tasks={live.filter((t) => t.projectId === p.id)} on={s.filter === p.id} />
             ))}
@@ -97,7 +97,7 @@ function ProjectCard({ p, tasks, on }) {
   const busy = tasks.filter((t) => groupOf(t) === 'working').length;
   const last = Math.max(0, ...tasks.map((t) => t.updatedAt));
   return (
-    <div class={`pcard room-scope ${on ? 'on' : ''}`} style={roomVars(p.color)} onContextMenu={(e) => openMenu(e, projectItems(p))}>
+    <div class={`projcard room-scope ${on ? 'on' : ''}`} style={roomVars(p.color)} onContextMenu={(e) => openMenu(e, projectItems(p))}>
       <button class="pc-main" onClick={() => set({ filter: on ? null : p.id })} aria-pressed={on} data-tip={on ? '모든 프로젝트 보기' : '목록에 이 프로젝트만 보기'}>
         <Glyph project={p} size={44} />
         <b class="pc-name">{p.name}</b>
