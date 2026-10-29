@@ -88,6 +88,19 @@ const WIN = process.platform === 'win32';
 export const realPath = (p) => (WIN ? fs.realpathSync.native(p) : fs.realpathSync(p));
 
 /** Find an executable on PATH plus common install dirs. On Windows: by PATHEXT, no execute bit to check. */
+/**
+ * A copy of this process's environment without what belongs to whoever started Desk: a parent
+ * Claude Code or Codex session (its markers make a child Claude Code stop saving its transcript,
+ * and its messaging socket and token are that session's, not ours) and the app's own runtime.
+ * Settings people put there on purpose (CLAUDE_CODE_USE_BEDROCK, ANTHROPIC_MODEL…) stay.
+ */
+const PARENT_ENV = /^(CLAUDECODE$|CLAUDE_PID$|CLAUDE_CODE_(ENTRYPOINT|CHILD_SESSION|SESSION_ID|SESSION_ATTENDED|BRIDGE_SESSION_ID|MESSAGING_SOCKET|MESSAGING_TOKEN|EXECPATH|SSE_PORT)$|CODEX_SANDBOX|CODEX_THREAD|ELECTRON_|CHROME_)/;
+export function inheritedEnv({ keepDesk = false } = {}) {
+  const env = { ...process.env };
+  for (const k of Object.keys(env)) if (PARENT_ENV.test(k) || (!keepDesk && k.startsWith('AGENTDESK_'))) delete env[k];
+  return env;
+}
+
 export function which(name) {
   const dirs = (process.env.PATH || '').split(path.delimiter).filter(Boolean);
   const home = os.homedir();

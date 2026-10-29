@@ -3,7 +3,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import pty from '@lydell/node-pty';
-import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, realPath } from './util.js';
+import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, realPath, inheritedEnv } from './util.js';
 import * as G from './git.js';
 import { AGENTS, lastAssistantText, summarize, trustedTranscript } from './agents.js';
 import { ConvoHub, legacyEntries } from './convo.js';
@@ -351,9 +351,8 @@ export class Tasks {
     const ad = AGENTS[task.agent];
     const bin = ad.bin();
     if (!bin) throw httpError(400, `${ad.label} CLI를 찾을 수 없어요`);
-    const env = { ...process.env };
     // Don't let a parent agent session or the app's own runtime leak into the child.
-    for (const k of Object.keys(env)) if (/^(CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_SANDBOX|CODEX_THREAD|ELECTRON_|CHROME_)/.test(k)) delete env[k];
+    const env = inheritedEnv({ keepDesk: true });
     Object.assign(env, {
       TERM: 'xterm-256color',
       COLORTERM: 'truecolor',

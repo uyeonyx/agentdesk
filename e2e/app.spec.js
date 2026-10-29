@@ -266,7 +266,8 @@ test('⌘J opens the raw terminal of the agent', async () => {
   await page.keyboard.press(`${MOD}+j`);
   const drawer = page.getByTestId('drawer');
   await expect(drawer.locator('.xterm-rows')).toContainText('Answer: just answer: 터미널', { timeout: 10_000 });
-  await page.keyboard.press(`${MOD}+j`);
+  // The terminal has focus now. Off the Mac, Ctrl+J belongs to it; the app's shortcut takes Shift too.
+  await page.keyboard.press(win ? 'Control+Shift+j' : `${MOD}+j`);
   await expect(drawer).toBeHidden();
   await call('POST', `/api/tasks/${t.id}/discard`);
 });

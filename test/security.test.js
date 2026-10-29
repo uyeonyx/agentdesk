@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { boot, makeRepo } from './helpers.js';
+import { inheritedEnv } from '../server/util.js';
 
 let ctx;
 before(async () => {
@@ -143,4 +144,21 @@ test('[review 5] hook transcript paths outside Claude transcripts are ignored', 
   await new Promise((r) => setTimeout(r, 300));
   const x = (await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id);
   assert.doesNotMatch(x.summary, /safe to merge/);
+});
+
+test('a parent Claude Code session stays out of the agents: its markers and messaging token are dropped', () => {
+  const set = { CLAUDECODE: '1', CLAUDE_CODE_CHILD_SESSION: '1', CLAUDE_CODE_SESSION_ID: 's', CLAUDE_CODE_MESSAGING_TOKEN: 'secret', CLAUDE_CODE_MESSAGING_SOCKET: '/tmp/x', CLAUDE_PID: '1', CLAUDE_CODE_USE_BEDROCK: '1', ANTHROPIC_MODEL: 'sonnet', AGENTDESK_X: '1' };
+  const before = { ...process.env };
+  Object.assign(process.env, set);
+  try {
+    const env = inheritedEnv();
+    for (const k of ['CLAUDECODE', 'CLAUDE_CODE_CHILD_SESSION', 'CLAUDE_CODE_SESSION_ID', 'CLAUDE_CODE_MESSAGING_TOKEN', 'CLAUDE_CODE_MESSAGING_SOCKET', 'CLAUDE_PID', 'AGENTDESK_X']) assert.equal(env[k], undefined, k);
+    // What a person set on purpose goes through.
+    assert.equal(env.CLAUDE_CODE_USE_BEDROCK, '1');
+    assert.equal(env.ANTHROPIC_MODEL, 'sonnet');
+    assert.equal(inheritedEnv({ keepDesk: true }).AGENTDESK_X, '1');
+  } finally {
+    for (const k of Object.keys(set)) if (!(k in before)) delete process.env[k];
+    Object.assign(process.env, before);
+  }
 });

@@ -8,6 +8,7 @@ import { api, onTerm, wsSend, attachTerm, detachTerm } from '../../api.js';
 import { useStore, set, get, toast } from '../../store.js';
 import { undoLastSend } from '../../actions.js';
 import { xtermTheme, onTheme } from '../../app/theme.js';
+import { isAppKey } from '../../app/keys.js';
 import { openMenu } from '../../ui/Menu.jsx';
 import { termItems } from '../task/taskActions.js';
 import { I } from '../../ui/bits.jsx';
@@ -25,6 +26,9 @@ function makeTerm(host, color) {
   term.loadAddon(fit);
   term.loadAddon(new WebLinksAddon((e, uri) => window.open(uri, '_blank', 'noopener')));
   term.open(host);
+  // Ctrl+Shift+J and friends are the app's, not the shell's (see keys.js). The agent's terminal
+  // replaces this handler with its own, which does the same first.
+  term.attachCustomKeyEventHandler((e) => !(e.type === 'keydown' && isAppKey(e)));
   // xterm measures the cell once; measure again when the bundled font has actually loaded.
   document.fonts?.load("13px 'Desk Mono'").then(() => {
     term.options.fontFamily = FONT + ' ';
@@ -86,6 +90,8 @@ function AgentTerminal({ task, project }) {
     st.current = { term, fit, task: task.id };
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown') return true;
+      // Ctrl+Shift+J and friends are the app's, not the shell's (see keys.js).
+      if (isAppKey(e)) return false;
       if (isUndoKey(e) && get().lastSend?.taskId === task.id) {
         e.preventDefault();
         undoLastSend();

@@ -5,6 +5,7 @@ import { openCommand, startTriage, newTask } from '../actions.js';
 import { AddProjectBody } from '../features/sheets/Sheets.jsx';
 import { Glyph, I } from '../ui/bits.jsx';
 import { keyLabel } from './keys.js';
+import { isMac } from '../util.js';
 
 export function Home() {
   const s = useStore((s) => ({ projects: s.projects, tasks: s.tasks, loaded: s.loaded }));
@@ -103,6 +104,7 @@ export function CheatSheet({ keys }) {
             </div>
           ))}
         </div>
+        {!isMac && <p class="cheat-note dim">터미널 안에서는 Ctrl 단축키를 Shift와 함께 눌러요. Ctrl만 누르면 터미널로 가요.</p>}
       </div>
     </div>
   );

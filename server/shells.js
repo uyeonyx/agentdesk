@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import { createRequire } from 'node:module';
 import pty from '@lydell/node-pty';
-import { randomId, which } from './util.js';
+import { inheritedEnv, randomId, which } from './util.js';
 import { httpError } from './projects.js';
 
 const require = createRequire(import.meta.url);
@@ -37,8 +37,7 @@ export class Shells {
     // Windows: PowerShell 7 if installed, else Windows PowerShell. A POSIX $SHELL (Git Bash, MSYS) isn't a Windows program path.
     const shell = WIN ? which('pwsh') || 'powershell.exe' : process.env.SHELL || '/bin/bash';
     // The agents' hook token and Desk's own variables never reach a shell the person types into.
-    const env = { ...process.env, TERM: 'xterm-256color', COLORTERM: 'truecolor' };
-    for (const k of Object.keys(env)) if (/^(AGENTDESK_|CLAUDECODE|CLAUDE_CODE_ENTRYPOINT|CODEX_SANDBOX|CODEX_THREAD|ELECTRON_|CHROME_)/.test(k)) delete env[k];
+    const env = { ...inheritedEnv(), TERM: 'xterm-256color', COLORTERM: 'truecolor' };
     const cols = 120;
     const rows = 14;
     const proc = pty.spawn(shell, WIN ? [] : ['-l'], { name: 'xterm-256color', cols, rows, cwd, env, ...(WIN ? { useConptyDll: true } : {}) });

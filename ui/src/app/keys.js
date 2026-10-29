@@ -41,6 +41,19 @@ export function isTypingTarget(el = document.activeElement) {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
 }
 
+/**
+ * Outside the Mac, Ctrl is also the terminal's own key (Ctrl+J is a new line, Ctrl+K kills the
+ * line…). In a terminal the app's Ctrl shortcuts take Shift as well, the way VS Code's terminal does.
+ */
+export const inTerminal = (el = document.activeElement) => !!el?.closest?.('.xterm');
+const needsShift = (k) => !isMac && k.mod && !k.shift && inTerminal();
+
+/** True when a terminal should let this keydown go to the app instead of the shell. */
+export function isAppKey(e) {
+  if (isMac || !e.ctrlKey || !e.shiftKey) return false;
+  return KEYS.some((k) => k.mod && !k.shift && k.scope === 'global' && k.code.includes(e.code));
+}
+
 /** Find and run the shortcut for a keydown. Returns true when one ran. */
 export function dispatch(e, ctx) {
   if (e.isComposing || e.keyCode === 229) return false;
@@ -50,7 +63,7 @@ export function dispatch(e, ctx) {
     // ⌘ on Mac is Ctrl elsewhere; a Ctrl shortcut on Mac stays Ctrl.
     const meta = isMac ? k.mod : false;
     const ctrl = isMac ? k.ctrl : k.mod || k.ctrl;
-    if (e.metaKey !== meta || e.ctrlKey !== ctrl || e.altKey !== k.alt || e.shiftKey !== k.shift) continue;
+    if (e.metaKey !== meta || e.ctrlKey !== ctrl || e.altKey !== k.alt || e.shiftKey !== (k.shift || needsShift(k))) continue;
     if (k.scope === 'nav' && typing) continue;
     const run = handlers.get(k.id);
     if (run && run(e, ctx) !== false) {
