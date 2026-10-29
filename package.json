@@ -1,6 +1,6 @@
 {
   "name": "agentdesk",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "One inbox for all your coding agents (Claude Code, Codex) across projects. Desktop app for macOS and Windows: real terminals, git worktrees.",
   "main": "desktop/main.js",
   "scripts": {
