@@ -14,6 +14,7 @@ import { listSessions } from './sessions.js';
 import { Shells, isShellId, needShellTask } from './shells.js';
 import { startHookServer } from './hookserver.js';
 import { VERSION, tilde } from './util.js';
+import { Usage } from './usage.js';
 
 const BODY_LIMIT = 1_000_000;
 const IMAGE_TYPES = { '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.ico': 'image/x-icon' };
@@ -64,6 +65,7 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
     prefs: store.prefs,
     projects: store.projects.map((p) => ({ ...p, display: tilde(p.path) })),
     tasks: store.tasks.map((t) => tasks.view(t)),
+    usage: usage.view(),
   });
 
   // Coalesce bursts (60ms of quiet), but never hold a push longer than 250ms: a busy agent changes
@@ -82,6 +84,9 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
 
   let hooks;
   const tasks = new Tasks(store, auth, () => hooks.path, changed);
+  // Plan usage from Claude Code's /usage, read now and then while Claude sessions run.
+  const usage = new Usage(changed);
+  if (process.env.AGENTDESK_USAGE !== 'off') usage.start(() => store.tasks.some((t) => t.agent === 'claude' && tasks.rt.has(t.id)));
   const shells = new Shells(store);
   tasks.onGone = (id) => shells.close(id);
   hooks = await startHookServer({ auth, tasks, path: sock, quiet });
@@ -96,6 +101,9 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
 
     if (a === 'state' && method === 'GET') return publicState();
     if (a === 'discover' && method === 'GET') return { repos: discoverRepos(store.projects) };
+    if (a === 'usage' && method === 'GET') return usage.view();
+    // Someone opened the usage view: read again if it's more than a minute old.
+    if (a === 'usage' && method === 'POST') return await usage.refresh({ minMs: body.force ? 0 : 60_000 });
     if (a === 'sessions' && method === 'GET') return { sessions: (await listSessions(store, { fresh: url.searchParams.get('fresh') === '1' })).map(({ file, ...x }) => x) };
     if (a === 'dirs' && method === 'GET') return { dirs: listDirs(url.searchParams.get('q')) };
     if (a === 'themes') {
@@ -292,6 +300,7 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
    * right after kill() leaves Windows console hosts behind, still holding this process's pipes.
    */
   function shutdown() {
+    usage.stop();
     if (closing) return closing;
     clearTimeout(warmTimer);
     clearInterval(warmEvery);

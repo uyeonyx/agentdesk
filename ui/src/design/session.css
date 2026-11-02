@@ -252,3 +252,132 @@
   gap: 6px;
   font-size: 13px;
 }
+
+/* ---------------------------------------------------------------- plan usage (Claude Code's /usage) */
+.usage {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: var(--r-2);
+  font-size: 12px;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.usage:hover,
+.usage[aria-expanded='true'] {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+.usage b {
+  font-weight: 600;
+  color: var(--text);
+}
+.usage .sep2 {
+  color: var(--text-3);
+}
+.usage.hi b,
+.usage.hi .ti {
+  color: var(--warn-text);
+}
+.usage.max b,
+.usage.max .ti {
+  color: var(--danger-text);
+}
+.usage-pop {
+  position: fixed;
+  z-index: 60;
+  width: 360px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-radius: 14px;
+  outline: none;
+}
+.ug {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ug h4 {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.ug h4 span {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.ur {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  row-gap: 5px;
+  align-items: baseline;
+  font-size: 12.5px;
+}
+.ur-l {
+  color: var(--text-2);
+}
+.ur b {
+  font-size: 13px;
+  color: var(--text);
+}
+.ur .meter {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+.ur .meter i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+.ur.hi .meter i {
+  background: var(--warn);
+}
+.ur.hi b {
+  color: var(--warn-text);
+}
+.ur.max .meter i {
+  background: var(--danger);
+}
+.ur.max b {
+  color: var(--danger-text);
+}
+.ur-s {
+  grid-column: 1 / -1;
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.ur-empty,
+.ur-err {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.ur-err {
+  color: var(--danger-text);
+}
+.up-f {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-3);
+}
+.up-f .btn {
+  flex: none;
+}

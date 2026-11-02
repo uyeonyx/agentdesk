@@ -137,6 +137,7 @@ export function connect() {
         prefs: m.prefs || {},
         projects: m.projects,
         tasks: mergeTasks(prev.tasks, m.tasks),
+        usage: m.usage || null,
       });
     } else if (m.t === 'convo') for (const l of convoListeners) l(m);
     else for (const l of termListeners) l(m);

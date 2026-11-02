@@ -64,7 +64,8 @@ for (let i = 0; i < argv.length; i++) {
     resume = true;
     fork = a === 'fork';
     resumeId = argv[++i];
-  } else if (a === '--settings') {
+  } else if (a === '--setting-sources') i++;
+  else if (a === '--settings') {
     const s = JSON.parse(argv[++i]);
     for (const [ev, list] of Object.entries(s.hooks || {})) hooks[ev] = list?.[0]?.hooks?.[0];
   } else if (a === '-c') {
@@ -633,6 +634,13 @@ process.stdin.on('data', (d) => {
         ctxTokens = 9000;
         W('\r\n\x1b[2K⎿  Compacted\r\n');
         modeLine();
+      } else if (line === '/usage' && kind === 'claude') {
+        // The plan's limits, the way Claude Code's /usage draws them (MOCK_USAGE: 5h,week,fable).
+        const [h5, wk, fb] = (process.env.MOCK_USAGE || '62,41,18').split(',');
+        W('\x1b[2J\x1b[H  Settings  Status   Config   Usage   Stats\r\n\r\n');
+        W(`  Current session\r\n  ${'█'.repeat(Math.round(h5 / 2))}${' '.repeat(52 - Math.round(h5 / 2))}${h5}% used\r\n  Resets 3:59pm (Asia/Seoul)\r\n\r\n`);
+        W(`  Current week (all models)\r\n  ${'█'.repeat(Math.round(wk / 2))}${' '.repeat(52 - Math.round(wk / 2))}${wk}% used\r\n  Resets Nov 6 at 9am (Asia/Seoul)\r\n\r\n`);
+        W(`  Current week (Fable)\r\n  ${'█'.repeat(Math.round(fb / 2))}${' '.repeat(52 - Math.round(fb / 2))}${fb}% used\r\n  Resets Nov 6 at 9am (Asia/Seoul)\r\n\r\n  Esc to cancel\r\n`);
       } else if (line === '/rewind' && kind === 'claude') {
         rewindList();
       } else if (line === '/context' && kind === 'claude') {

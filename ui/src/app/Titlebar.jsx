@@ -7,6 +7,7 @@ import { updateAction } from '../api.js';
 import { Glyph, I } from '../ui/bits.jsx';
 import { keyLabel } from './keys.js';
 import { isMac } from '../util.js';
+import { UsageChip } from '../features/usage/Usage.jsx';
 
 export function Titlebar() {
   const s = useStore((s) => ({ screen: s.screen, selected: s.selected, tasks: s.tasks, projects: s.projects, filter: s.filter, connected: s.connected, loaded: s.loaded, update: s.update, triage: s.triage }));
@@ -61,6 +62,7 @@ export function Titlebar() {
           </span>
         )}
         <UpdatePill u={s.update} />
+        <UsageChip />
         {yours > 0 && (
           <button class={`turnpill ${blocked ? 'hot' : ''} ${s.triage ? 'on' : ''}`} onClick={startTriage} data-tip={blocked ? `${blocked}개가 허락이나 선택을 기다려요 · 차례로 처리` : '차례로 처리'} data-kbd={keyLabel('triage')} data-testid="yours">
             내 차례 <b class="num">{yours}</b>

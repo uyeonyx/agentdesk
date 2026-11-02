@@ -306,6 +306,20 @@ test('rewind and fork: /rewind drops a turn and hands the words back; a fork sta
   for (const x of [t, f]) await call('POST', `/api/tasks/${x.id}/discard`);
 });
 
+test('usage: the title bar reads Claude Code\'s own /usage and shows each limit', async () => {
+  await page.getByTestId('usage').click();
+  const pop = page.getByTestId('usage-pop');
+  await expect(pop).toBeVisible();
+  await expect(pop.getByText('5시간 한도')).toBeVisible({ timeout: 20_000 });
+  await expect(pop.getByText('이번 주 · Fable')).toBeVisible();
+  await expect(pop).toContainText('62%');
+  await expect(page.getByTestId('usage')).toContainText('5시간 62%');
+  await expect(page.getByTestId('usage')).toContainText('주간 41%');
+  await page.screenshot({ path: shots('usage') });
+  await page.keyboard.press('Escape');
+  await expect(pop).toBeHidden();
+});
+
 test('관제 new-session tile: project, start mode and model, then it runs in that mode', async () => {
   await page.getByTestId('view-overview').click();
   await navMode();
