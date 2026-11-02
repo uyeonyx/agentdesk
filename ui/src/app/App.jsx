@@ -10,6 +10,7 @@ import { Settings } from '../features/settings/Settings.jsx';
 import { CommandBar } from '../features/command/CommandBar.jsx';
 import { SheetHost } from '../features/sheets/Sheets.jsx';
 import { TriageDone } from '../features/triage/TriageBar.jsx';
+import { Board, useAway } from '../features/recap/Board.jsx';
 import { ContextMenu } from '../ui/Menu.jsx';
 import { Tooltip } from '../ui/Tooltip.jsx';
 import { Glyph, I } from '../ui/bits.jsx';
@@ -19,6 +20,7 @@ export function App() {
   const task = s.screen === 'task' ? taskOf(s, s.selected) : null;
   const open = task && !task.archived ? task : null;
   const project = open && projectOf(s, open.projectId);
+  useAway();
 
   // A selection that no longer exists (deleted, or put away elsewhere) falls back to home. A task
   // just created can be selected a moment before the live state has it, so wait a little.
@@ -59,6 +61,7 @@ export function App() {
       <input id="cmd-proxy" class="sr-only" tabIndex={-1} aria-hidden="true" />
       <CommandBar />
       <SheetHost />
+      <Board />
       <Toasts />
       <ContextMenu />
       <Tooltip />

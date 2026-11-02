@@ -14,7 +14,8 @@ const sel = () => taskOf(get(), get().selected);
 
 // ---------------------------------------------------------------- everywhere
 key('command', { code: 'KeyK', mod: true, scope: 'global', label: '찾기·명령', group: G }, () => openCommand('all'));
-key('new', { code: 'KeyN', mod: true, scope: 'global', label: '새 작업', group: G }, () => newTask());
+const startNew = () => (get().screen === 'overview' ? set({ composing: true }) : newTask());
+key('new', { code: 'KeyN', mod: true, scope: 'global', label: '새 작업', group: G }, startNew);
 key('files', { code: 'KeyP', mod: true, scope: 'global', label: '파일 열기', group: G }, () => (sel() ? openCommand('files') : false));
 key('settings', { code: 'Comma', mod: true, scope: 'global', label: '설정', group: G }, () => set({ screen: get().screen === 'settings' ? 'task' : 'settings' }));
 key('tab1', { code: 'Digit1', mod: true, scope: 'global', label: '대화', group: G }, () => (sel() ? (set({ screen: 'task' }), setView(get().selected, 'chat')) : false));
@@ -53,8 +54,8 @@ key('archive', { code: 'KeyE', label: '보관', group: N }, () => {
   return false;
 });
 key('pick', { code: 'KeyX', label: '선택', group: N }, () => (get().selected ? togglePick(get().selected) : false));
-key('overview', { code: 'KeyB', label: '관제탑', group: N }, () => set({ screen: get().screen === 'overview' ? 'task' : 'overview' }));
-key('newNav', { code: 'KeyN', label: '', group: N }, () => newTask());
+key('overview', { code: 'KeyB', label: '관제 ↔ 집중', group: N }, () => set({ screen: get().screen === 'overview' ? 'task' : 'overview' }));
+key('newNav', { code: 'KeyN', label: '', group: N }, startNew);
 key('find', { code: 'Slash', label: '찾기', group: N }, () => openCommand('all'));
 key('help', { code: 'Slash', shift: true, label: '단축키', group: N, hint: '?' }, () => set({ cheat: !get().cheat }));
 for (let i = 0; i <= 9; i++) {

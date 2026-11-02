@@ -13,7 +13,7 @@ export const W = {
   allow: '허락',
   deny: '거절',
   reply: '답장',
-  review: '검토',
+  review: '새 결과',
 };
 
 /** Words that used to mean the same things, banned from UI copy (see test/ui-core.test.js). */

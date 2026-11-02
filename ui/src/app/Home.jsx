@@ -44,7 +44,7 @@ export function Home() {
               <h2>
                 내 차례 <span class={`badge ${blocked.length ? 'warn' : 'info'} num`}>{yours.length}</span>
               </h2>
-              <span class="dim">{blocked.length ? `${blocked.length}개가 허락이나 선택을 기다려요` : '답장하거나 검토할 작업이에요'}</span>
+              <span class="dim">{blocked.length ? `${blocked.length}개가 허락이나 선택을 기다려요` : '답장하거나 결과를 볼 작업이에요'}</span>
               <span class="sp" />
               <button class={`btn sm ${blocked.length ? 'warn' : 'primary'}`} onClick={startTriage}>
                 차례로 처리 <kbd>Space</kbd>
@@ -105,7 +105,7 @@ function ProjectCard({ p, tasks, on }) {
         <span class="pc-st">
           {waiting > 0 && <span class="tag warn solid">기다림 {waiting}</span>}
           {yours > 0 && <span class="tag info">답장 {yours}</span>}
-          {review > 0 && <span class="tag ok">검토 {review}</span>}
+          {review > 0 && <span class="tag ok">새 결과 {review}</span>}
           {busy > 0 && (
             <span class="pc-busy">
               <span class="spin xs" /> 작업 중 {busy}

@@ -127,7 +127,7 @@ test('the conversation: markdown replies, agent HTML as plain text, tool calls f
   expect(await convo.locator('b', { hasText: '태그는 글자로' }).count()).toBe(0);
   // Code is highlighted (spans), and the plan sits on top.
   await expect(convo.locator('code .tok-keyword').first()).toBeVisible();
-  await expect(page.getByText(/할 일 \d\/3/)).toBeVisible();
+  await expect(convo.getByText(/할 일 \d\/3/)).toBeVisible();
   const run = convo.locator('[data-kind="run"]').filter({ hasText: '명령' }).first();
   await run.getByRole('button', { expanded: false }).first().click();
   await run.getByRole('button', { name: /npm test/ }).click();
@@ -242,6 +242,95 @@ test('관제탑: a stuck task is answered right on its tile', async () => {
   await tile.getByRole('button', { name: /^1\s*허락$/ }).click();
   await until(t.id, (x) => x?.state !== 'needs_input');
   await page.keyboard.press('b');
+  await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('관제 mosaic: a stuck session gets the big tile, and shrinks back once answered', async () => {
+  const p = await project('repo-mosaic');
+  const stuck = await start(p.id, 'ask before deleting build');
+  const quiet = await start(p.id, 'just answer: 조용히');
+  await until(stuck.id, (x) => !!x?.prompt?.screen?.ready);
+  await until(quiet.id, (x) => x?.state === 'needs_input');
+  await page.getByTestId('view-overview').click();
+  const big = page.locator(`[data-testid="tile"][data-task-id="${stuck.id}"]`);
+  await expect(big).toHaveAttribute('data-z', 'l');
+  await expect(page.locator(`[data-testid="tile"][data-task-id="${quiet.id}"]`)).toHaveAttribute('data-z', 'm');
+  await page.screenshot({ path: shots('mosaic') });
+  await big.getByRole('button', { name: /^1\s*허락$/ }).click();
+  await until(stuck.id, (x) => x?.state !== 'needs_input');
+  await expect(big).not.toHaveAttribute('data-z', 'l');
+  for (const t of [stuck, quiet]) await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('관제 new-session tile: project, start mode and model, then it runs in that mode', async () => {
+  await page.getByTestId('view-overview').click();
+  await navMode();
+  await page.keyboard.press('n');
+  const tile = page.getByTestId('new-tile');
+  await expect(tile).toBeVisible();
+  await tile.getByRole('button', { name: /계획 모드/ }).click();
+  await tile.getByRole('button', { name: 'Sonnet' }).click();
+  await page.getByTestId('new-input').fill('just answer: 계획부터');
+  await page.getByTestId('new-input').press('Enter');
+  await expect(tile).toBeHidden();
+  const made = (await call('GET', '/api/state')).tasks.find((t) => t.title.includes('계획부터'));
+  await until(made.id, (x) => x?.mode === 'plan');
+  await call('POST', `/api/tasks/${made.id}/discard`);
+});
+
+test('focus: the composer bar changes the permission mode, mid-session, with Shift+Tab or the chip', async () => {
+  const p = await project('repo-mode');
+  const t = await start(p.id, 'just answer: 모드');
+  await until(t.id, (x) => x?.state === 'needs_input' && x?.mode === 'default');
+  await toList();
+  await row(t.id).click();
+  const chip = page.getByTestId('mode-chip');
+  await expect(chip).toHaveAttribute('data-mode', 'default');
+  await page.getByTestId('composer').locator('textarea').focus();
+  await page.keyboard.press('Shift+Tab');
+  await until(t.id, (x) => x?.mode === 'acceptEdits');
+  await expect(chip).toHaveAttribute('data-mode', 'acceptEdits');
+  await chip.click();
+  await page.getByRole('option', { name: /계획 모드/ }).click();
+  await until(t.id, (x) => x?.mode === 'plan');
+  await expect(page.getByTestId('composer').locator('textarea')).toHaveAttribute('placeholder', /계획 모드/);
+  await page.screenshot({ path: shots('mode-plan') });
+  await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('focus: recap and a slash command\'s output show in the conversation, not in a terminal', async () => {
+  const p = await project('repo-recap');
+  const t = await start(p.id, 'just answer: 요약 남겨줘 recap');
+  await until(t.id, (x) => x?.state === 'needs_input' && !!x?.recap);
+  await toList();
+  await row(t.id).click();
+  const convo = page.getByTestId('conversation');
+  await expect(convo.getByTestId('recap')).toContainText('다음은 테스트를 더 넣는 거예요');
+  await expect(page.getByTestId('ctx-chip')).toContainText('%');
+  const box = page.getByTestId('composer').locator('textarea');
+  await box.fill('/context');
+  await box.press('Enter');
+  await expect(convo.getByTestId('cmdout')).toContainText('Context Usage');
+  await expect(page.getByTestId('drawer')).toBeHidden();
+  // Typing /model opens the app's own picker (this session only), never the CLI's.
+  await box.fill('/model');
+  await box.press('Enter');
+  await expect(page.getByRole('listbox', { name: '모델' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('a stopped session comes back from its tile', async () => {
+  const p = await project('repo-stopped');
+  const t = await start(p.id, 'just answer: 멈췄다 다시');
+  await until(t.id, (x) => x?.state === 'needs_input');
+  await call('POST', `/api/tasks/${t.id}/stop`);
+  await until(t.id, (x) => x?.state === 'exited');
+  await page.getByTestId('view-overview').click();
+  const tile = page.locator(`[data-testid="tile"][data-task-id="${t.id}"]`);
+  await expect(tile).toHaveAttribute('data-z', 'm');
+  await tile.getByTestId('resume').click();
+  await until(t.id, (x) => x?.running === true);
   await call('POST', `/api/tasks/${t.id}/discard`);
 });
 

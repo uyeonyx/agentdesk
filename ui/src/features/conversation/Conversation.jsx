@@ -121,6 +121,24 @@ const Turn = memo(function Turn({ turn, task, messages, last, onFileRef, entries
               <I n="arrows-minimize" /> 대화를 요약해서 이어가요{it.e.pre ? <span class="num"> · {Math.round(it.e.pre / 1000)}k 토큰</span> : ''}
             </div>
           );
+        if (it.type === 'recap')
+          return (
+            <div key={it.id} class="recap-e" data-testid="recap">
+              <div class="rh">
+                <I n="message-2" /> 요약 · Claude Code가 남김
+              </div>
+              {it.e.text}
+            </div>
+          );
+        if (it.type === 'cmdout')
+          return (
+            <div key={it.id} class={`cmdout-e ${it.e.err ? 'err' : ''}`} data-testid="cmdout">
+              <div class="rh">
+                <I n="terminal-2" /> <code>{it.e.cmd || '명령'}</code> 결과 · 터미널 대신 여기서 보여 줘요
+              </div>
+              <pre>{it.e.text}</pre>
+            </div>
+          );
         if (it.type === 'notice')
           return (
             <div key={it.id} class={`notice ${it.e.level === 'warn' ? 'warn' : ''}`}>

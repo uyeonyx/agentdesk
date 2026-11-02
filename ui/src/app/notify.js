@@ -46,7 +46,7 @@ export function watchTasks() {
       if (!('Notification' in window) || Notification.permission !== 'granted') continue;
       const p = next.projects.find((x) => x.id === t.projectId);
       const ask = askOf(t);
-      const body = ask ? `${ask.label} · ${t.prompt?.command?.text || t.prompt?.title || t.reason}` : t.state === 'review' ? `검토할 것 · ${firstLine(t.summary || t.reply?.md || t.reason)}` : `답장 차례 · ${firstLine(t.reply?.md || t.reason)}`;
+      const body = ask ? `${ask.label} · ${t.prompt?.command?.text || t.prompt?.title || t.reason}` : t.state === 'review' ? `새 결과 · ${firstLine(t.summary || t.reply?.md || t.reason)}` : `답장 차례 · ${firstLine(t.reply?.md || t.reason)}`;
       // A stuck agent stays on screen until looked at: nothing moves until then.
       const n = new Notification(`${p?.name || ''} · ${t.title}`, { body, tag: t.id, requireInteraction: !!ask, silent: settings.sounds });
       n.onclick = () => {

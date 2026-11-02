@@ -1,0 +1,254 @@
+/* A session's settings as chips and pickers: permission mode, model, effort, context. Each mode has
+   its own tone so it's clear which one you're in; amber stays for "waiting on you" only. */
+
+.m- {
+  --mc: var(--text-2);
+}
+.m-edit {
+  --mc: var(--act-edit);
+}
+.m-plan {
+  --mc: var(--ok-text);
+}
+.m-auto {
+  --mc: var(--accent-text);
+}
+.m-mute {
+  --mc: var(--text-2);
+}
+.m-danger {
+  --mc: var(--danger-text);
+}
+
+.mchip,
+.chip2,
+.ctxm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 9px;
+  font-size: 12.5px;
+  font-weight: var(--w-3);
+  color: var(--text-2);
+  white-space: nowrap;
+  flex: none;
+}
+.chip2:hover,
+.ctxm:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.chip2 .dn {
+  font-size: 12px;
+  color: var(--text-3);
+}
+.mchip {
+  font-weight: var(--w-4);
+  color: var(--mc);
+  background: color-mix(in oklab, var(--mc) 13%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--mc) 38%, transparent);
+}
+.mchip.m- {
+  background: var(--bg-active);
+  box-shadow: none;
+}
+.mchip:hover {
+  background: color-mix(in oklab, var(--mc) 20%, transparent);
+}
+.mchip .k {
+  margin-left: 2px;
+  font: var(--w-3) 11px var(--font);
+  color: color-mix(in oklab, var(--mc) 70%, var(--text-3));
+}
+.mchip.ico {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  justify-content: center;
+}
+.ctxm b {
+  font-weight: var(--w-4);
+}
+.ctxm.hi,
+.ctxmini.hi {
+  color: var(--warn-text);
+}
+.ctxm.max,
+.ctxmini.max {
+  color: var(--danger-text);
+}
+.ring {
+  flex: none;
+  transform: rotate(-90deg);
+}
+.ring circle {
+  fill: none;
+  stroke: var(--bg-active);
+  stroke-width: 3.2;
+}
+.ring .fg {
+  stroke: currentColor;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s var(--ease-out);
+}
+.ctxmini {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  font-size: 11.5px;
+  font-weight: var(--w-3);
+  color: var(--text-3);
+}
+.mm {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  font-weight: var(--w-4);
+  color: var(--mc);
+}
+.mm .ti {
+  font-size: 12px;
+}
+
+/* The picker that opens from a chip. */
+.pk-pop {
+  position: fixed;
+  z-index: var(--z-menu);
+  padding: 6px;
+  border-radius: var(--r-3);
+  outline: none;
+  animation: pop-in var(--dur-2) var(--ease-out);
+}
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.pk-h {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px 8px;
+  font-size: 12px;
+  font-weight: var(--w-4);
+  color: var(--text-3);
+}
+.pk-h span {
+  margin-left: auto;
+  font-weight: var(--w-3);
+}
+.pk-li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-align: left;
+}
+.pk-li.on {
+  background: var(--bg-hover);
+}
+.pk-li[aria-selected='true'] {
+  background: var(--bg-active);
+}
+.pk-li:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.pk-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--mc, var(--text-2));
+  background: color-mix(in oklab, var(--mc, var(--text-2)) 14%, transparent);
+}
+.pk-t {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.pk-t b {
+  font-size: 13.5px;
+  font-weight: var(--w-4);
+}
+.pk-t span {
+  font-size: 12px;
+  line-height: 17px;
+  color: var(--text-2);
+}
+.pk-ck {
+  margin-top: 5px;
+  color: var(--accent-text);
+}
+.pk-ctx {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 10px 8px;
+}
+.pk-ctx-n {
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+.pk-ctx-n b {
+  font-size: 16px;
+  color: var(--text);
+}
+.pk-ctx p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-3);
+}
+.pk-bar {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+.pk-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--act-edit);
+}
+.pk-bar.hi i {
+  background: var(--warn-fill);
+}
+.pk-bar.max i {
+  background: var(--danger);
+}
+.pk-acts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pk-acts .sp {
+  flex: 1;
+}
+
+/* The title bar's view switch. */
+.viewsw {
+  flex: none;
+  -webkit-app-region: no-drag;
+}
+.viewsw button {
+  white-space: nowrap;
+  flex: none;
+  height: 26px;
+  padding: 0 11px;
+  gap: 6px;
+  font-size: 13px;
+}

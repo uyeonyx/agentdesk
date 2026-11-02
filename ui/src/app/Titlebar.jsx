@@ -18,9 +18,19 @@ export function Titlebar() {
   return (
     <header class="titlebar" data-testid="titlebar">
       <div class="tb-left">
+        <div class="seg viewsw" role="group" aria-label="보기">
+          <button aria-pressed={s.screen === 'overview'} onClick={() => set({ screen: 'overview' })} data-tip="모든 세션을 한눈에" data-kbd={keyLabel('overview')} data-testid="view-overview">
+            <I n="layout-grid" />
+            관제
+          </button>
+          <button aria-pressed={s.screen === 'task'} onClick={() => set({ screen: 'task' })} data-tip="세션 하나를 자세히" data-kbd={keyLabel('overview')} data-testid="view-focus">
+            <I n="layout-sidebar" />
+            집중
+          </button>
+        </div>
         <nav class="crumbs" aria-label="지금 위치">
           {s.screen === 'overview' ? (
-            <b>관제탑</b>
+            <span class="cr-t">세션 {live.filter((t) => !['merged', 'discarded'].includes(t.state)).length}개</span>
           ) : s.screen === 'settings' ? (
             <b>설정</b>
           ) : project ? (
@@ -56,9 +66,6 @@ export function Titlebar() {
             내 차례 <b class="num">{yours}</b>
           </button>
         )}
-        <button class={`ibtn ${s.screen === 'overview' ? 'on' : ''}`} onClick={() => set({ screen: s.screen === 'overview' ? 'task' : 'overview' })} data-tip="관제탑" data-kbd={keyLabel('overview')} aria-label="관제탑">
-          <I n="layout-dashboard" />
-        </button>
         <button class={`ibtn ${s.screen === 'settings' ? 'on' : ''}`} onClick={() => set({ screen: s.screen === 'settings' ? 'task' : 'settings' })} data-tip="설정" data-kbd={keyLabel('settings')} aria-label="설정">
           <I n="settings" />
         </button>

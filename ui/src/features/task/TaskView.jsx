@@ -13,6 +13,7 @@ import { Composer } from '../composer/Composer.jsx';
 import { Review } from '../review/Review.jsx';
 import { Files } from '../files/Files.jsx';
 import { Drawer } from '../terminal/Drawer.jsx';
+import { FocusSide } from './FocusSide.jsx';
 import { TriageBar } from '../triage/TriageBar.jsx';
 import { openMenuAt } from '../../ui/Menu.jsx';
 import { Glyph, I, Spinner, roomVars, useNow } from '../../ui/bits.jsx';
@@ -41,8 +42,9 @@ export function TaskView({ task, project }) {
     <section class="task room-scope" style={roomVars(project?.color)} data-testid="task" data-task-id={task.id} data-state={blocked ? 'blocked' : task.state}>
       <Header task={task} project={project} view={view} />
       {s.triage && !s.triage.done && <TriageBar />}
-      <div class="task-body">
+      <div class={`task-body ${view === 'chat' ? 'has-side' : ''}`}>
         {view === 'chat' && <Conversation task={task} project={project} dock={dock} />}
+        {view === 'chat' && <FocusSide task={task} />}
         {view === 'review' && <Review task={task} project={project} />}
         {view === 'files' && <Files task={task} project={project} />}
       </div>
@@ -53,7 +55,6 @@ export function TaskView({ task, project }) {
 
 function Header({ task, project, view }) {
   const [editing, setEditing] = useState(false);
-  const canMerge = task.isolated && !task.adopted && task.changes?.files > 0 && isLive(task);
   const menuBtn = (e) => openMenuAt(e.currentTarget, taskItems(task));
   return (
     <header class="th">
@@ -126,16 +127,6 @@ function Header({ task, project, view }) {
         ))}
       </div>
       <div class="th-act">
-        {canMerge && (
-          <>
-            <button class="btn sm" onClick={() => openModal('pr', { taskId: task.id })}>
-              <I n="git-pull-request" /> PR
-            </button>
-            <button class="btn sm primary" onClick={() => openModal('merge', { taskId: task.id })}>
-              <I n="git-merge" /> 머지
-            </button>
-          </>
-        )}
         {task.prUrl && (
           <a class="btn sm ghost" href={task.prUrl} target="_blank" rel="noopener noreferrer">
             <I n="external-link" /> PR

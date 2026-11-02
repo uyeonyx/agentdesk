@@ -10,14 +10,22 @@ import { fuzzyFilter, isMac } from '../../util.js';
 import { setComposer } from '../../app/focus.js';
 import { loadFiles } from '../files/Files.jsx';
 import { I, useListNav } from '../../ui/bits.jsx';
+import { api } from '../../api.js';
+import { toast } from '../../store.js';
+import { modeOf, nextMode } from '../../core/session.js';
+import { ModeChip, ModelChip, EffortChip, CtxChip, changeMode, compact } from '../session/Pickers.jsx';
 
 // Commands that open their own screen in the CLI: after sending, the raw terminal opens to show it.
-const INTERACTIVE = new Set(['/model', '/config', '/mcp', '/resume', '/agents', '/permissions', '/login', '/logout', '/hooks', '/memory', '/status', '/doctor', '/ide', '/theme', '/approvals']);
+const INTERACTIVE = new Set(['/config', '/mcp', '/resume', '/agents', '/permissions', '/login', '/logout', '/hooks', '/memory', '/status', '/doctor', '/ide', '/theme', '/approvals']);
+// Claude Code commands this window answers itself. /model and /effort typed in the CLI would also
+// save the choice as the person's default; the chips change them for this session only.
+const OWN = { '/model': 'model', '/effort': 'effort' };
 const SLASH = {
   claude: [
     ['/compact', '대화를 요약해서 문맥을 비워요'],
     ['/clear', '대화를 새로 시작해요'],
-    ['/model', '모델 바꾸기'],
+    ['/model', '모델 바꾸기 · 이 세션만'],
+    ['/effort', '노력 수준 · 이 세션만'],
     ['/cost', '이번 세션 비용'],
     ['/context', '문맥 사용량'],
     ['/review', '변경 리뷰'],
@@ -74,6 +82,15 @@ export function Composer({ task, project, blocked }) {
   async function doSend() {
     if (!canSend || busy) return;
     const first = s.draft.trim().split(/\s/)[0];
+    if (task.agent !== 'codex' && OWN[first]) {
+      setDraft('');
+      set({ openPick: OWN[first] });
+      return;
+    }
+    if (task.agent !== 'codex' && first === '/compact' && s.draft.trim() === '/compact') {
+      setDraft('');
+      return compact(task);
+    }
     setBusy(true);
     const ok = await sendMessage(task.id);
     setBusy(false);
@@ -107,7 +124,15 @@ export function Composer({ task, project, blocked }) {
   };
 
   const onKeyDown = (e) => {
-    if (pop && popKeys.current?.(e)) return;
+    // A command typed out in full: Enter runs it instead of picking it from the list again.
+    const exact = pop?.kind === 'slash' && e.key === 'Enter' && !e.shiftKey && (SLASH[task.agent] || SLASH.claude).some(([c]) => c === s.draft.trim());
+    if (exact) setPop(null);
+    else if (pop && popKeys.current?.(e)) return;
+    // Like Claude Code: Shift+Tab goes to the next permission mode, even while it works.
+    if (e.key === 'Tab' && e.shiftKey && task.agent !== 'codex' && task.running) {
+      e.preventDefault();
+      return changeMode(task, nextMode(task.mode || 'default'));
+    }
     if (e.key === 'Escape') {
       if (pop) {
         e.preventDefault();
@@ -147,11 +172,12 @@ export function Composer({ task, project, blocked }) {
   };
 
   const popKeys = useRef();
-  const placeholder = task.watching ? '' : gated ? '원본 터미널에서 먼저 답해 주세요' : stopped ? '보내면 세션을 재개하고 이어서 지시해요' : yourTurn ? '답장을 적어 주세요' : task.state === 'working' ? '작업 중이에요 · 보내면 다음 지시로 이어가요' : '에이전트에게 지시하기';
+  const planning = task.agent !== 'codex' && task.mode === 'plan';
+  const placeholder = task.watching ? '' : gated ? '원본 터미널에서 먼저 답해 주세요' : stopped ? '보내면 세션을 재개하고 이어서 지시해요' : planning ? '계획 모드 · 코드는 바꾸지 않고 계획만 세워요' : yourTurn ? '답장을 적어 주세요' : task.state === 'working' ? '작업 중이에요 · 보내면 다음 지시로 이어가요' : '에이전트에게 지시하기 · / 명령';
   const pills = s.comments.length + s.refs.length + s.images.length;
 
   return (
-    <div class={`composer glass-2 lens ${nudge ? 'nudge' : ''}`} data-testid="composer" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
+    <div class={`composer glass-2 lens ${nudge ? 'nudge' : ''} ${task.agent !== 'codex' ? `m-${modeOf(task.mode || 'default').tone}` : ''}`} data-testid="composer" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
       {pills > 0 && (
         <div class="cp-pills">
           {s.comments.map((c) => (
@@ -206,6 +232,20 @@ export function Composer({ task, project, blocked }) {
           <I n={stopped ? 'player-play' : 'arrow-up'} />
         </button>
       </div>
+      {task.agent !== 'codex' && !task.watching && (
+        <div class="cp-bar">
+          <ModeChip task={task} hint />
+          <ModelChip task={task} />
+          <EffortChip task={task} />
+          <span class="sp" />
+          <CtxChip task={task} onDetail={task.running ? () => api('POST', `/api/tasks/${task.id}/send`, { text: '/context' }).catch((e) => toast(e.message, { kind: 'err' })) : null} />
+          {task.ctx && (
+            <button type="button" class="chip2" onClick={() => compact(task)} disabled={!task.running || task.state === 'working'} data-tip="대화를 요약해서 문맥을 비워요 · /compact">
+              <I n="arrows-minimize" /> 압축
+            </button>
+          )}
+        </div>
+      )}
       {nudge && <div class="cp-nudge">신중 모드예요 · {isMac ? '⌘↵' : 'Ctrl+↵'}로 보내요</div>}
       {pop?.kind === 'file' && <FilePop task={task} q={pop.q} onPick={(p) => insert('@' + p)} keys={popKeys} />}
       {pop?.kind === 'slash' && <SlashPop agent={task.agent} q={pop.q} onPick={(c) => insert(c)} keys={popKeys} />}

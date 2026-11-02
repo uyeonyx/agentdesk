@@ -6,7 +6,7 @@ const CAT_ORDER = ['cmd', 'read', 'edit', 'search', 'web', 'mcp', 'code', 'ask',
 
 /**
  * @param entries top-level entries in order (children of subagents are fetched separately)
- * @returns {{ id, user, items, end }[]} items: {type:'reply'|'thinking'|'notice'|'compact'|'agent'|'run', ...}
+ * @returns {{ id, user, items, end }[]} items: {type:'reply'|'thinking'|'notice'|'compact'|'recap'|'cmdout'|'agent'|'run', ...}
  */
 export function groupTurns(entries) {
   const turns = [];
@@ -38,7 +38,7 @@ export function groupTurns(entries) {
     }
     run = null;
     if (e.kind === 'agent') turn.items.push({ type: 'agent', id: e.id, e });
-    else if (e.kind === 'reply' || e.kind === 'thinking' || e.kind === 'notice' || e.kind === 'compact') turn.items.push({ type: e.kind, id: e.id, e });
+    else if (['reply', 'thinking', 'notice', 'compact', 'recap', 'cmdout'].includes(e.kind)) turn.items.push({ type: e.kind, id: e.id, e });
   }
   return turns;
 }

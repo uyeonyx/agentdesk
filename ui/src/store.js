@@ -36,6 +36,16 @@ let state = {
   railHidden: load('railHidden', false),
   drawer: load('drawer', { open: false, tab: 'agent', h: 280 }),
   treeOpen: load('treeOpen', false),
+  // 관제: 'mosaic' sizes tiles by what needs me; 'grid' keeps them equal. Pins stay big.
+  ovLayout: load('ovLayout', 'mosaic'),
+  ovPins: load('ovPins', []),
+  ovDone: false,
+  composing: false, // the new-session tile is open
+  newDraft: load('newDraft', null), // { projectId, agent, mode, model } it starts with
+  board: null, // the recap board: 'all' | 'away'
+  openPick: null, // a session chip to open: 'model' | 'effort' (typed as a slash command)
+  awayAt: 0, // when the window lost focus, for "while you were away"
+  boardSince: 0, // the away board shows recaps newer than this
   // Layers on top.
   modal: null, // { kind, ... }
   command: null, // the command bar: { mode: 'all'|'new'|'files'|'theme', query }
@@ -66,7 +76,7 @@ function load(k, d) {
     return d;
   }
 }
-const PERSIST = ['screen', 'selected', 'filter', 'views', 'collapsed', 'railW', 'railHidden', 'drawer', 'treeOpen', 'drafts', 'comments', 'settings'];
+const PERSIST = ['screen', 'selected', 'filter', 'views', 'collapsed', 'railW', 'railHidden', 'drawer', 'treeOpen', 'drafts', 'comments', 'settings', 'ovLayout', 'ovPins', 'newDraft'];
 
 export function get() {
   return state;

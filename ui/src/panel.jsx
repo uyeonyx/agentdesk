@@ -107,7 +107,7 @@ function Item({ t, p, focused, onFocus }) {
             {t.title}
           </button>
         </span>
-        {ask ? <span class="askchip">{ask.short}</span> : t.state === 'review' ? <span class="pn-tag">검토</span> : <span class="pn-tag">답장</span>}
+        {ask ? <span class="askchip">{ask.short}</span> : t.state === 'review' ? <span class="pn-tag">새 결과</span> : <span class="pn-tag">답장</span>}
       </div>
       {blocked && t.prompt ? (
         <PromptCard task={t} project={p} compact focus={focused} />
@@ -115,7 +115,7 @@ function Item({ t, p, focused, onFocus }) {
         <div class="pn-b">
           <p>{whyOf(t)}</p>
           <button class="btn sm" onClick={() => window.desk.open(t.id, 'review')}>
-            <I n="git-compare" /> 검토하기
+            <I n="git-compare" /> 결과 보기
           </button>
         </div>
       ) : (

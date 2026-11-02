@@ -69,7 +69,7 @@ export function tagOf(t) {
   const ask = askOf(t);
   if (ask) return { label: ask.short, tone: 'warn', solid: true };
   if (t.state === 'needs_input') return { label: '답장', tone: 'info' };
-  if (t.state === 'review') return { label: '검토', tone: 'ok' };
+  if (t.state === 'review') return { label: '새 결과', tone: 'ok' };
   if (t.state === 'waiting') return { label: '대기', tone: 'muted' };
   return null;
 }
@@ -79,7 +79,7 @@ export const STATE_LABEL = {
   working: '작업 중',
   waiting: '대기 중',
   needs_input: '답장 차례',
-  review: '검토할 것',
+  review: '새 결과',
   exited: '멈춤',
   merged: '머지함',
   discarded: '버림',
