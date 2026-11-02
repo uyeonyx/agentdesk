@@ -263,3 +263,44 @@ export function effortSliderFromLines(lines) {
   }
   return '';
 }
+
+/**
+ * Claude Code's /rewind list ("Restore the code and/or conversation to the point before…"): the
+ * text under the cursor, `(current)` at the bottom. null when the list isn't on screen.
+ */
+export function rewindCursorFromLines(lines) {
+  let top = -1;
+  for (let y = lines.length - 1; y >= 0; y--) {
+    if (/Restore the code and\/or conversation to the point before/i.test(lines[y])) {
+      top = y;
+      break;
+    }
+  }
+  if (top < 0) return null;
+  for (let y = top + 1; y < lines.length; y++) {
+    if (/Enter to continue|Esc to cancel/i.test(lines[y])) break;
+    const m = lines[y].match(/^\s+❯\s+(.*?)\s*$/);
+    if (m) return m[1];
+  }
+  return '';
+}
+
+/** The step after picking a message: which digit restores what. null when it isn't on screen. */
+export function rewindChoicesFromLines(lines) {
+  if (!lines.some((l) => /Confirm you want to restore/i.test(l))) return null;
+  const out = {};
+  for (const l of lines) {
+    const m = l.match(/(\d)\.\s+(Restore code and conversation|Restore conversation|Restore code|Summarize from here|Summarize up to here|Never mind)\b/i);
+    if (m) out[m[2].toLowerCase()] = m[1];
+  }
+  return out;
+}
+
+/** Does a line of the rewind list show this message? The list shows its first line, maybe cut short. */
+export function sameMessage(shown, text) {
+  const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+  const a = norm(shown).replace(/(…|\.\.\.)$/, '').trim();
+  const b = norm(String(text || '').split('\n').find((l) => l.trim()) || '');
+  if (a.length < 2 || !b) return false;
+  return b.startsWith(a) || a.startsWith(b);
+}

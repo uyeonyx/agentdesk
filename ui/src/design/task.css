@@ -1383,3 +1383,33 @@
   font-family: var(--font-mono);
   font-size: 12px;
 }
+
+/* Rewind and fork on a message I sent: Claude Code's own /rewind and --fork-session. */
+.umsg-act .btn.xs {
+  height: 22px;
+  padding: 0 7px;
+  gap: 4px;
+  font-size: 12px;
+  border-radius: 6px;
+}
+.umsg-act .btn.xs .ti {
+  font-size: 13px;
+}
+.rw {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: var(--r-2);
+  font-size: var(--fs-2);
+  color: var(--text-2);
+  background: var(--bg-hover);
+}
+.rw > .ti {
+  flex: none;
+  color: var(--text-3);
+}
+.rw .sp {
+  flex: 1;
+}

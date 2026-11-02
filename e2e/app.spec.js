@@ -44,6 +44,7 @@ test.beforeAll(async () => {
     AGENTDESK_TRANSCRIPT_ROOTS: path.join(tmp, 'transcripts'),
     CODEX_HOME: path.join(tmp, 'codex-home'),
     CLAUDE_CONFIG_DIR: path.join(tmp, 'claude-home'),
+    MOCK_REWIND_LOG: path.join(tmp, 'rewind.log'),
   };
   fs.mkdirSync(env.MOCK_TRANSCRIPT_DIR, { recursive: true });
   const exe = process.env.AGENTDESK_E2E_EXE;
@@ -262,6 +263,47 @@ test('관제 mosaic: a stuck session gets the big tile, and shrinks back once an
   await until(stuck.id, (x) => x?.state !== 'needs_input');
   await expect(big).not.toHaveAttribute('data-z', 'l');
   for (const t of [stuck, quiet]) await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
+test('rewind and fork: /rewind drops a turn and hands the words back; a fork starts from before a message', async () => {
+  const p = await project('repo-rewind');
+  const t = await start(p.id, 'just answer: 첫 지시');
+  await until(t.id, (x) => x?.state === 'needs_input');
+  await call('POST', `/api/tasks/${t.id}/send`, { text: 'create notes/second.md 두 번째 지시' });
+  await until(t.id, (x) => x?.state === 'review' && x.changes?.files > 0);
+  const wt = (await task(t.id)).worktreeAbs;
+  expect(fs.existsSync(path.join(wt, 'notes/second.md'))).toBe(true);
+  await toList();
+  await row(t.id).click();
+  const convo = page.getByTestId('conversation');
+  const second = convo.locator('.umsg').filter({ hasText: '두 번째 지시' });
+  await second.hover();
+  await second.getByTestId('rewind').click();
+  await page.getByTestId('rewind-go').click();
+  // The CLI dropped the turn, the files went back, the words came back to the composer.
+  await expect(page.getByTestId('composer').locator('textarea')).toHaveValue(/두 번째 지시/, { timeout: 15_000 });
+  await expect(convo.getByText(/지시 전으로 되감았어요/)).toBeVisible();
+  await expect(convo.locator('.umsg').filter({ hasText: '두 번째 지시' })).toHaveCount(0);
+  await expect.poll(() => fs.existsSync(path.join(wt, 'notes/second.md'))).toBe(false);
+  // …and the CLI's own input box is empty again, so the next message isn't glued to it.
+  expect((await call('GET', `/api/tasks/${t.id}/screen?lines=6`)).lines.join('\n')).not.toContain('두 번째 지시');
+  const log = fs.readFileSync(process.env.MOCK_REWIND_LOG_E2E || path.join(tmp, 'rewind.log'), 'utf8');
+  expect(log).toContain('"choice":"2"');
+  // A fork from before the first message's follow-up: same history up to there, its own folder.
+  await page.getByTestId('composer').locator('textarea').fill('');
+  await call('POST', `/api/tasks/${t.id}/send`, { text: 'just answer: 세 번째 지시' });
+  await until(t.id, (x) => x?.state === 'needs_input' && x.messages.some((m) => m.text.includes('세 번째') && !m.undone));
+  const third = convo.locator('.umsg').filter({ hasText: '세 번째 지시' });
+  await third.hover();
+  await third.getByTestId('fork').click();
+  await expect.poll(async () => (await call('GET', '/api/state')).tasks.filter((x) => x.forkOf?.id === t.id).length, { timeout: 15_000 }).toBe(1);
+  const f = (await call('GET', '/api/state')).tasks.find((x) => x.forkOf?.id === t.id);
+  expect(f.worktreeAbs).not.toBe(wt);
+  await expect(page.getByTestId('conversation').getByText(/갈라졌어요/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('conversation').locator('.umsg').filter({ hasText: '첫 지시' })).toBeVisible();
+  await expect(page.getByTestId('conversation').locator('.umsg').filter({ hasText: '세 번째 지시' })).toHaveCount(0);
+  await page.screenshot({ path: shots('fork') });
+  for (const x of [t, f]) await call('POST', `/api/tasks/${x.id}/discard`);
 });
 
 test('관제 new-session tile: project, start mode and model, then it runs in that mode', async () => {

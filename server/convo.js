@@ -67,7 +67,11 @@ class Convo {
   /** The main transcript: from the hook when we have it, else found by session id (Codex: by folder). */
   locate() {
     const t = this.task;
-    if (t.agent === 'claude') return t.transcriptPath && fs.existsSync(t.transcriptPath) ? t.transcriptPath : claudeTranscriptOf(t.watch?.sessionId || t.sessionId);
+    if (t.agent === 'claude') {
+      if (t.transcriptPath && fs.existsSync(t.transcriptPath)) return t.transcriptPath;
+      // A fork shows the history it was cut from until it writes its own.
+      return claudeTranscriptOf(t.watch?.sessionId || t.sessionId) || (t.forkSrc?.file && fs.existsSync(t.forkSrc.file) ? t.forkSrc.file : null);
+    }
     if (t.watch?.file && fs.existsSync(t.watch.file)) return t.watch.file;
     return t.cwd ? findRollout(t.cwd, (t.createdAt || 0) - 60_000) : null;
   }

@@ -76,6 +76,8 @@ export const AGENTS = {
       if (resume && sessionId) {
         args.push(`--resume=${sessionId}`);
         if (fork) args.push('--fork-session');
+        // The fork's own id, known up front like a new session's.
+        if (fork && newSessionId) args.push(`--session-id=${newSessionId}`);
       } else if (resume) args.push('--continue');
       else {
         if (newSessionId) args.push(`--session-id=${newSessionId}`);

@@ -204,6 +204,7 @@ const notifyCodex = (obj) => kind === 'codex' && notify && spawn(notify[0], [...
 
 let busy = null;
 let menuOpen = false;
+const prompts = []; // what the person sent, oldest first: what /rewind lists
 let pendingAfterMenu = null;
 
 function finish(text) {
@@ -271,6 +272,7 @@ function work(text) {
     return;
   }
   hook('UserPromptSubmit', { prompt: text });
+  prompts.push(text);
   // Both agents keep the conversation on disk, prompt and reply, the way the real ones do.
   userLine(text);
   thinkLine('요청을 살펴보는 중');
@@ -484,6 +486,81 @@ function planMode(text) {
   };
 }
 
+/**
+ * Claude Code's /rewind: the messages I sent, "(current)" at the bottom; ↑↓ and Enter, then which
+ * part to restore by digit. Restoring the conversation drops those prompts and puts the picked
+ * message back in the input box (the real CLI does the same).
+ */
+function rewindList() {
+  let at = prompts.length; // on "(current)"
+  const draw = () => {
+    W('\x1b[2J\x1b[H');
+    W(' Rewind\r\n Restore the code and/or conversation to the point before…\r\n');
+    prompts.forEach((p, i) => W(`${i === at ? '   ❯ ' : '     '}${p.split('\n')[0].slice(0, 90)}\r\n     No code changes\r\n`));
+    W(`${at === prompts.length ? '   ❯ ' : '     '}(current)\r\n Enter to continue · Esc to cancel\r\n`);
+  };
+  draw();
+  form = (k) => {
+    if (k === '\x1b[A') at = Math.max(0, at - 1);
+    else if (k === '\x1b[B') at = Math.min(prompts.length, at + 1);
+    else if (k === '\x1b') {
+      form = null;
+      W('\x1b[2J\x1b[H');
+      modeLine();
+      return;
+    } else if (k === '\r') {
+      if (at === prompts.length) {
+        form = null;
+        W('\x1b[2J\x1b[H');
+        modeLine();
+        return;
+      }
+      const picked = prompts[at];
+      W('\x1b[2J\x1b[H');
+      W(` Rewind\r\n Confirm you want to restore to the point before you sent this message:\r\n │ ${picked.split('\n')[0]}\r\n This message and everything after it will be removed.\r\n`);
+      W(' ❯ 1. Restore code and conversation\r\n   2. Restore conversation\r\n   3. Restore code\r\n   4. Summarize from here\r\n   5. Never mind\r\n');
+      form = (d) => {
+        if (!/^[1-5]$/.test(d) && d !== '\x1b') return;
+        form = null;
+        if (process.env.MOCK_REWIND_LOG) fs.appendFileSync(process.env.MOCK_REWIND_LOG, JSON.stringify({ sid, picked, choice: d }) + '\n');
+        W('\x1b[2J\x1b[H');
+        if (d === '1' || d === '2') {
+          prompts.splice(at);
+          // The message comes back into the input box.
+          buf = picked;
+          modeLine();
+          W(picked);
+        } else modeLine();
+      };
+      return;
+    }
+    if (form) draw();
+  };
+}
+
+// --fork-session: the new session starts as a copy of the one it was resumed from.
+if (kind === 'claude' && fork && resumeId) {
+  const roots = [process.env.CLAUDE_CONFIG_DIR && path.join(process.env.CLAUDE_CONFIG_DIR, 'projects'), process.env.MOCK_TRANSCRIPT_DIR].filter(Boolean);
+  let from;
+  for (const r of roots) {
+    if (from || !fs.existsSync(r)) continue;
+    const direct = path.join(r, `${resumeId}.jsonl`);
+    if (fs.existsSync(direct)) from = direct;
+    else for (const d of fs.readdirSync(r)) if (fs.existsSync(path.join(r, d, `${resumeId}.jsonl`))) from = path.join(r, d, `${resumeId}.jsonl`);
+  }
+  if (from) {
+    for (const l of fs.readFileSync(from, 'utf8').split('\n')) {
+      if (!l.trim()) continue;
+      try {
+        const e = JSON.parse(l);
+        fs.appendFileSync(transcriptPath(), JSON.stringify({ ...e, sessionId: sid }) + '\n');
+        if (e.uuid) last[''] = e.uuid;
+        if (e.type === 'user' && typeof e.message?.content === 'string') prompts.push(e.message.content);
+      } catch {}
+    }
+  }
+}
+
 const remoteLine = () => W(`\r\n\x1b[2m/remote-control is active · Continue on your phone: https://claude.ai/code/session_mock${String(process.pid)}\x1b[0m\r\n> `);
 W(`\x1b[1mMock ${kind}\x1b[0m ${resume ? `(resumed${resumeId ? ' ' + resumeId : ''}${fork ? ' as fork' : ''})` : ''} session ${sid} ${name ? `"${name}"` : ''} in ${process.cwd()}\r\n> `);
 if (kind === 'claude') {
@@ -556,12 +633,18 @@ process.stdin.on('data', (d) => {
         ctxTokens = 9000;
         W('\r\n\x1b[2K⎿  Compacted\r\n');
         modeLine();
+      } else if (line === '/rewind' && kind === 'claude') {
+        rewindList();
       } else if (line === '/context' && kind === 'claude') {
         tline({ type: 'system', subtype: 'local_command', content: '<command-name>/context</command-name>\n<command-message>context</command-message>\n<command-args></command-args>' });
         tline({ type: 'system', subtype: 'local_command', content: `<local-command-stdout>Context Usage\n${Math.round(ctxTokens / 1000)}k/200k tokens (${Math.round(ctxTokens / 2000)}%)\nMessages: ${Math.round(ctxTokens / 1000) - 12}k</local-command-stdout>` });
         W('\r\n\x1b[2K⎿  Context Usage\r\n');
         modeLine();
       } else if (line) work(line);
+    } else if (ch === '\x15') {
+      // Ctrl+U: the whole line goes.
+      W('\r\x1b[2K> ');
+      buf = '';
     } else if (ch === '\x7f') {
       buf = buf.slice(0, -1);
       W('\b \b');

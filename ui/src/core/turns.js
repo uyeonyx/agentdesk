@@ -8,6 +8,31 @@ const CAT_ORDER = ['cmd', 'read', 'edit', 'search', 'web', 'mcp', 'code', 'ask',
  * @param entries top-level entries in order (children of subagents are fetched separately)
  * @returns {{ id, user, items, end }[]} items: {type:'reply'|'thinking'|'notice'|'compact'|'recap'|'cmdout'|'agent'|'run', ...}
  */
+const hhmm = (at) => new Date(at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+
+/**
+ * What the session no longer has: entries inside a rewound range go, with a note where it happened.
+ * A fork gets a note where its own part starts. Entries without a time stay.
+ */
+export function applyCuts(entries, task) {
+  const cuts = task?.cuts || [];
+  const fork = task?.forkOf;
+  if (!cuts.length && !fork) return entries;
+  const out = [];
+  const notes = cuts.map((c, i) => ({ at: c.to, e: { id: `cut-${i}-${c.to}`, kind: 'notice', at: c.to, text: `${hhmm(c.from + 1500)}에 보낸 지시 전으로 되감았어요 · 그 뒤의 대화와 파일 변경은 지웠어요` } }));
+  if (fork) notes.push({ at: task.createdAt || 0, e: { id: `fork-${task.id}`, kind: 'notice', at: task.createdAt || 0, text: `「${fork.title}」에서 ${hhmm(fork.at)} 지시 전 시점으로 갈라졌어요 · 그때까지의 대화와 파일을 이어받았어요` } });
+  notes.sort((a, b) => a.at - b.at);
+  let n = 0;
+  for (const e of entries) {
+    const at = e.at || 0;
+    while (n < notes.length && at && at > notes[n].at) out.push(notes[n++].e);
+    if (at && cuts.some((c) => at >= c.from && at <= c.to)) continue;
+    out.push(e);
+  }
+  while (n < notes.length) out.push(notes[n++].e);
+  return out;
+}
+
 export function groupTurns(entries) {
   const turns = [];
   let turn = null;

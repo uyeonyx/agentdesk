@@ -199,6 +199,8 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
             return { ok: true };
           case 'fork': {
             const t = tasks.need(id);
+            // Desk's own Claude task: a new session from just before a message (or from now).
+            if (t.agent === 'claude' && !t.watch && !t.imported && t.repos.length) return tasks.view(await tasks.fork(id, body.msgId));
             const sid = t.watch?.sessionId || t.sessionId;
             return tasks.view(await tasks.adopt({ agent: t.agent, sessionId: sid, mode: 'fork' }));
           }
@@ -228,6 +230,8 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
             return await tasks.setEffort(id, body.effort);
           case 'compact':
             return await tasks.compact(id);
+          case 'rewind':
+            return await tasks.rewind(id, body.msgId);
         }
       }
     }

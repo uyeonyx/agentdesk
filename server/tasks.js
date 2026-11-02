@@ -11,7 +11,7 @@ import { ConvoHub, legacyEntries } from './convo.js';
 import { httpError, addProject } from './projects.js';
 import { findSession, liveClaude, stopClaude, queueCodex, claudeTranscriptOf } from './sessions.js';
 import { Watcher } from './watch.js';
-import { gateFromLines, menuFromLines, promptTextFromLines, modeFromLines, effortFromLines, effortSliderFromLines, modelMenuFromLines, EFFORT_WORDS } from './screen.js';
+import { gateFromLines, menuFromLines, promptTextFromLines, modeFromLines, effortFromLines, effortSliderFromLines, modelMenuFromLines, EFFORT_WORDS, rewindCursorFromLines, rewindChoicesFromLines, sameMessage } from './screen.js';
 import { buildPrompt, promptView, replyExcerpt } from './prompt.js';
 import { drive, answerLine, Fallback } from './answer.js';
 import { commandsIn } from './shells.js';
@@ -262,6 +262,8 @@ export class Tasks {
       ctx: t.ctx || null,
       recap: t.recap || null,
       pick: t.pick || null,
+      cuts: t.cuts || [],
+      forkOf: t.forkOf || null,
       strip: stripView(t),
       menu,
       prompt: t.state === 'needs_input' && r ? promptView(this.prompts.get(t.id), menu, { careful: !!this.store.project(t.projectId)?.careful }) : null,
@@ -402,6 +404,13 @@ export class Tasks {
 
   spawn(task, { prompt, resume = false, fork = false, fromSession, latest = false } = {}) {
     const ad = AGENTS[task.agent];
+    // A fork that hasn't written its own transcript yet starts again from its cut copy.
+    let forkTo;
+    if (resume && !fork && task.forkSrc && !claudeTranscriptOf(task.sessionId) && fs.existsSync(task.forkSrc.file)) {
+      fork = true;
+      fromSession = task.forkSrc.id;
+      forkTo = task.sessionId;
+    }
     const bin = ad.bin();
     if (!bin) throw httpError(400, `${ad.label} CLI를 찾을 수 없어요`);
     // Don't let a parent agent session or the app's own runtime leak into the child.
@@ -421,7 +430,7 @@ export class Tasks {
       resume,
       fork,
       sessionId: latest ? undefined : fromSession || task.sessionId,
-      newSessionId: resume ? undefined : task.sessionId,
+      newSessionId: resume ? forkTo : task.sessionId,
       remote: task.remote ? this.remoteName(task) : false,
       name: task.agent === 'claude' ? task.title : undefined,
       // Back in the mode it was in; the model and effort picked here, not whatever the default is now.
@@ -768,6 +777,7 @@ export class Tasks {
     let changed = false;
     for (const t of this.store.tasks) {
       if (t.agent !== 'claude' || t.archived) continue;
+      if (t.forkSrc) this.dropForkSrc(t);
       const r = this.rt.get(t.id);
       const m = this.meta(t);
       // Stopped ones only need reading once.
@@ -952,6 +962,230 @@ export class Tasks {
       r.proc.write('\r');
       return { ok: true };
     });
+  }
+
+  /** Poll the screen until `test` returns something (not null/false), or give up with null. */
+  async waitScreen(r, test, ms = 4000) {
+    const t0 = Date.now();
+    while (Date.now() - t0 < ms) {
+      await new Promise((res) => r.term.write('', res));
+      const v = test(this.screenLines(r));
+      if (v != null && v !== false) return v;
+      await delay(120);
+    }
+    return null;
+  }
+
+  /**
+   * Back to just before a message with Claude Code's own /rewind: the session drops that message
+   * and everything after it, and the files go back to Desk's snapshot from right before it (which
+   * also covers what shell commands changed; the CLI's checkpoints don't). The message comes back
+   * to the composer to be edited.
+   */
+  async rewind(id, msgId) {
+    const task = this.need(id);
+    if (task.agent !== 'claude') throw httpError(400, 'Claude Code 세션만 되감을 수 있어요');
+    const idx = task.messages.findIndex((m) => m.id === msgId);
+    const msg = task.messages[idx];
+    if (!msg || msg.undone) throw httpError(404, '되감을 지시를 찾지 못했어요');
+    if (msg.source === 'answer') throw httpError(400, '카드에 한 답은 되감을 수 없어요 · 그 앞의 지시를 되감으세요');
+    const r = this.rt.get(id);
+    if (!r) throw httpError(409, '세션이 멈춰 있어요. 먼저 재개하세요.');
+    if (this.menuOf(r)) throw httpError(409, '화면에 질문이 떠 있어요 · 먼저 답해 주세요');
+    await this.checkSnapshots(task, msg);
+    return this.serial(r, async () => {
+      if (['working', 'starting'].includes(task.state)) {
+        r.proc.write('\x1b');
+        await delay(600);
+      }
+      // The same words sent again later sit below it in the list: skip that many matches.
+      let later = task.messages.slice(idx + 1).filter((m) => !m.undone && m.source !== 'answer' && sameMessage(firstLine(m.text), msg.text)).length;
+      const listed = (l) => {
+        const c = rewindCursorFromLines(l);
+        return c === null ? null : c;
+      };
+      r.proc.write('/rewind');
+      await delay(250);
+      r.proc.write('\r');
+      // The first Enter can be taken by the command list; a second one runs it.
+      if ((await this.waitScreen(r, listed, 2500)) == null) {
+        r.proc.write('\r');
+        if ((await this.waitScreen(r, listed, 3000)) == null) {
+          r.proc.write('\x1b');
+          throw httpError(409, 'Claude Code의 되감기 화면을 열지 못했어요 · 원본 터미널에서 /rewind로 해 보세요');
+        }
+      }
+      // Up from "(current)" until the cursor is on that message. At the top the cursor stops.
+      let found = false;
+      let prev = null;
+      let still = 0;
+      for (let i = 0; i < 150; i++) {
+        await new Promise((res) => r.term.write('', res));
+        const lines = this.screenLines(r);
+        const cur = rewindCursorFromLines(lines);
+        if (cur && sameMessage(cur, msg.text)) {
+          if (later === 0) {
+            found = true;
+            break;
+          }
+          later--;
+        }
+        const at = lines.findIndex((l) => /^\s+❯\s/.test(l));
+        if (prev === at && ++still > 3) break;
+        if (prev !== at) still = 0;
+        prev = at;
+        r.proc.write('\x1b[A');
+        await delay(70);
+      }
+      if (!found) {
+        r.proc.write('\x1b');
+        throw httpError(409, '되감을 지시를 Claude Code 목록에서 찾지 못했어요 · 원본 터미널에서 /rewind로 해 보세요');
+      }
+      r.proc.write('\r');
+      const choices = await this.waitScreen(r, rewindChoicesFromLines, 3000);
+      // Files come back from Desk's snapshot. Only without one (not git) the CLI puts them back,
+      // and never in a fork: its checkpoints point at the original session's folder.
+      const cliCode = !msg.snap && !task.forkOf;
+      const key = cliCode && choices?.['restore code and conversation'] ? 'restore code and conversation' : 'restore conversation';
+      const digit = choices?.[key];
+      if (!digit) {
+        r.proc.write('\x1b');
+        await delay(200);
+        r.proc.write('\x1b');
+        throw httpError(409, '되감기 선택지를 읽지 못했어요 · 원본 터미널에서 /rewind로 해 보세요');
+      }
+      r.proc.write(digit);
+      await this.waitScreen(r, (l) => !rewindChoicesFromLines(l) && rewindCursorFromLines(l) === null, 4000);
+      // The CLI puts the message back in its own input box (a moment after the list closes); it
+      // goes to Desk's composer instead, so the box is emptied once it's there.
+      await this.waitScreen(r, () => this.promptText(r) || null, 2000);
+      for (let i = 0; i < 16 && this.promptText(r); i++) {
+        r.proc.write('\x15');
+        await delay(40);
+        r.proc.write('\x7f');
+        await delay(60);
+        await new Promise((res) => r.term.write('', res));
+      }
+      if (msg.snap) await this.restoreSnapshots(task, msg);
+      for (const m of task.messages.slice(idx)) {
+        m.undone = true;
+        m.rewound = true;
+      }
+      task.cuts = [...(task.cuts || []), { from: msg.at - 1500, to: Date.now() }].slice(-20);
+      await this.refreshChanges(task);
+      this.setState(task, 'needs_input', '되감았어요 · 이어서 지시하세요');
+      this.store.save();
+      this.changed();
+      return { ...this.view(task), undoneText: msg.text };
+    });
+  }
+
+  /** In a person's own checkout, refuse to reset files if the branch or commit moved since. */
+  async checkSnapshots(task, msg) {
+    for (const s of msg.snap || []) {
+      const repo = task.repos[s.i];
+      if (!repo?.adopted) continue;
+      const head = await G.head(repo.worktree);
+      const branch = (await G.currentBranch(repo.worktree)) || '';
+      if ((s.parent && head !== s.parent) || branch !== (repo.branch || '')) {
+        throw httpError(409, `${repo.name}: 그 뒤로 이 폴더의 브랜치나 커밋이 바뀌어서 되돌리면 다른 작업까지 지워질 수 있어요. 되돌리지 않았어요.`);
+      }
+    }
+  }
+
+  async restoreSnapshots(task, msg) {
+    for (const s of msg.snap || []) {
+      const repo = task.repos[s.i];
+      if (repo && fs.existsSync(repo.worktree)) await G.restore(repo.worktree, s);
+    }
+  }
+
+  /**
+   * A new session from just before a message (or from now): the conversation up to there and the
+   * files as they were then, in a worktree of its own. The original goes on untouched. Claude Code
+   * forks a copy of the history cut at that message (`--resume <copy> --fork-session`).
+   */
+  async fork(id, msgId) {
+    const task = this.need(id);
+    if (task.agent !== 'claude') throw httpError(400, 'Claude Code 세션만 갈래를 낼 수 있어요');
+    if (task.repos.length !== 1) throw httpError(400, task.repos.length ? '여러 저장소 작업은 아직 갈래를 낼 수 없어요' : 'git 저장소에서만 갈래를 낼 수 있어요');
+    const idx = msgId ? task.messages.findIndex((m) => m.id === msgId) : -1;
+    const msg = msgId ? task.messages[idx] : null;
+    if (msgId && (!msg || msg.source === 'answer')) throw httpError(404, '갈래를 낼 지시를 찾지 못했어요');
+    const src = this.transcriptOf(task);
+    if (!src) throw httpError(409, '이 세션의 대화 기록을 찾지 못했어요 · 한 번이라도 대화한 뒤에 갈래를 낼 수 있어요');
+    const lines = fs.readFileSync(src, 'utf8').split('\n');
+    let cut = lines.length;
+    if (msg) {
+      cut = userLineOf(lines, msg);
+      if (cut < 0) throw httpError(409, '그 지시를 대화 기록에서 찾지 못했어요');
+    }
+    const snap = msg ? msg.snap?.[0] : (await this.snapshotAll(task, 'fork'))?.[0];
+    if (!snap) throw httpError(409, '그 시점의 파일 스냅샷이 없어요');
+    const repo = task.repos[0];
+    const nid = randomId('t');
+    const slug = nid.slice(1);
+    const wt = path.join(repo.repo, '.agentdesk', 'worktrees', slug);
+    const branch = `desk/${slug}`;
+    try {
+      G.excludeFromStatus(repo.repo, '/.agentdesk/');
+      await G.addWorktree(repo.repo, wt, branch, snap.parent || repo.baseRef);
+      await G.restore(wt, snap);
+    } catch (e) {
+      await G.removeWorktree(repo.repo, wt, branch).catch(() => {});
+      throw httpError(500, `갈래 작업 폴더를 만들지 못했어요: ${errText(e)}`);
+    }
+    const tmpId = randomUUID();
+    const tmpFile = path.join(path.dirname(src), `${tmpId}.jsonl`);
+    fs.writeFileSync(tmpFile, lines.slice(0, cut).join('\n') + '\n', { mode: 0o600 });
+    const now = Date.now();
+    const nt = {
+      id: nid,
+      projectId: task.projectId,
+      agent: 'claude',
+      title: `${task.title} · 갈래`,
+      prompt: task.prompt,
+      state: 'starting',
+      reason: '',
+      createdAt: now,
+      updatedAt: now,
+      messages: task.messages
+        .slice(0, msg ? idx : task.messages.length)
+        .filter((m) => !m.undone)
+        .map((m) => ({ ...m, id: randomId('m') })),
+      repos: [{ name: repo.name, prefix: '', repo: repo.repo, worktree: wt, branch, baseRef: snap.parent || repo.baseRef, projectId: repo.projectId }],
+      cwd: wt,
+      activity: emptyActivity(),
+      sessionId: randomUUID(),
+      remote: false,
+      ...(task.mode ? { mode: task.mode } : {}),
+      ...(task.pick ? { pick: { ...task.pick } } : {}),
+      // Until the fork writes its own transcript, it starts (and shows) from this cut copy.
+      forkSrc: { file: tmpFile, id: tmpId },
+      forkOf: { id: task.id, title: task.title, at: msg?.at || now },
+    };
+    this.store.tasks.push(nt);
+    this.store.save();
+    this.spawn(nt, { resume: true });
+    this.changed();
+    return nt;
+  }
+
+  /** The Claude transcript Desk follows for a task. */
+  transcriptOf(t) {
+    if (t.transcriptPath && fs.existsSync(t.transcriptPath)) return t.transcriptPath;
+    return claudeTranscriptOf(t.sessionId) || (t.forkSrc && fs.existsSync(t.forkSrc.file) ? t.forkSrc.file : null);
+  }
+
+  /** A fork's cut copy goes once the fork has written its own transcript. */
+  dropForkSrc(t, force = false) {
+    if (!t.forkSrc) return;
+    if (!force && !claudeTranscriptOf(t.sessionId)) return;
+    try {
+      fs.unlinkSync(t.forkSrc.file);
+    } catch {}
+    delete t.forkSrc;
+    this.store.save();
   }
 
   // ------------------------------------------------------------ screen reading
@@ -1480,6 +1714,7 @@ export class Tasks {
     // Discarding is one step: it also leaves the list (nothing left to clear afterwards).
     task.archived = true;
     this.onGone?.(id);
+    this.dropForkSrc(task, true);
     if (task.imported) {
       this.watchers.delete(id);
       delete task.watch;
@@ -1668,7 +1903,7 @@ export class Tasks {
 /** Tools whose whole job is to ask the person something; the agent waits on the answer. */
 const ASKS_PERSON = new Set(['AskUserQuestion', 'ExitPlanMode']);
 
-const messageView = (m) => ({ id: m.id, text: m.text, at: m.at, undone: !!m.undone, canUndo: !!m.snap && !m.undone, source: m.source });
+const messageView = (m) => ({ id: m.id, text: m.text, at: m.at, undone: !!m.undone, rewound: !!m.rewound, canUndo: !!m.snap && !m.undone, source: m.source });
 
 /** A menu on screen is a permission prompt ("Do you want to proceed?") or some other choice. */
 function askOfMenu(menu) {
@@ -1804,4 +2039,36 @@ function walk(root, max = 20000) {
   };
   go(root, '');
   return out;
+}
+
+const firstLine = (s) => String(s || '').split('\n').find((l) => l.trim()) || '';
+
+/**
+ * The line of a Claude transcript where a message I sent starts (its user entry), or -1. Matched by
+ * its words and time: the first entry with those words from around when it was sent.
+ */
+export function userLineOf(lines, msg) {
+  const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  const want = norm(msg.text);
+  if (!want) return -1;
+  let fallback = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].includes('"user"')) continue;
+    let e;
+    try {
+      e = JSON.parse(lines[i]);
+    } catch {
+      continue;
+    }
+    if (e.type !== 'user' || e.isMeta || e.isSidechain) continue;
+    const c = e.message?.content;
+    const text = typeof c === 'string' ? c : Array.isArray(c) ? (c.find((x) => x?.type === 'text')?.text ?? (c.some((x) => x?.type === 'tool_result') ? null : '')) : null;
+    if (text == null) continue;
+    const got = norm(text);
+    if (!got || !(got.startsWith(want) || want.startsWith(got))) continue;
+    const at = Date.parse(e.timestamp || '') || 0;
+    if (!at || at >= (msg.at || 0) - 20000) return i;
+    fallback = i;
+  }
+  return fallback;
 }

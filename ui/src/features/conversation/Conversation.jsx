@@ -3,10 +3,10 @@
 import { memo } from 'preact/compat';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useConversation } from '../../core/conversation.js';
-import { groupTurns, latestPlan, duration } from '../../core/turns.js';
+import { groupTurns, latestPlan, duration, applyCuts } from '../../core/turns.js';
 import { useStore, set, get } from '../../store.js';
 import { isBlocked } from '../../core/status.js';
-import { openFileInTask, undoMessage } from '../../actions.js';
+import { openFileInTask, undoMessage, rewindMessage, forkFrom } from '../../actions.js';
 import { vscodeLink, isMac, SOURCE_LABEL } from '../../util.js';
 import { Markdown } from '../../md/Markdown.jsx';
 import { I, ago } from '../../ui/bits.jsx';
@@ -20,7 +20,8 @@ const scrolls = new Map();
 
 export function Conversation({ task, project, dock }) {
   const c = useConversation(task.id);
-  const top = useMemo(() => c.list.filter((e) => !e.parent), [c.ver, c.list]);
+  const cutKey = `${(task.cuts || []).map((x) => x.to).join()}|${task.forkOf?.at || ''}`;
+  const top = useMemo(() => applyCuts(c.list.filter((e) => !e.parent), task), [c.ver, c.list, cutKey]);
   const turns = useMemo(() => groupTurns(top), [top]);
   const plan = useMemo(() => latestPlan(top), [top]);
   const [shown, setShown] = useState(FIRST_TURNS);
@@ -157,15 +158,36 @@ function UserMsg({ e, task, messages }) {
   const source = m?.source && !['composer', 'start'].includes(m.source) ? SOURCE_LABEL[m.source] || '' : '';
   const copy = () => window.desk.copy(e.text);
   const rewrite = () => set((s) => ({ drafts: { ...s.drafts, [task.id]: e.text } }));
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  // Claude Code's own rewind and a fork from here; other agents keep Desk's undo.
+  const claude = task.agent !== 'codex' && !task.watching && m && !m.undone && m.source !== 'answer';
+  const canFork = claude && task.isolated && !task.multi;
+  const go = async (fn) => {
+    setBusy(true);
+    await fn();
+    setBusy(false);
+    setAsking(false);
+  };
   return (
     <div class={`umsg ${m?.undone ? 'undone' : ''}`} data-kind="user">
       <div class="umsg-meta">
         <span class="num">{ago(e.at)}</span>
         {source && <span class="src">{source}에서</span>}
-        {m?.undone && <span class="src">되돌림</span>}
+        {m?.undone && <span class="src">{m.rewound ? '되감음' : '되돌림'}</span>}
         <span class="sp" />
         <span class="umsg-act">
-          {m?.canUndo && (
+          {claude && (
+            <button class="btn xs ghost" disabled={!task.running || busy} onClick={() => setAsking(true)} data-tip={task.running ? 'Claude Code 되감기(/rewind) · 이 지시 전으로 대화와 파일을 되돌려요' : '세션을 재개하면 되감을 수 있어요'} data-testid="rewind">
+              <I n="chevrons-left" /> 되감기
+            </button>
+          )}
+          {canFork && (
+            <button class="btn xs ghost" disabled={busy} onClick={() => go(() => forkFrom(task.id, m.id))} data-tip="이 지시 전 시점에서 새 세션을 갈라 내요 · 대화와 파일을 그때 상태로 이어받아요" data-testid="fork">
+              <I n="git-fork" /> 갈래
+            </button>
+          )}
+          {!claude && m?.canUndo && (
             <button class="ibtn sm" onClick={() => undoMessage(task.id, m.id, { text: m.text })} data-tip="되돌리기 · 에이전트를 멈추고 파일을 이 지시 전으로">
               <I n="arrow-back-up" />
             </button>
@@ -179,6 +201,19 @@ function UserMsg({ e, task, messages }) {
         </span>
       </div>
       <div class="umsg-text selectable">{e.text}</div>
+      {asking && (
+        <div class="rw" data-testid="rewind-confirm">
+          <I n="chevrons-left" />
+          <span>이 지시 전으로 대화와 파일을 되돌려요 · 이 지시부터 뒤의 대화는 지워지고, 지시는 입력창으로 돌아와요</span>
+          <span class="sp" />
+          <button class="btn sm ghost" onClick={() => setAsking(false)} disabled={busy}>
+            취소
+          </button>
+          <button class="btn sm primary" onClick={() => go(() => rewindMessage(task.id, m.id))} disabled={busy} data-testid="rewind-go">
+            {busy ? '되감는 중…' : '되감기'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

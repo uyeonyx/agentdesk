@@ -131,6 +131,37 @@ export async function undoMessage(taskId, msgId, restore) {
 }
 
 /**
+ * Claude Code's /rewind to just before a message: the conversation from there on is dropped, the
+ * files go back, and the message returns to the composer to be edited.
+ */
+export async function rewindMessage(taskId, msgId) {
+  const t = taskOf(get(), taskId);
+  try {
+    const r = await api('POST', `/api/tasks/${taskId}/rewind`, { msgId });
+    set((s) => ({ drafts: { ...s.drafts, [taskId]: r.undoneText || '' } }));
+    toast('되감았어요 · 지시를 고쳐서 다시 보내세요', { projectId: t?.projectId });
+    return true;
+  } catch (e) {
+    toast(e.message, { kind: 'err' });
+    return false;
+  }
+}
+
+/** A new session from just before a message (or from now), in its own folder. Opens it. */
+export async function forkFrom(taskId, msgId) {
+  const t = taskOf(get(), taskId);
+  try {
+    const n = await api('POST', `/api/tasks/${taskId}/fork`, msgId ? { msgId } : {});
+    openTask(n.id);
+    toast('새 세션으로 갈라 냈어요 · 원래 세션은 그대로예요', { projectId: t?.projectId, ms: 5000 });
+    return n;
+  } catch (e) {
+    toast(e.message, { kind: 'err' });
+    return null;
+  }
+}
+
+/**
  * A button on a prompt card. On a careful project the first press only arms it (the card does
  * that); `confirm` says it was pressed twice. When the screen isn't what the card expected, the
  * terminal drawer opens so the person can answer there.
