@@ -199,6 +199,8 @@ export function planChoices(menu, { careful = false } = {}) {
 
 // The mode line under Claude Code's input box: "⏵⏵ accept edits on (shift+tab to cycle)".
 const MODE_LINE = [
+  // Claude Code 2.1 names the default too ("⏸ manual mode on"); older ones show nothing.
+  [/manual mode on/i, 'default'],
   [/plan mode on/i, 'plan'],
   [/accept edits on/i, 'acceptEdits'],
   [/bypass permissions on/i, 'bypassPermissions'],

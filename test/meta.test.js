@@ -73,6 +73,8 @@ test('screen: the mode line under the input box, and nothing when a menu covers 
   assert.equal(modeFromLines(rows('❯ \n────\n  ⏸ plan mode on (shift+tab to cycle)')), 'plan');
   assert.equal(modeFromLines(rows('❯ \n────\n  ⏵⏵ auto mode on (shift+tab to cycle)')), 'auto');
   assert.equal(modeFromLines(rows('❯ \n────\n  ? for shortcuts')), 'default');
+  // Claude Code 2.1 names the default mode too.
+  assert.equal(modeFromLines(rows('❯\n────\n우유팩\n⏸ manual mode on · ← 1 agent')), 'default');
   assert.equal(modeFromLines(rows(' Do you want to proceed?\n ❯ 1. Yes\n   2. No')), null);
   // A mode quoted far up in the conversation isn't the mode.
   assert.equal(modeFromLines(rows('I turned plan mode on earlier\n\n\n\n\n\n\n\n❯ \n  ? for shortcuts')), 'default');

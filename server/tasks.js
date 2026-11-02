@@ -261,6 +261,7 @@ export class Tasks {
       effort: t.effort || '',
       ctx: t.ctx || null,
       recap: t.recap || null,
+      pick: t.pick || null,
       strip: stripView(t),
       menu,
       prompt: t.state === 'needs_input' && r ? promptView(this.prompts.get(t.id), menu, { careful: !!this.store.project(t.projectId)?.careful }) : null,
@@ -775,7 +776,8 @@ export class Tasks {
         if (m.poll()) changed = true;
       } catch {}
       if (!r) continue;
-      const lines = this.screenLines(r);
+      // Dim cells dropped: the input box's placeholder ("Try …") would hide the bare prompt.
+      const lines = this.screenLines(r, { skipDim: true });
       const mode = modeFromLines(lines);
       if (mode && mode !== t.mode) {
         t.mode = mode;
@@ -819,7 +821,7 @@ export class Tasks {
     return this.serial(r, async () => {
       for (let i = 0; i < 6; i++) {
         await new Promise((res) => r.term.write('', res));
-        const cur = modeFromLines(this.screenLines(r));
+        const cur = modeFromLines(this.screenLines(r, { skipDim: true }));
         if (cur === mode) {
           task.mode = mode;
           this.store.save();

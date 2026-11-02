@@ -44,6 +44,9 @@ let fork = false;
 let sessionArg;
 let remote = false;
 let name = '';
+let mode = 'default';
+let model = 'claude-opus-5-5';
+let effort = '';
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i];
   const eq = a.match(/^(--[\w-]+)=(.*)$/s);
@@ -53,6 +56,9 @@ for (let i = 0; i < argv.length; i++) {
   } else if (eq && eq[1] === '--session-id') sessionArg = eq[2];
   else if (eq && eq[1] === '--remote-control') remote = eq[2] || true;
   else if (eq && eq[1] === '--name') name = eq[2];
+  else if (eq && eq[1] === '--permission-mode') mode = eq[2];
+  else if (eq && eq[1] === '--model') model = { opus: 'claude-opus-5-5', sonnet: 'claude-sonnet-5-5', haiku: 'claude-haiku-5-5', fable: 'claude-fable-5-1' }[eq[2]] || eq[2];
+  else if (eq && eq[1] === '--effort') effort = eq[2];
   else if (a === '--fork-session') fork = true;
   else if ((a === 'resume' || a === 'fork') && kind === 'codex' && argv[i + 1] && argv[i + 1] !== '--last') {
     resume = true;
@@ -113,7 +119,20 @@ function tline(obj, sub) {
   last[key] = uuid;
 }
 const userLine = (text) => tline({ type: 'user', message: { role: 'user', content: text } });
-const replyLine = (text) => tline({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text }] } });
+// Like the real one: every answer reports the model and what the request sent (the context in use).
+let ctxTokens = 18000;
+const usage = () => ({ input_tokens: 4, cache_creation_input_tokens: 1200, cache_read_input_tokens: (ctxTokens += 9000) });
+const replyLine = (text) => tline({ type: 'assistant', message: { role: 'assistant', model, content: [{ type: 'text', text }], usage: usage() } });
+
+// The line under the input box, and Shift+Tab going round it the way Claude Code does.
+const MODE_TEXT = { default: '? for shortcuts', acceptEdits: '⏵⏵ accept edits on (shift+tab to cycle)', plan: '⏸ plan mode on (shift+tab to cycle)', auto: '⏵⏵ auto mode on (shift+tab to cycle)', bypassPermissions: '⏵⏵ bypass permissions on (shift+tab to cycle)', dontAsk: "⏵⏵ don't ask on (shift+tab to cycle)" };
+const CYCLE = ['default', 'acceptEdits', 'plan', 'auto'];
+const modeLine = () => W(`\r\n\x1b[2K  ${MODE_TEXT[mode] || MODE_TEXT.default}${effort ? `   ◐ ${effort} · /effort` : ''}\r\n> `);
+function cycleMode() {
+  mode = CYCLE[(CYCLE.indexOf(mode) + 1) % CYCLE.length];
+  tline({ type: 'permission-mode', permissionMode: mode });
+  modeLine();
+}
 const thinkLine = (text) => tline({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'thinking', thinking: text, signature: 'mock' }] } });
 
 /** What Claude Code keeps about a finished tool call (toolUseResult), close enough to the real shapes. */
@@ -238,6 +257,7 @@ function finish(text) {
     return;
   }
   tline({ type: 'system', subtype: 'turn_duration', durationMs: 900, isMeta: false });
+  if (/recap|요약/i.test(text)) tline({ type: 'system', subtype: 'away_summary', content: `${reply.slice(0, 60)} 다음은 테스트를 더 넣는 거예요. (disable recaps in /config)` });
   hook('Stop', { last_assistant_message: reply });
   notifyCodex({ type: 'agent-turn-complete', 'last-assistant-message': reply });
 }
@@ -466,6 +486,10 @@ function planMode(text) {
 
 const remoteLine = () => W(`\r\n\x1b[2m/remote-control is active · Continue on your phone: https://claude.ai/code/session_mock${String(process.pid)}\x1b[0m\r\n> `);
 W(`\x1b[1mMock ${kind}\x1b[0m ${resume ? `(resumed${resumeId ? ' ' + resumeId : ''}${fork ? ' as fork' : ''})` : ''} session ${sid} ${name ? `"${name}"` : ''} in ${process.cwd()}\r\n> `);
+if (kind === 'claude') {
+  tline({ type: 'permission-mode', permissionMode: mode });
+  modeLine();
+}
 if (remote) setTimeout(remoteLine, 50);
 if (prompt) setTimeout(() => work(prompt), 200);
 
@@ -494,6 +518,7 @@ process.stdin.on('data', (d) => {
     return;
   }
   if (s === '\x03') process.exit(0);
+  if (s === '\x1b[Z' && kind === 'claude' && !form) return cycleMode();
   if (form) {
     // Keys typed into a form arrive one at a time or as a burst; arrow keys as one sequence.
     if (s.startsWith('\x1b[')) return form(s);
@@ -525,6 +550,17 @@ process.stdin.on('data', (d) => {
       if (line === '/remote-control') {
         remote = true;
         remoteLine();
+      } else if (line === '/compact' && kind === 'claude') {
+        tline({ type: 'system', subtype: 'local_command', content: '<command-name>/compact</command-name>\n<command-message>compact</command-message>\n<command-args></command-args>' });
+        tline({ type: 'system', subtype: 'compact_boundary', compactMetadata: { trigger: 'manual', preTokens: ctxTokens } });
+        ctxTokens = 9000;
+        W('\r\n\x1b[2K⎿  Compacted\r\n');
+        modeLine();
+      } else if (line === '/context' && kind === 'claude') {
+        tline({ type: 'system', subtype: 'local_command', content: '<command-name>/context</command-name>\n<command-message>context</command-message>\n<command-args></command-args>' });
+        tline({ type: 'system', subtype: 'local_command', content: `<local-command-stdout>Context Usage\n${Math.round(ctxTokens / 1000)}k/200k tokens (${Math.round(ctxTokens / 2000)}%)\nMessages: ${Math.round(ctxTokens / 1000) - 12}k</local-command-stdout>` });
+        W('\r\n\x1b[2K⎿  Context Usage\r\n');
+        modeLine();
       } else if (line) work(line);
     } else if (ch === '\x7f') {
       buf = buf.slice(0, -1);
