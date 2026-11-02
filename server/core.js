@@ -220,6 +220,14 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
             return { ok: true };
           case 'attachments':
             return tasks.addAttachment(id, body);
+          case 'mode':
+            return await tasks.setMode(id, body.mode);
+          case 'model':
+            return await tasks.setModel(id, body.model);
+          case 'effort':
+            return await tasks.setEffort(id, body.effort);
+          case 'compact':
+            return await tasks.compact(id);
         }
       }
     }

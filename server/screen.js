@@ -196,3 +196,68 @@ export function planChoices(menu, { careful = false } = {}) {
   }
   return out;
 }
+
+// The mode line under Claude Code's input box: "⏵⏵ accept edits on (shift+tab to cycle)".
+const MODE_LINE = [
+  [/plan mode on/i, 'plan'],
+  [/accept edits on/i, 'acceptEdits'],
+  [/bypass permissions on/i, 'bypassPermissions'],
+  [/don'?t ask (?:mode )?on/i, 'dontAsk'],
+  [/auto mode on/i, 'auto'],
+];
+
+/**
+ * The permission mode Claude Code shows below its input box: 'default' when the input box is there
+ * with no mode named, null when the bottom of the screen is something else (a menu, a dialog).
+ * Only the bottom rows count: a mode name quoted in the conversation above isn't the mode.
+ */
+export function modeFromLines(lines) {
+  let end = lines.length;
+  while (end > 0 && !lines[end - 1].trim()) end--;
+  let seen = false;
+  for (let y = end - 1; y >= Math.max(0, end - 6); y--) {
+    for (const [re, mode] of MODE_LINE) if (re.test(lines[y])) return mode;
+    if (/shift\+tab to cycle|\? for shortcuts/i.test(lines[y])) seen = true;
+  }
+  // No mode named: 'default' only if the status line is there at all (a menu can cover it).
+  return seen || PROMPT_BOX.test(lines.slice(Math.max(0, end - 6), end).join('\n')) ? 'default' : null;
+}
+const PROMPT_BOX = /^\s*❯\s*$/m;
+
+const EFFORT_WORDS = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+/** The effort level in the status line ("◐ medium · /effort"), or '' when it isn't shown. */
+export function effortFromLines(lines) {
+  for (let y = lines.length - 1; y >= 0; y--) {
+    const m = lines[y].match(/\b(low|medium|high|xhigh|max)\b\s*·\s*\/effort/i);
+    if (m) return m[1].toLowerCase();
+  }
+  return '';
+}
+export { EFFORT_WORDS };
+
+/** The model picker /model opens: its rows in order, and which one the cursor is on. */
+export function modelMenuFromLines(lines) {
+  const rows = [];
+  for (const l of lines) {
+    const m = l.match(/^\s*(❯)?\s*(?:↓\s*)?(\d{1,2})\.\s+(.+?)(?:\s{2,}(.*))?$/);
+    if (m) rows.push({ n: +m[2], label: m[3].replace(/\s*✔\s*$/, '').trim(), current: /✔/.test(m[3]), cursor: !!m[1], desc: (m[4] || '').trim() });
+  }
+  if (rows.length < 2 || !lines.some((l) => /session only/i.test(l))) return null;
+  return rows;
+}
+
+/** The /effort slider: the level its marker sits over, or ''. */
+export function effortSliderFromLines(lines) {
+  const at = lines.findIndex((l) => /\blow\b.*\bmedium\b.*\bhigh\b/.test(l));
+  if (at < 1) return '';
+  const labels = [...lines[at].matchAll(/\b(low|medium|high|xhigh|max)\b/g)].map((m) => ({ w: m[1], x: m.index + m[1].length / 2 }));
+  for (let y = at - 1; y >= Math.max(0, at - 3); y--) {
+    const x = lines[y].indexOf('▲');
+    if (x < 0) continue;
+    let best = labels[0];
+    for (const l of labels) if (Math.abs(l.x - x) < Math.abs(best.x - x)) best = l;
+    return best.w;
+  }
+  return '';
+}

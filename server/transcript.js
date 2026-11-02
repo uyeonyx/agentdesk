@@ -571,6 +571,7 @@ export function createParser({ agent = 'claude', cwd = '', parent = null, caps =
   const state = { turn: 0, sessionId: null, tools: new Map(), orphans: new Map() };
   let seq = 0;
   let compact = null; // the newest entry, while it is a compact one: its summary comes next
+  let lastCommand = ''; // the slash command whose output comes next (local_command stdout)
   let promptSeen = !parent; // a subagent's transcript opens with its prompt
   const legacyPrompted = new Set(); // old in-file subagents whose prompt was skipped
   let wrapper = null; // Codex: the open `exec` call, { id, kids }
@@ -873,8 +874,22 @@ export function createParser({ agent = 'claude', cwd = '', parent = null, caps =
         const tries = Number.isFinite(j.retryAttempt) ? ` (${j.retryAttempt}/${j.maxRetries ?? '?'})` : '';
         return notice(ops, id, at, p, `API 오류로 다시 시도하는 중${tries}`, 'warn', why ? { summary: sanitize(String(why), 500) } : {});
       }
-      case 'local_command':
-        if (typeof j.content === 'string' && j.content.trim().startsWith('<command-name>')) notice(ops, id, at, p, commandText(j.content.trim()));
+      case 'away_summary':
+        // Claude Code's own recap of the session, written when the person comes back. Shown as is.
+        if (p || typeof j.content !== 'string') return;
+        return emit(ops, entry(id, 'recap', at, p, { text: sanitize(j.content.replace(/\s*\(disable recaps in \/config\)\s*$/i, '').trim(), 2000) }));
+      case 'local_command': {
+        const c = typeof j.content === 'string' ? j.content.trim() : '';
+        if (c.startsWith('<command-name>')) {
+          lastCommand = commandName(c);
+          notice(ops, id, at, p, commandText(c));
+        } else if (c.startsWith('<local-command-stdout>') || c.startsWith('<local-command-stderr>')) {
+          // What a command like /context or /cost printed: shown in the conversation instead of the terminal.
+          const out = tag(c, 'local-command-stdout') || tag(c, 'local-command-stderr');
+          if (out.trim()) emit(ops, entry(id, 'cmdout', at, p, { cmd: lastCommand, text: sanitize(out, caps.text), err: c.startsWith('<local-command-stderr>') }));
+          lastCommand = '';
+        }
+      }
     }
   }
 
@@ -1184,6 +1199,11 @@ const tag = (s, name) => {
 };
 
 /** "<command-name>/model</command-name>…<command-args>opus</command-args>" → "명령: /model opus". */
+function commandName(s) {
+  const name = tag(s, 'command-name').trim();
+  return clip(name.startsWith('/') ? name : '/' + name, 60);
+}
+
 function commandText(s) {
   const name = tag(s, 'command-name');
   const args = tag(s, 'command-args');

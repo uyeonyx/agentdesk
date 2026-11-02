@@ -43,9 +43,9 @@ export const AGENTS = {
     idleMs: 12000,
     remote: true,
     /**
-     * @param {{prompt?:string, resume?:boolean, sessionId?:string, fork?:boolean, newSessionId?:string, remote?:string|false, name?:string}} o
+     * @param {{prompt?:string, resume?:boolean, sessionId?:string, fork?:boolean, newSessionId?:string, remote?:string|false, name?:string, mode?:string, model?:string, effort?:string}} o
      */
-    args({ prompt, resume, sessionId, fork, newSessionId, remote, name }) {
+    args({ prompt, resume, sessionId, fork, newSessionId, remote, name, mode, model, effort }) {
       const hook = claudeHook();
       const sync = [{ hooks: [{ ...hook, timeout: 5 }] }];
       // Tool and subagent events only feed the progress view, so they never block the agent.
@@ -69,6 +69,10 @@ export const AGENTS = {
       // `=` form: these take optional values and would otherwise swallow the prompt.
       if (name) args.push(`--name=${flagValue(name)}`);
       if (remote) args.push(`--remote-control=${flagValue(remote)}`);
+      // For this session only. Typing /model or /effort would also change the person's default.
+      if (CLAUDE_MODES.includes(mode)) args.push(`--permission-mode=${mode}`);
+      if (MODEL.test(model || '')) args.push(`--model=${model}`);
+      if (EFFORTS.includes(effort)) args.push(`--effort=${effort}`);
       if (resume && sessionId) {
         args.push(`--resume=${sessionId}`);
         if (fork) args.push('--fork-session');
@@ -95,6 +99,11 @@ export const AGENTS = {
     },
   },
 };
+
+export const CLAUDE_MODES = ['default', 'acceptEdits', 'plan', 'auto', 'dontAsk', 'bypassPermissions'];
+export const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+/** A model alias or full id, as --model takes it: never anything that could read as another flag. */
+export const MODEL = /^[a-z][a-z0-9.\-]{1,60}(\[1m\])?$/i;
 
 function safePositional(s) {
   // A prompt starting with "-" would be parsed as a flag.

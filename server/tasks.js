@@ -5,12 +5,13 @@ import { randomUUID } from 'node:crypto';
 import pty from '@lydell/node-pty';
 import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, realPath, inheritedEnv } from './util.js';
 import * as G from './git.js';
-import { AGENTS, lastAssistantText, summarize, trustedTranscript } from './agents.js';
+import { AGENTS, CLAUDE_MODES, EFFORTS, MODEL, lastAssistantText, summarize, trustedTranscript } from './agents.js';
+import { MetaTail } from './meta.js';
 import { ConvoHub, legacyEntries } from './convo.js';
 import { httpError, addProject } from './projects.js';
 import { findSession, liveClaude, stopClaude, queueCodex, claudeTranscriptOf } from './sessions.js';
 import { Watcher } from './watch.js';
-import { gateFromLines, menuFromLines, promptTextFromLines } from './screen.js';
+import { gateFromLines, menuFromLines, promptTextFromLines, modeFromLines, effortFromLines, effortSliderFromLines, modelMenuFromLines, EFFORT_WORDS } from './screen.js';
 import { buildPrompt, promptView, replyExcerpt } from './prompt.js';
 import { drive, answerLine, Fallback } from './answer.js';
 import { commandsIn } from './shells.js';
@@ -37,6 +38,36 @@ const ROWS = 40;
 const LIVE = new Set(['starting', 'working', 'waiting', 'needs_input', 'review', 'exited']);
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
+const STRIP_MS = 30 * 60_000;
+const STRIP_MAX = 80;
+const KIND_CODE = { read: 'r', search: 'r', edit: 'e', cmd: 'c', web: 'w', agent: 'a' };
+
+/**
+ * The last half hour, compact, for the activity strip on every panel: tool calls as
+ * [start s, length s (0 while running), kind, ok|err|run] and state changes as [start s, state, ask].
+ * Seconds from `from`, which moves once a minute so an idle task's view doesn't change every push.
+ */
+export function stripView(t, now = Date.now()) {
+  const from = Math.floor((now - STRIP_MS) / 60_000) * 60_000;
+  const c = [];
+  for (const f of t.activity?.feed || []) {
+    if (!f?.at || f.by) continue;
+    const run = f.st === 'run';
+    const end = run ? now : f.at + (f.ms || 1000);
+    if (end < from) continue;
+    c.push([Math.max(0, Math.round((f.at - from) / 1000)), run ? 0 : Math.max(1, Math.round((end - Math.max(f.at, from)) / 1000)), KIND_CODE[f.kind] || 't', f.st === 'err' ? 'e' : run ? 'r' : 'o']);
+  }
+  const s = [];
+  const states = t.states || [];
+  for (let i = 0; i < states.length; i++) {
+    const [at, st, ask] = states[i];
+    const next = states[i + 1]?.[0] ?? Infinity;
+    if (next < from) continue;
+    s.push([Math.max(0, Math.round((at - from) / 1000)), st, ask]);
+  }
+  return { from, c: c.slice(-STRIP_MAX), s };
+}
+
 /**
  * A task runs one agent in `task.cwd`. Its code lives in `task.repos`: zero (plain folder),
  * one (a worktree inside that repo), or several (a task folder holding one worktree per repo,
@@ -57,6 +88,7 @@ export class Tasks {
     this.prompts = new Map(); // task id -> what its agent waits on (prompt.js), while needs_input
     this.convos = new ConvoHub(this); // the conversations windows are looking at (convo.js)
     this.replies = new Map(); // task id -> { of, excerpt }: lastReply excerpt, made once per reply
+    this.metas = new Map(); // task id -> MetaTail: mode, model, context and recap from its transcript (meta.js)
     for (const t of store.tasks) {
       migrate(t);
       if (t.watch) continue; // followed again by the watch poll
@@ -69,6 +101,7 @@ export class Tasks {
     this.changesTimer = setInterval(() => this.pollChanges(), 6000);
     this.codexTimer = setInterval(() => this.pollCodex(), 2000);
     this.watchTimer = setInterval(() => this.pollWatch(), 1200);
+    this.metaTimer = setInterval(() => this.pollMeta(), 1500);
     // Main may have moved while Desk was closed (and older versions counted what came with it): recount once.
     this.recountTimer = setTimeout(() => this.recount(), 2000);
   }
@@ -223,6 +256,12 @@ export class Tasks {
       remote: !!t.remote,
       remoteUrl: t.remote || t.watch ? t.remoteUrl || '' : '',
       activity: activityView(t.activity),
+      mode: t.mode || '',
+      model: t.model || '',
+      effort: t.effort || '',
+      ctx: t.ctx || null,
+      recap: t.recap || null,
+      strip: stripView(t),
       menu,
       prompt: t.state === 'needs_input' && r ? promptView(this.prompts.get(t.id), menu, { careful: !!this.store.project(t.projectId)?.careful }) : null,
       reply: t.archived ? null : this.replyOf(t),
@@ -251,7 +290,7 @@ export class Tasks {
   /**
    * @param {{projectId:string, agent:string, prompt:string, extraProjectIds?:string[]}} input
    */
-  async create({ projectId, agent, prompt, extraProjectIds = [], remote, import: imp }) {
+  async create({ projectId, agent, prompt, extraProjectIds = [], remote, import: imp, mode, model, effort }) {
     if (imp) return this.adopt({ ...imp, projectId, remote });
     const project = this.store.project(projectId);
     if (!project) throw httpError(404, '프로젝트를 찾을 수 없어요');
@@ -294,6 +333,12 @@ export class Tasks {
       sessionId: agent === 'claude' ? randomUUID() : undefined,
       remote: this.wantsRemote(agent, project, remote),
     };
+    // What to start the session with. Flags only: /model and /effort would change the person's default.
+    if (agent === 'claude') {
+      if (CLAUDE_MODES.includes(mode)) task.mode = mode;
+      if (typeof model === 'string' && MODEL.test(model)) task.pick = { ...task.pick, model };
+      if (EFFORTS.includes(effort)) task.pick = { ...task.pick, effort };
+    }
 
     const made = [];
     try {
@@ -378,6 +423,10 @@ export class Tasks {
       newSessionId: resume ? undefined : task.sessionId,
       remote: task.remote ? this.remoteName(task) : false,
       name: task.agent === 'claude' ? task.title : undefined,
+      // Back in the mode it was in; the model and effort picked here, not whatever the default is now.
+      mode: task.mode || undefined,
+      model: task.pick?.model,
+      effort: task.pick?.effort,
     });
     if (task.remote) task.remoteUrl = '';
     const [file, ...pre] = commandFor(bin);
@@ -421,6 +470,10 @@ export class Tasks {
   }
 
   setState(task, state, reason, extra = {}) {
+    // When it changed, for the activity strip: [at, state, waiting on a person?].
+    const ask = state === 'needs_input' && extra.ask ? 1 : 0;
+    const last = task.states?.at(-1);
+    if (!last || last[1] !== state || last[2] !== ask) task.states = [...(task.states || []), [Date.now(), state, ask]].slice(-40);
     task.state = state;
     if (reason !== undefined) task.reason = reason;
     if (extra.summary) task.summary = extra.summary;
@@ -696,6 +749,207 @@ export class Tasks {
     r.proc.write('/remote-control');
     setTimeout(() => r.proc.write('\r'), 120);
     return { applied: 'now' };
+  }
+
+  // ------------------------------------------------------------ session settings
+
+  meta(task) {
+    let m = this.metas.get(task.id);
+    if (!m) {
+      m = new MetaTail(task);
+      this.metas.set(task.id, m);
+    }
+    return m;
+  }
+
+  /** Mode, model, context and recap: from each Claude session's transcript, and the mode line on screen. */
+  pollMeta() {
+    let changed = false;
+    for (const t of this.store.tasks) {
+      if (t.agent !== 'claude' || t.archived) continue;
+      const r = this.rt.get(t.id);
+      const m = this.meta(t);
+      // Stopped ones only need reading once.
+      if (!r && m.path) continue;
+      try {
+        if (m.poll()) changed = true;
+      } catch {}
+      if (!r) continue;
+      const lines = this.screenLines(r);
+      const mode = modeFromLines(lines);
+      if (mode && mode !== t.mode) {
+        t.mode = mode;
+        changed = true;
+      }
+      const effort = effortFromLines(lines);
+      if (effort && effort !== t.effort) {
+        t.effort = effort;
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.store.save();
+      this.changed();
+    }
+  }
+
+  /** One thing at a time on a session's keyboard: settings changes and messages must not interleave. */
+  serial(r, fn) {
+    const run = (r.chain || Promise.resolve()).then(fn);
+    r.chain = run.catch(() => {});
+    return run;
+  }
+
+  /**
+   * The permission mode, applied to the next tool call even mid-turn: Shift+Tab until the mode line
+   * under the input box says so. A stopped session takes it when it starts again.
+   */
+  async setMode(id, mode) {
+    const task = this.need(id);
+    if (task.agent !== 'claude') throw httpError(400, 'Claude Code 세션만 권한 모드를 바꿀 수 있어요');
+    if (!CLAUDE_MODES.includes(mode)) throw httpError(400, '알 수 없는 모드예요');
+    const r = this.rt.get(id);
+    if (!r) {
+      task.mode = mode;
+      this.store.save();
+      this.changed();
+      return { mode, applied: 'start' };
+    }
+    if (this.menuOf(r)) throw httpError(409, '화면에 질문이 떠 있어요 · 먼저 답해 주세요');
+    return this.serial(r, async () => {
+      for (let i = 0; i < 6; i++) {
+        await new Promise((res) => r.term.write('', res));
+        const cur = modeFromLines(this.screenLines(r));
+        if (cur === mode) {
+          task.mode = mode;
+          this.store.save();
+          this.changed();
+          return { mode, applied: 'now' };
+        }
+        if (cur == null && i > 0) break;
+        r.proc.write('\x1b[Z');
+        await delay(380);
+      }
+      throw httpError(409, '이 세션에서는 그 모드로 바꿀 수 없어요 · 원본 터미널에서 ⇧Tab으로 바꿔 보세요');
+    });
+  }
+
+  /** Type a slash command into an idle session. */
+  async command(r, text) {
+    r.proc.write(text);
+    await delay(250);
+    r.proc.write('\r');
+    await delay(900);
+    await new Promise((res) => r.term.write('', res));
+  }
+
+  idleFor(task, what) {
+    if (['working', 'starting'].includes(task.state)) throw httpError(409, `작업이 끝나면 ${what}할 수 있어요`);
+    const r = this.rt.get(task.id);
+    if (r && this.menuOf(r)) throw httpError(409, '화면에 질문이 떠 있어요 · 먼저 답해 주세요');
+  }
+
+  /**
+   * The model for this session only. /model opens a picker; we move to the model and press `s`
+   * ("use this session only"). Enter, or "/model <name>", would save it as the person's default.
+   */
+  async setModel(id, family) {
+    const task = this.need(id);
+    if (task.agent !== 'claude') throw httpError(400, 'Claude Code 세션만 모델을 바꿀 수 있어요');
+    if (typeof family !== 'string' || !/^[a-z]{2,20}$/i.test(family)) throw httpError(400, '알 수 없는 모델이에요');
+    const r = this.rt.get(id);
+    if (!r) {
+      task.pick = { ...task.pick, model: family.toLowerCase() };
+      this.store.save();
+      this.changed();
+      return { model: family, applied: 'start' };
+    }
+    this.idleFor(task, '모델을 바꿀');
+    return this.serial(r, async () => {
+      await this.command(r, '/model');
+      const rows = modelMenuFromLines(this.screenLines(r));
+      const to = rows?.find((x) => x.label.toLowerCase().startsWith(family.toLowerCase()));
+      const from = rows?.findIndex((x) => x.cursor);
+      if (!rows || !to || from < 0) {
+        r.proc.write('\x1b');
+        throw httpError(409, '모델 목록을 읽지 못했어요 · 원본 터미널에서 /model로 바꿔 보세요');
+      }
+      const steps = rows.indexOf(to) - from;
+      for (let i = 0; i < Math.abs(steps); i++) {
+        r.proc.write(steps > 0 ? '\x1b[B' : '\x1b[A');
+        await delay(60);
+      }
+      await delay(150);
+      await new Promise((res) => r.term.write('', res));
+      const now = modelMenuFromLines(this.screenLines(r))?.find((x) => x.cursor);
+      if (now?.label !== to.label) {
+        r.proc.write('\x1b');
+        throw httpError(409, '모델을 고르지 못했어요 · 원본 터미널에서 /model로 바꿔 보세요');
+      }
+      r.proc.write('s');
+      task.pick = { ...task.pick, model: family.toLowerCase() };
+      this.store.save();
+      this.changed();
+      return { model: to.label, applied: 'now' };
+    });
+  }
+
+  /** Effort for this session only: the /effort slider, moved to the level, then `s`. */
+  async setEffort(id, level) {
+    const task = this.need(id);
+    if (task.agent !== 'claude') throw httpError(400, 'Claude Code 세션만 노력 수준을 바꿀 수 있어요');
+    if (!EFFORTS.includes(level)) throw httpError(400, '알 수 없는 노력 수준이에요');
+    const r = this.rt.get(id);
+    if (!r) {
+      task.pick = { ...task.pick, effort: level };
+      task.effort = level;
+      this.store.save();
+      this.changed();
+      return { effort: level, applied: 'start' };
+    }
+    this.idleFor(task, '노력 수준을 바꿀');
+    return this.serial(r, async () => {
+      await this.command(r, '/effort');
+      const cur = effortSliderFromLines(this.screenLines(r));
+      if (!cur) {
+        r.proc.write('\x1b');
+        throw httpError(409, '노력 수준 화면을 읽지 못했어요 · 원본 터미널에서 /effort로 바꿔 보세요');
+      }
+      const steps = EFFORT_WORDS.indexOf(level) - EFFORT_WORDS.indexOf(cur);
+      for (let i = 0; i < Math.abs(steps); i++) {
+        r.proc.write(steps > 0 ? '\x1b[C' : '\x1b[D');
+        await delay(60);
+      }
+      await delay(150);
+      await new Promise((res) => r.term.write('', res));
+      if (effortSliderFromLines(this.screenLines(r)) !== level) {
+        r.proc.write('\x1b');
+        throw httpError(409, '노력 수준을 맞추지 못했어요 · 원본 터미널에서 /effort로 바꿔 보세요');
+      }
+      r.proc.write('s');
+      task.pick = { ...task.pick, effort: level };
+      task.effort = level;
+      this.store.save();
+      this.changed();
+      return { effort: level, applied: 'now' };
+    });
+  }
+
+  /** Summarize the conversation to free the context (/compact). The code stays as it is. */
+  async compact(id) {
+    const task = this.need(id);
+    if (task.agent !== 'claude') throw httpError(400, 'Claude Code 세션만 압축할 수 있어요');
+    const r = this.rt.get(id);
+    if (!r) throw httpError(409, '세션이 멈춰 있어요. 먼저 재개하세요.');
+    this.idleFor(task, '압축');
+    return this.serial(r, async () => {
+      r.expect.push(Date.now());
+      r.proc.write('/compact');
+      await delay(200);
+      this.markInput(task);
+      r.proc.write('\r');
+      return { ok: true };
+    });
   }
 
   // ------------------------------------------------------------ screen reading
@@ -1393,6 +1647,7 @@ export class Tasks {
     clearInterval(this.changesTimer);
     clearInterval(this.codexTimer);
     clearInterval(this.watchTimer);
+    clearInterval(this.metaTimer);
     const closed = [];
     for (const [, r] of this.rt) {
       closed.push(new Promise((resolve) => r.proc.onExit(() => resolve())));
