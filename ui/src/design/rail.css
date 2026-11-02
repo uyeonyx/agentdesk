@@ -351,6 +351,15 @@ section[data-group='yours'] .grp-x {
   border-radius: inherit;
   transition: width var(--dur-4) var(--ease-out);
 }
+/* The last half hour of the session, as in 관제. */
+.rr-strip {
+  height: 3px;
+  margin-top: 6px;
+  opacity: 0.85;
+}
+.rrow.sel .rr-strip {
+  opacity: 1;
+}
 .rr-meta {
   font-size: var(--fs-1);
   color: var(--text-3);

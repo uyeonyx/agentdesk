@@ -12,6 +12,7 @@ import { useFlip } from '../../ui/useFlip.js';
 import { taskItems, pickedItems, projectItems } from '../task/taskActions.js';
 import { keyLabel } from '../../app/keys.js';
 import { openModal } from '../../store.js';
+import { Strip } from '../overview/Strip.jsx';
 
 // Groups you clear out once you've looked: their header offers "모두 보관".
 const CLEARABLE = new Set(['stopped', 'done']);
@@ -138,6 +139,7 @@ const Row = memo(function Row({ t, p, sel, picked, group }) {
               <i style={{ width: `${(done / plan.length) * 100}%` }} />
             </span>
           )}
+          {!finished && t.strip && <Strip t={t} class="rr-strip" />}
         </span>
         <span class="rr-meta">
           {t.state === 'review' && t.changes?.files > 0 ? (

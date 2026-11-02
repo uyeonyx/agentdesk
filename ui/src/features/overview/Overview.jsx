@@ -247,7 +247,13 @@ function waited(ms) {
 
 function Body({ t, p, z, focused }) {
   if (isBlocked(t)) {
-    if (t.prompt) return <PromptCard task={t} project={p} compact focus={focused} />;
+    if (t.prompt)
+      return (
+        <>
+          <PromptCard task={t} project={p} compact focus={focused} />
+          {z === 'l' && <Before t={t} />}
+        </>
+      );
     return (
       <div class="pn-term">
         <div class="qhead">
@@ -320,6 +326,23 @@ function Body({ t, p, z, focused }) {
 }
 
 const kindOf = (k) => ({ read: 'read', search: 'read', edit: 'edit', cmd: 'cmd', web: 'web', agent: 'agent' })[k] || 'read';
+
+/** What the agent did just before it stopped to ask: context for the answer, kept quiet. */
+function Before({ t }) {
+  const feed = (t.activity?.feedTail || []).filter((f) => f.st !== 'run').slice(-3);
+  if (!feed.length) return null;
+  return (
+    <div class="recent before">
+      <span class="bf-h">묻기 전에 한 일</span>
+      {feed.map((f) => (
+        <div key={f.id} class={`rl ${f.st === 'err' ? 'err' : ''}`}>
+          <i class={`kd k-${kindOf(f.kind)}`} />
+          <span class="lb">{f.text}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function Now({ t, z }) {
   const now = useNow();

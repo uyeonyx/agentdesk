@@ -247,7 +247,8 @@ test('관제탑: a stuck task is answered right on its tile', async () => {
 
 test('관제 mosaic: a stuck session gets the big tile, and shrinks back once answered', async () => {
   const p = await project('repo-mosaic');
-  const stuck = await start(p.id, 'ask before deleting build');
+  // "test": the mock runs `npm test` first, so the big tile has something to show under the card.
+  const stuck = await start(p.id, 'ask before deleting build, run test first');
   const quiet = await start(p.id, 'just answer: 조용히');
   await until(stuck.id, (x) => !!x?.prompt?.screen?.ready);
   await until(quiet.id, (x) => x?.state === 'needs_input');
@@ -255,6 +256,7 @@ test('관제 mosaic: a stuck session gets the big tile, and shrinks back once an
   const big = page.locator(`[data-testid="tile"][data-task-id="${stuck.id}"]`);
   await expect(big).toHaveAttribute('data-z', 'l');
   await expect(page.locator(`[data-testid="tile"][data-task-id="${quiet.id}"]`)).toHaveAttribute('data-z', 'm');
+  await expect(big.locator('.before')).toContainText('npm test');
   await page.screenshot({ path: shots('mosaic') });
   await big.getByRole('button', { name: /^1\s*허락$/ }).click();
   await until(stuck.id, (x) => x?.state !== 'needs_input');

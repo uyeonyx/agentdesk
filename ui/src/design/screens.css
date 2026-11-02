@@ -281,6 +281,20 @@
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 22px);
   mask-image: linear-gradient(to bottom, transparent 0, #000 22px);
 }
+.recent.before {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  justify-content: flex-start;
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+.recent.before .bf-h {
+  flex: none;
+  font-size: var(--fs-1);
+  color: var(--text-3);
+  margin-bottom: 2px;
+}
 .rl {
   flex: none;
   display: grid;

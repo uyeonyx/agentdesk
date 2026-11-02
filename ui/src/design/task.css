@@ -1318,6 +1318,9 @@
   color: var(--diff-del-text);
 }
 .fs .empty {
+  display: block;
+  padding: 2px 0;
+  text-align: start;
   font-size: 12.5px;
   color: var(--text-3);
 }
