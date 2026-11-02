@@ -370,3 +370,21 @@ test('import: hostile and broken files are rejected or neutralized', () => {
   const css = JSON.stringify([d.vars, d.xterm, d.monaco]);
   for (const bad of ['url(', 'expression', ';}', '!important', 'var(']) assert.ok(!css.includes(bad), bad);
 });
+
+test('activity colors: every built-in tells reads, edits, commands and web apart, and each shows on its surface', () => {
+  for (const t of BUILTIN_THEMES) {
+    const v = deriveTokens(t).vars;
+    const surface = parseColor(v['--bg-surface']);
+    const hues = ['--act-edit', '--act-cmd', '--act-web'].map((k) => {
+      const c = parseColor(v[k]);
+      assert.ok(contrast(c, surface) >= 3 - 0.05, `${t.name} ${k} on surface: ${contrast(c, surface).toFixed(2)}`);
+      return toOklch(c).h;
+    });
+    for (let i = 0; i < hues.length; i++)
+      for (let j = i + 1; j < hues.length; j++) {
+        const d = Math.min(Math.abs(hues[i] - hues[j]), 360 - Math.abs(hues[i] - hues[j]));
+        assert.ok(d >= 40, `${t.name}: two activity colors look alike (${d.toFixed(0)}°)`);
+      }
+    assert.ok(contrast(parseColor(v['--act-read']), surface) >= 2 - 0.05, `${t.name} --act-read`);
+  }
+});

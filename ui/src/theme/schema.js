@@ -20,6 +20,7 @@ export const COLOR_TOKENS = [
   'accent', 'accent-ink', 'accent-soft', 'accent-line', 'accent-text',
   ...SEMANTIC.flatMap((s) => [s, `${s}-ink`, `${s}-text`, `${s}-soft`, `${s}-line`, `${s}-fill`, `${s}-fill-ink`]),
   'diff-add-bg', 'diff-add-text', 'diff-add-mark', 'diff-del-bg', 'diff-del-text', 'diff-del-mark',
+  'act-read', 'act-edit', 'act-cmd', 'act-web',
   ...SYNTAX_KEYS.map((k) => `syn-${k}`),
   'term-bg', 'term-fg', 'term-cursor', 'term-selection', ...ANSI_NAMES.map((_, i) => `term-${i}`),
   'glass-tint', 'glass-tint-strong', 'glass-float', 'glass-edge', 'glass-shadow', 'glow-color',

@@ -198,6 +198,29 @@ export function deriveTokens(input, { glass = 'rich' } = {}) {
     set(`diff-${kind}-mark`, mark);
   }
 
+  // Activity strips and log dots: what kind of tool call. Hues from the theme's own palette (blue
+  // edits, magenta commands, cyan web), lifted to a fill that reads on the surface. Reads and searches
+  // stay a quiet gray, so the work that changes things is what stands out.
+  const actFill = (c) => {
+    const o = toOklch(c);
+    return solid(fromOklch({ ...o, L: dark ? 0.72 : 0.6, C: Math.max(o.C, 0.13) }), surface);
+  };
+  // Themes that reuse one color for several ANSI slots would draw two kinds alike: turn the later
+  // one's hue until it sits at least 50° from the ones before it.
+  const acts = [];
+  for (const [name, c] of [['act-edit', ansi[4]], ['act-cmd', ansi[5]], ['act-web', ansi[6]]]) {
+    let col = actFill(c);
+    for (let k = 0; k < 6; k++) {
+      const h = toOklch(col).h;
+      if (!acts.some((x) => Math.min(Math.abs(toOklch(x).h - h), 360 - Math.abs(toOklch(x).h - h)) < 50)) break;
+      const o = toOklch(col);
+      col = solid(fromOklch({ ...o, h: (o.h + 60) % 360 }), surface);
+    }
+    acts.push(col);
+    set(name, ensureContrast(col, [surface], 3));
+  }
+  set('act-read', ensureContrast(solid(mix(fg, surface, 0.5), surface), [surface], 2));
+
   // Syntax: the theme's own colors, else the usual ANSI roles. Only a floor is enforced here:
   // real themes keep comments quiet on purpose, but a token that vanishes into the bg is a bug.
   const synFallback = {

@@ -7,6 +7,11 @@ text levels, status colors, diff, syntax, terminal, Monaco, glass, shadows) and 
 lightness until it passes WCAG against every surface it can land on, glass over the brightest
 aurora stop included.
 
+The activity strip's four colors (`--act-read`, `--act-edit`, `--act-cmd`, `--act-web`: reading,
+editing, commands, web) come from the theme's own terminal colors. Editing, commands and web are
+kept at least 40° apart in hue and at 3:1 against the surface; reading is the quiet one, a gray at
+2:1. `test/theme.test.js` checks this for every built-in theme.
+
 Settings > 강조색 lays one accent over any theme, the way macOS does (`ui/src/theme/accents.js`):
 blue, purple, pink, red, orange, green, teal or graphite, each with a dark-theme and a light-theme
 shade that carries white text on a filled button. "테마" keeps the theme's own accent.
