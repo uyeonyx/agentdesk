@@ -121,7 +121,7 @@ export function Overview() {
         </button>
       </div>
       <div class={`ov-grid ${mosaic ? 'mosaic' : ''}`} ref={grid} style={mosaic ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: `${rowH}px` } : undefined}>
-        {s.composing && <NewTile cols={cols} />}
+        {s.composing && <NewTile cols={cols} rowH={rowH} />}
         {items.map(({ t, z }) => (
           <Panel key={t.id} t={t} p={projectOf(s, t.projectId)} z={z} cols={cols} mosaic={mosaic} pinned={pins.has(t.id)} focused={t.id === focusId} onFocus={() => setFocus(t.id)} onPin={() => pin(t.id)} />
         ))}
@@ -241,8 +241,8 @@ function Body({ t, p, z, focused }) {
     if (t.prompt)
       return (
         <>
-          <PromptCard task={t} project={p} compact focus={focused} />
           {z === 'l' && <Before t={t} />}
+          <PromptCard task={t} project={p} compact focus={focused} />
         </>
       );
     return (
@@ -265,9 +265,9 @@ function Body({ t, p, z, focused }) {
   }
   if (t.state === 'needs_input')
     return t.reply?.md ? (
-      <div class="pn-md">
+      <Fade>
         <Markdown md={t.reply.md} compact />
-      </div>
+      </Fade>
     ) : (
       <p class="sumtx q">{whyOf(t)}</p>
     );
@@ -275,9 +275,9 @@ function Body({ t, p, z, focused }) {
     return t.recap?.text ? (
       <p class="sumtx">{t.recap.text}</p>
     ) : t.reply?.md ? (
-      <div class="pn-md">
+      <Fade>
         <Markdown md={t.reply.md} compact />
-      </div>
+      </Fade>
     ) : (
       <p class="sumtx">{whyOf(t)}</p>
     );
@@ -313,6 +313,26 @@ function Body({ t, p, z, focused }) {
       )}
       <Now t={t} z={z} />
     </>
+  );
+}
+
+/** A reply cut to the tile: the last lines fade only when there is more below them. */
+function Fade({ children }) {
+  const ref = useRef();
+  const [cut, setCut] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setCut(el.scrollHeight > el.clientHeight + 2);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  return (
+    <div ref={ref} class={`pn-md ${cut ? 'cut' : ''}`}>
+      {children}
+    </div>
   );
 }
 
@@ -458,7 +478,7 @@ function QuickReply({ t, p }) {
 }
 
 /** A new session: what to ask, where, with which agent, starting in which mode and model. */
-function NewTile({ cols }) {
+function NewTile({ cols, rowH }) {
   const s = useStore((s) => ({ projects: s.projects, filter: s.filter, agents: s.agents, draft: s.newDraft }));
   const d = { projectId: s.filter || s.projects[0]?.id, agent: 'claude', mode: 'default', model: '', ...(s.draft || {}) };
   const ta = useRef();
@@ -485,7 +505,12 @@ function NewTile({ cols }) {
   };
   const m = modeOf(d.mode);
   return (
-    <article class={`pn glass-2 new z-l m-${claude ? m.tone : ''}`} style={{ ...roomVars(p?.color), gridColumn: `span ${Math.min(2, cols)}`, gridRow: 'span 2' }} data-testid="new-tile">
+    <article
+      class={`pn glass-2 new z-l m-${claude ? m.tone : ''}`}
+      // Wide enough for a row of choices on one line, tall enough for all of them.
+      style={{ ...roomVars(p?.color), gridColumn: `span ${cols >= 6 ? 3 : Math.min(2, cols)}`, gridRow: `span ${rowH && rowH < 200 ? 3 : 2}` }}
+      data-testid="new-tile"
+    >
       <div class="pn-h">
         <Glyph project={p} size={30} />
         <span class="pn-tt">
@@ -560,7 +585,6 @@ function NewTile({ cols }) {
                     </button>
                   ))}
                 </div>
-                <kbd>⇧Tab</kbd>
               </div>
               <div class="nr">
                 <span class="nl">모델</span>
@@ -582,7 +606,7 @@ function NewTile({ cols }) {
         </div>
         <div class="new-f">
           <span class="hint">
-            <kbd>↵</kbd> 시작 · <kbd>Esc</kbd> 취소
+            <kbd>↵</kbd> 시작{claude ? <> · <kbd>⇧Tab</kbd> 모드</> : null} · <kbd>Esc</kbd> 취소
           </span>
           <span class="sp" />
           <button class="btn sm primary" disabled={busy || text.trim().length < 2} onClick={start}>

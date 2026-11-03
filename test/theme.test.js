@@ -44,13 +44,14 @@ function assertComplete(d, label) {
 
   const c = (n) => parseColor(d.vars[n]);
   const surfaces = ['--bg-surface', '--bg-raised', '--bg-overlay'].map(c);
-  const amb = [1, 2, 3, 4].map((i) => c(`--amb-${i}`));
-  const glass = [c('--bg-app'), ...amb].flatMap((b) => [over(c('--glass-tint'), b), over(c('--glass-tint-strong'), b)]);
+  // Glass sits over the flat app background (no aurora behind it any more).
+  const glass = [c('--bg-app')].flatMap((b) => [over(c('--glass-tint'), b), over(c('--glass-tint-strong'), b)]);
   const all = [...surfaces, ...glass];
   const min = (fg, bgs) => Math.min(...bgs.map((b) => contrast(fg, b)));
   assert.ok(min(c('--text'), all) >= 4.5, `${label}: --text ${min(c('--text'), all).toFixed(2)}`);
   assert.ok(min(c('--text-2'), all) >= 4.5, `${label}: --text-2 ${min(c('--text-2'), all).toFixed(2)}`);
-  assert.ok(min(c('--text-3'), all) >= 3, `${label}: --text-3 ${min(c('--text-3'), all).toFixed(2)}`);
+  // Tertiary text is small (times, paths, labels): it gets the AA bar too.
+  assert.ok(min(c('--text-3'), all) >= 4.5, `${label}: --text-3 ${min(c('--text-3'), all).toFixed(2)}`);
   // Hierarchy survives the correction: primary reads at least as strongly as secondary, secondary as tertiary.
   const onSurface = (n) => contrast(c(n), c('--bg-surface'));
   assert.ok(onSurface('--text') >= onSurface('--text-2') && onSurface('--text-2') >= onSurface('--text-3'), `${label}: text hierarchy`);

@@ -288,12 +288,12 @@ button.chip:hover {
   background: var(--text-2);
   animation: pulse 1.6s var(--ease-in-out) infinite;
 }
-@keyframes shimmer {
+@keyframes breathe {
   from {
-    background-position: 100% 0;
+    opacity: 1;
   }
   to {
-    background-position: -50% 0;
+    opacity: 0.45;
   }
 }
 .skeleton {
@@ -305,9 +305,8 @@ button.chip:hover {
 .skeleton i {
   height: 12px;
   border-radius: 6px;
-  background: linear-gradient(90deg, var(--bg-hover), var(--bg-active), var(--bg-hover));
-  background-size: 200% 100%;
-  animation: shimmer 1.6s linear infinite;
+  background: var(--bg-active);
+  animation: breathe 1.6s var(--ease-in-out) infinite alternate;
 }
 
 /* The task's state in its color: solid amber when it's stuck on me. */

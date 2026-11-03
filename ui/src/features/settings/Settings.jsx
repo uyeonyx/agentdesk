@@ -153,7 +153,6 @@ function ThemeTab() {
           <Seg value={pref.glass || 'rich'} options={[['rich', '풍부하게'], ['light', '가볍게'], ['off', '끄기']]} onChange={(v) => savePref({ glass: v })} />
         </div>
         {isMac && <Switch on={pref.vibrancy !== false} onChange={(v) => savePref({ vibrancy: v })} label="창 뒤 비치기" desc="바탕화면 색이 창 뒤로 은은하게 비쳐요" />}
-        <Switch on={pref.ambient !== false} onChange={(v) => savePref({ ambient: v })} label="오로라 움직임" desc="배경의 빛이 아주 천천히 흘러요. 창을 안 볼 때는 멈춰요" />
       </Section>
     </>
   );

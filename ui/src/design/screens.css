@@ -147,8 +147,11 @@
   font-weight: var(--w-4);
   color: color-mix(in oklab, var(--room) 70%, var(--text));
 }
+/* Under the head: a hairline that carries the activity marks. */
 .pn-strip {
   margin: 0 14px;
+  height: 3px;
+  background: var(--line);
 }
 .pn-body {
   position: relative;
@@ -204,7 +207,26 @@
 .pn.z-s .pn-title {
   font-size: 13.5px;
 }
-/* A blocked tile's question card is the body: no second frame around it. */
+/* A blocked tile's question card is the body: no second frame around it. Its answers sit at the
+   bottom, on one line with the other waiting tiles' answers. */
+.pn.blocked .pn-body {
+  padding-bottom: 14px;
+}
+.pn.blocked .pn-body > .pcard {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pn.blocked .pcard .pc-b {
+  min-height: 0;
+  overflow: hidden;
+}
+.pn.blocked .pcard .pc-f,
+.pn.blocked .pcard .pc-opts + .pc-f {
+  margin-top: auto;
+  padding-top: 12px;
+}
 .pn .pcard {
   padding: 0;
   background: none;
@@ -224,8 +246,10 @@
   min-height: 0;
   overflow: hidden;
   font-size: var(--fs-3);
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+.pn-md.cut {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent);
 }
 .sumtx {
   margin: 0;
@@ -282,9 +306,10 @@
   mask-image: linear-gradient(to bottom, transparent 0, #000 22px);
 }
 .recent.before {
-  margin-top: 14px;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
+  flex: none;
+  margin: 0 0 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
   justify-content: flex-start;
   -webkit-mask-image: none;
   mask-image: none;
@@ -468,7 +493,7 @@
   display: block;
 }
 .strip .sb.work {
-  background: color-mix(in oklab, var(--text) 9%, transparent);
+  background: color-mix(in oklab, var(--text) 15%, transparent);
 }
 .strip .sb.wait {
   background: repeating-linear-gradient(-45deg, var(--warn-fill) 0 4px, color-mix(in oklab, var(--warn-fill) 48%, transparent) 4px 8px);
@@ -532,10 +557,11 @@
   flex-direction: column;
   gap: 10px;
   padding: 2px 14px 12px;
+  overflow-y: auto;
 }
 .new-b textarea {
   flex: 1;
-  min-height: 64px;
+  min-height: 56px;
   width: 100%;
   padding: 10px 12px;
   border: 0;
@@ -901,9 +927,7 @@
   position: absolute;
   inset: 0;
   z-index: -1;
-  background:
-    radial-gradient(60% 70% at 15% 10%, color-mix(in oklab, var(--c-amb1) 55%, transparent), transparent),
-    radial-gradient(60% 70% at 90% 90%, color-mix(in oklab, var(--c-amb2) 55%, transparent), transparent);
+  background: none;
 }
 .tc-mini.small::before {
   content: '';
@@ -1334,12 +1358,8 @@ input[type='range'] {
 .projcard {
   position: relative;
   border-radius: var(--r-4);
-  background:
-    linear-gradient(180deg, color-mix(in oklab, var(--room) 11%, transparent), transparent 70%),
-    var(--bg-raised);
-  box-shadow:
-    inset 0 0 0 1px var(--line),
-    inset 0 1px 0 var(--glass-edge);
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--line);
   transition:
     box-shadow var(--dur-2),
     transform var(--dur-3) var(--ease-spring);
@@ -2016,4 +2036,31 @@ input[type='range'] {
 .ac-add .btn {
   height: 34px;
   padding: 0 14px;
+}
+.ac-add .btn {
+  height: 34px;
+}
+.ac-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px 18px;
+  border-radius: var(--r-3);
+  border: 1px dashed var(--line-strong);
+  color: var(--text-2);
+}
+.ac-empty > .ti {
+  font-size: 20px;
+  color: var(--text-3);
+}
+.ac-empty b {
+  display: block;
+  font-weight: var(--w-3);
+  color: var(--text);
+}
+.ac-empty small {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
 }

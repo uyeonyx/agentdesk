@@ -15,14 +15,17 @@ function ScopePick({ value, onChange }) {
   return (
     <label class="ac-scope">
       <span>보는 곳</span>
-      <select class="field" value={value} onChange={(e) => onChange(e.currentTarget.value)} data-testid="ac-scope">
-        <option value="">사용자 전체</option>
-        {projects.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+      <span class="sel">
+        <select class="field" value={value} onChange={(e) => onChange(e.currentTarget.value)} data-testid="ac-scope">
+          <option value="">사용자 전체</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+        <I n="chevron-down" />
+      </span>
     </label>
   );
 }
@@ -92,7 +95,15 @@ export function McpTab() {
         )}
         <div class="ac-list" data-testid="mcp-list">
           {servers == null && <span class="muted">읽는 중…</span>}
-          {servers?.length === 0 && !extra.length && <span class="muted">아직 없어요</span>}
+          {servers?.length === 0 && !extra.length && (
+            <div class="ac-empty">
+              <I n="plug-off" />
+              <span>
+                <b>{project ? '이 프로젝트에서 쓰는 MCP 서버가 없어요' : '등록된 MCP 서버가 없어요'}</b>
+                <small>[MCP 추가]로 넣거나 터미널에서 claude mcp add로 넣으면 여기 보여요. claude.ai 커넥터는 [연결 확인]을 누르면 보여요.</small>
+              </span>
+            </div>
+          )}
           {(servers || []).map((s) => (
             <McpRow key={`${s.scope}:${s.name}`} s={s} st={statusOf(s.name)} checked={!!check} onRemove={() => remove(s)} />
           ))}
@@ -174,11 +185,14 @@ function McpForm({ project, onDone }) {
       <label>{f.kind === 'http' ? '주소' : '명령'}</label>
       <input class="field mono" value={f.target} onInput={put('target')} placeholder={f.kind === 'http' ? 'https://mcp.example.com/mcp' : 'npx -y @sentry/mcp-server@latest'} autocomplete="off" />
       <label>범위</label>
-      <select class="field" value={f.scope} onChange={put('scope')}>
-        <option value="user">사용자 전체</option>
-        {project && <option value="project">이 프로젝트 · 함께 쓰는 사람도 (.mcp.json)</option>}
-        {project && <option value="local">이 프로젝트 · 나만</option>}
-      </select>
+      <span class="sel">
+        <select class="field" value={f.scope} onChange={put('scope')}>
+          <option value="user">사용자 전체</option>
+          {project && <option value="project">이 프로젝트 · 함께 쓰는 사람도 (.mcp.json)</option>}
+          {project && <option value="local">이 프로젝트 · 나만</option>}
+        </select>
+        <I n="chevron-down" />
+      </span>
       <pre class="ac-pre">{preview}</pre>
       <div class="ac-act">
         <button class="btn sm ghost" onClick={() => onDone(null)} disabled={busy}>
@@ -232,18 +246,24 @@ export function PermTab() {
       <ScopePick value={project} onChange={setProject} />
       <div class="ac-add">
         <input class="field mono" value={nr.rule} onInput={(e) => setNr({ ...nr, rule: e.currentTarget.value })} placeholder="Bash(pnpm test:*) · Edit(docs/**) · WebFetch(domain:github.com)" data-testid="perm-rule" />
-        <select class="field" value={nr.kind} onChange={(e) => setNr({ ...nr, kind: e.currentTarget.value })}>
-          {KIND.map(([k, l]) => (
-            <option key={k} value={k}>
-              {l}
-            </option>
-          ))}
-        </select>
-        <select class="field" value={nr.scope} onChange={(e) => setNr({ ...nr, scope: e.currentTarget.value })}>
-          <option value="user">사용자 전체</option>
-          {project && <option value="project">이 프로젝트 · 함께</option>}
-          {project && <option value="local">이 프로젝트 · 나만</option>}
-        </select>
+        <span class="sel">
+          <select class="field" value={nr.kind} onChange={(e) => setNr({ ...nr, kind: e.currentTarget.value })}>
+            {KIND.map(([k, l]) => (
+              <option key={k} value={k}>
+                {l}
+              </option>
+            ))}
+          </select>
+          <I n="chevron-down" />
+        </span>
+        <span class="sel">
+          <select class="field" value={nr.scope} onChange={(e) => setNr({ ...nr, scope: e.currentTarget.value })}>
+            <option value="user">사용자 전체</option>
+            {project && <option value="project">이 프로젝트 · 함께</option>}
+            {project && <option value="local">이 프로젝트 · 나만</option>}
+          </select>
+          <I n="chevron-down" />
+        </span>
         <button class="btn sm primary" disabled={!nr.rule.trim()} onClick={async () => (await edit({ op: 'add', ...nr })) && setNr({ ...nr, rule: '' })} data-testid="perm-add">
           추가
         </button>

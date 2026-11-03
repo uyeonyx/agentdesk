@@ -20,6 +20,8 @@ export function Run({ tools, task, live, waiting }) {
   const now = useNow();
   const running = live && sum.running;
   const cats = [...new Set(tools.filter((t) => t.kind !== 'todo').map((t) => t.cat || 'tool'))].slice(0, 4);
+  // A run of only to-do updates still gets its own mark.
+  if (!cats.length) cats.push(tools.some((t) => t.kind === 'todo') ? 'todo' : 'tool');
   return (
     <div class={`run ${isOpen ? 'open' : ''} ${sum.fail ? 'failed' : ''} ${running ? 'live' : ''}`} data-kind="run">
       <button class="run-h" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen}>

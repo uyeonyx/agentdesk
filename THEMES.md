@@ -1,11 +1,11 @@
 # Themes
 
 Agent Desk ships the themes below and can import more from other apps. A theme only supplies a
-background, a foreground, the 16 terminal colors and (optionally) syntax colors, an accent, an
-aurora and glass settings. `ui/src/theme/derive.js` turns that into the full token set (surfaces,
-text levels, status colors, diff, syntax, terminal, Monaco, glass, shadows) and adjusts text
-lightness until it passes WCAG against every surface it can land on, glass over the brightest
-aurora stop included.
+background, a foreground, the 16 terminal colors and (optionally) syntax colors, an accent and
+glass settings. `ui/src/theme/derive.js` turns that into the full token set (surfaces, text
+levels, status colors, diff, syntax, terminal, Monaco, glass, shadows) and adjusts text lightness
+until it passes WCAG against every surface it can land on, glass included: primary text at 7:1,
+secondary at 5.6:1 and the small tertiary text (times, paths, labels) at 4.5:1.
 
 The activity strip's four colors (`--act-read`, `--act-edit`, `--act-cmd`, `--act-web`: reading,
 editing, commands, web) come from the theme's own terminal colors. Editing, commands and web are

@@ -100,21 +100,51 @@
   content-visibility: visible;
 }
 
+/* What I said: a bubble on the right, its time and actions under it. The agent's words run the
+   full width on the left, so who said what reads at a glance. */
 .umsg {
   position: relative;
-  margin-top: 14px;
-  padding: 10px 14px 12px;
-  border-radius: var(--r-3);
-  background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--line);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-top: 18px;
+}
+.umsg-text {
+  order: 1;
+  max-width: min(86%, 680px);
+  padding: 9px 14px 10px;
+  border-radius: 16px 16px 5px 16px;
+  background: color-mix(in oklab, var(--accent) 9%, var(--bg-raised));
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 16%, var(--line));
 }
 .umsg-meta {
+  order: 2;
   display: flex;
   align-items: center;
-  gap: 8px;
-  height: 18px;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 100%;
+  height: 26px;
+  margin-top: 2px;
   font-size: var(--fs-1);
   color: var(--text-3);
+}
+.umsg-meta .sp {
+  display: none;
+}
+.umsg-meta > .num {
+  order: 3;
+  padding-right: 4px;
+}
+.umsg-meta > .src {
+  order: 2;
+}
+.umsg-meta > .umsg-act {
+  order: 1;
+}
+.umsg > .rw {
+  order: 3;
+  width: 100%;
 }
 .umsg-meta .src {
   padding: 0 6px;
@@ -132,9 +162,8 @@
   opacity: 1;
 }
 .umsg-text {
-  margin-top: 4px;
   font-size: var(--fs-4);
-  line-height: 1.65;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -160,8 +189,12 @@
   font-size: var(--fs-2);
   color: var(--text-3);
 }
+.thinking .th-h {
+  width: auto;
+  max-width: 100%;
+}
 .thinking .first {
-  flex: 1;
+  flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1335,6 +1368,13 @@
   border-radius: 6px;
   box-shadow: inset 0 0 0 1px var(--line);
   background: var(--bg-inset);
+}
+.strip.big.none {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 11.5px;
+  color: var(--text-3);
 }
 .strip.big .sc {
   top: 5px;

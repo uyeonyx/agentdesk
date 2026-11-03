@@ -9,7 +9,9 @@ import { normalizeTheme, SYNTAX_KEYS, ANSI_NAMES } from './schema.js';
 const AA = 4.5;
 const LARGE = 3;
 // Primary text aims higher than the AA floor so it stays visibly above --text-2 even in low-contrast themes.
-const PRIMARY = 6;
+const PRIMARY = 7;
+// Secondary and tertiary text: small labels, times and paths have to read, not just be there.
+const SECONDARY = 5.6;
 // Aim slightly above each bar so 8-bit rounding and the browser's own blending never dip below it.
 const MARGIN = 0.06;
 
@@ -110,8 +112,8 @@ export function deriveTokens(input, { glass = 'rich' } = {}) {
   // Text has to read on panels, cards, menus, hover rows and on glass over the brightest aurora stop.
   const text0 = solid(ui('text', fg), surface);
   // Secondary text stays close to the primary: gray-on-gray is what makes a screen look dull.
-  const text20 = solid(ui('text-2', mix(fg, surface, 0.24)), surface);
-  const text30 = solid(ui('text-3', mix(fg, surface, 0.44)), surface);
+  const text20 = solid(ui('text-2', mix(fg, surface, 0.2)), surface);
+  const text30 = solid(ui('text-3', mix(fg, surface, 0.38)), surface);
   // Light glass is frosted white, not a veil of the (grayer) window background.
   const glassBase = dark ? app : mix(app, WHITE, 0.6);
   const solve = (alpha) => {
@@ -120,15 +122,15 @@ export function deriveTokens(input, { glass = 'rich' } = {}) {
     // blurred behind, but nearly solid, so what they say reads at once.
     const strong = withAlpha(raised, Math.min(1, Math.max(alpha + 0.24, 0.86)));
     const float = withAlpha(overlay, Math.min(1, Math.max(alpha + 0.3, 0.92)));
-    const glassBgs = [app, ...amb].flatMap((b) => [over(tint, b), over(strong, b), over(float, b)]);
+    const glassBgs = [app].flatMap((b) => [over(tint, b), over(strong, b), over(float, b)]);
     const bgs = [
       surface, raised, overlay, inset, over(hover, surface), over(hover, raised), over(active, surface),
       ...glassBgs, ...glassBgs.map((b) => over(hover, b)),
     ];
     const text = ensureContrast(text0, bgs, PRIMARY);
-    const text2 = ensureContrast(text20, bgs, AA + MARGIN);
-    const text3 = ensureContrast(text30, bgs, LARGE + MARGIN);
-    const ok = worst(text, bgs) >= AA && worst(text2, bgs) >= AA && worst(text3, bgs) >= LARGE;
+    const text2 = ensureContrast(text20, bgs, SECONDARY + MARGIN);
+    const text3 = ensureContrast(text30, bgs, AA + MARGIN);
+    const ok = worst(text, bgs) >= AA && worst(text2, bgs) >= AA && worst(text3, bgs) >= AA;
     return { alpha, tint, strong, float, text, text2, text3, ok };
   };
   // If no text color can win on the aurora, thicken the glass rather than give up readability.

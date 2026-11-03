@@ -37,13 +37,7 @@ export function App() {
 
   return (
     <div class={`app screen-${s.screen}`}>
-      <div class="ambient" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-        <i />
-      </div>
-      <LensFilter />
+      <div class="ambient" aria-hidden="true" />
       <Titlebar />
       <div class={`stage ${s.railHidden ? 'no-rail' : ''}`}>
         {s.screen === 'overview' ? (
@@ -103,24 +97,3 @@ function Toasts() {
   );
 }
 
-/**
- * The lens the big glass bars look through: a displacement map that bends what's behind them a
- * little at their edges (backdrop-filter: url(#desk-lens)). Red moves pixels sideways, green up/down;
- * mid-grey moves nothing, so only the rim refracts.
- */
-const MAP =
-  'data:image/svg+xml;utf8,' +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200" preserveAspectRatio="none"><defs><linearGradient id="x" x1="0" x2="1"><stop offset="0" stop-color="#000"/><stop offset=".14" stop-color="#800000"/><stop offset=".86" stop-color="#800000"/><stop offset="1" stop-color="#f00"/></linearGradient><linearGradient id="y" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#000"/><stop offset=".22" stop-color="#008000"/><stop offset=".78" stop-color="#008000"/><stop offset="1" stop-color="#0f0"/></linearGradient></defs><rect width="200" height="200" fill="url(#x)"/><rect width="200" height="200" fill="url(#y)" style="mix-blend-mode:screen"/></svg>`
-  );
-
-function LensFilter() {
-  return (
-    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
-      <filter id="desk-lens" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
-        <feImage href={MAP} x="0" y="0" width="100%" height="100%" preserveAspectRatio="none" result="map" />
-        <feDisplacementMap in="SourceGraphic" in2="map" scale="18" xChannelSelector="R" yChannelSelector="G" />
-      </filter>
-    </svg>
-  );
-}

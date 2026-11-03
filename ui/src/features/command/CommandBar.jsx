@@ -220,7 +220,7 @@ function commands(t) {
   list.push(
     { id: 'c:new', icon: 'plus', label: '새 작업', keys: keyLabel('new'), run: () => openCommand('new') },
     { id: 'c:triage', icon: 'player-track-next', label: '차례로 처리', keys: keyLabel('triage'), run: go(startTriage) },
-    { id: 'c:overview', icon: 'layout-dashboard', label: '관제탑', keys: keyLabel('overview'), run: go(() => set({ screen: get().screen === 'overview' ? 'task' : 'overview' })) },
+    { id: 'c:overview', icon: 'layout-dashboard', label: '관제 ↔ 집중 전환', keys: keyLabel('overview'), run: go(() => set({ screen: get().screen === 'overview' ? 'task' : 'overview' })) },
     { id: 'c:theme', icon: 'palette', label: '테마 바꾸기', run: () => openCommand('theme') },
     { id: 'c:import', icon: 'history', label: '세션 불러오기', run: go(() => openModal('import', {})) },
     { id: 'c:add', icon: 'folder-plus', label: '프로젝트 추가', run: go(() => openModal('addProject')) },
