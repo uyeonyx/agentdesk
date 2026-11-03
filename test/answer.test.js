@@ -194,3 +194,16 @@ test('a new file on the card: its lines, not a phantom empty one after the final
   assert.deepEqual(f.hunks[0].lines, ['+hi']);
   assert.deepEqual([f.adds, f.dels], [1, 0]);
 });
+
+test('a message sent while a card waits is refused, not typed into the menu', async () => {
+  const t = await start(one.id, 'ask before deleting build');
+  await blocked(t.id);
+  const r = await ctx.api('POST', `/api/tasks/${t.id}/send`, { text: 'just answer: 이건 메뉴에 들어가면 안 돼' });
+  assert.equal(r.status, 409);
+  assert.match(r.json.error, /카드에서 먼저 답/);
+  const lines = (await ctx.api('GET', `/api/tasks/${t.id}/screen?lines=40`)).json.lines.join('\n');
+  assert.doesNotMatch(lines, /메뉴에 들어가면/);
+  const x = (await ctx.api('GET', '/api/state')).json.tasks.find((y) => y.id === t.id);
+  assert.equal(x.state, 'needs_input', 'the card is still waiting');
+  await ctx.api('POST', `/api/tasks/${t.id}/discard`);
+});

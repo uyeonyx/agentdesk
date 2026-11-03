@@ -114,6 +114,19 @@ export async function drive(io, prompt, body) {
     const k = String(body.option || '');
     const o = first.options.find((x) => x.key === k);
     if (!o) throw new Fallback('계획 승인 선택지가 화면과 달라요 · 터미널에서 직접 답해 주세요', 'plan');
+    // Claude Code 2.1.317: "Tell Claude what to change" is a box. What to change goes in it and
+    // Enter sends it (typed later as a message, it would land in that same box instead).
+    if (body.action === 'keep' && first.input === k) {
+      const at = first.options.find((x) => x.selected);
+      if (at?.key !== k) press(k);
+      else if (/^[\d\s]+$/.test(at.label)) press('\x7f'.repeat(at.label.length + 2));
+      await new Promise((r) => setTimeout(r, 150));
+      const text = String(body.text || '').replace(/[\x00-\x1f\x7f]+/g, ' ').trim().slice(0, 2000);
+      if (text) press(text);
+      press('\r');
+      if (!(await waitMenu(gone(first), 3000))) throw new Fallback('계획에 바꿀 점을 넣었지만 넘어가지 않았어요 · 터미널을 확인해 주세요', 'plan');
+      return { steps };
+    }
     await select(first, k);
     if (!(await waitMenu(gone(first), 3000))) throw new Fallback('눌렀지만 화면이 바뀌지 않았어요 · 터미널을 확인해 주세요', 'plan');
     if (body.action === 'keep' && body.text) return { steps, ...(await reason(body.text)) };

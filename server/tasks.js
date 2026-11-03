@@ -1558,6 +1558,30 @@ export class Tasks {
     for (const [ws, tid] of this.viewers) if (tid === id && ws.readyState === 1) ws.send(s);
   }
 
+  /**
+   * Can a message be typed into this session now? 'menu' when a choice menu is up (it stays up a
+   * moment, not one that's just redrawing); true once the CLI's input box is there. A session that
+   * just (re)started gets up to 15 s for it; one that has been running is typed into as before.
+   */
+  async inputReady(r) {
+    const flush = () => new Promise((res) => r.term.write('', res));
+    const fresh = Date.now() - r.startedAt < 20_000;
+    const end = Date.now() + (fresh ? 15_000 : 600);
+    let menuSince = 0;
+    for (;;) {
+      await flush();
+      if (this.menuOf(r)) {
+        menuSince ||= Date.now();
+        if (Date.now() - menuSince >= 400) return 'menu';
+      } else {
+        menuSince = 0;
+        if (this.promptText(r) !== null) return true;
+      }
+      if (Date.now() > end) return !fresh || null;
+      await delay(120);
+    }
+  }
+
   writeText(r, text) {
     // Composer text is *typed* into a terminal, so control bytes must never get through:
     // an ESC could close bracketed paste early and a CR would submit an extra line.
@@ -1605,6 +1629,11 @@ export class Tasks {
     }
     const r = this.rt.get(id);
     if (!r) throw httpError(409, '세션이 멈춰 있어요. 먼저 재개하세요.');
+    // Typed text goes wherever the CLI's cursor is: into a choice menu it picks options or fills a
+    // box there, and while the CLI is still starting up it's dropped. So: never into a menu, and
+    // after a (re)start, only once the input box is there.
+    const ready = await this.inputReady(r);
+    if (ready === 'menu') throw httpError(409, '선택지가 떠 있어요 · 카드에서 먼저 답한 뒤 보내 주세요');
     const snap = await this.snapshotAll(task, text.slice(0, 60));
     const msg = { id: randomId('m'), text, at: Date.now(), snap, source };
     task.messages.push(msg);

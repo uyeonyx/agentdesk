@@ -27,7 +27,7 @@ function cli({ question, options, boxAt, hint = false, at = 0, typed = '' }) {
     key: (k) => {
       if (k === '\x1b[A') s.at = Math.max(0, s.at - 1);
       else if (k === '\x1b[B') s.at = Math.min(options.length - 1, s.at + 1);
-      else if (k === '\r') s.picked = options[s.at];
+      else if (k === '\r') s.picked = s.at === boxAt ? `box:${s.typed}` : options[s.at];
       else if (s.at === boxAt && /^\x7f+$/.test(k)) s.typed = s.typed.slice(0, Math.max(0, s.typed.length - k.length));
       else if (s.at === boxAt) s.typed += k; // in the box, anything is text
       else if (/^\d$/.test(k)) {
@@ -81,4 +81,17 @@ test('question: a pick made while the highlight is in "Type something." with tex
   const { s, io } = cli({ question: '좋아하는 색은?', options: ['빨강', '파랑', 'Type something.', 'Chat about this'], boxAt: 2, at: 2, typed: 'abc' });
   await drive(io, { kind: 'question', questions: [{ question: '좋아하는 색은?', options: [{ label: '빨강' }, { label: '파랑' }] }] }, { action: 'answer', answers: [{ pick: ['파랑'] }] });
   assert.equal(s.picked, '파랑');
+});
+
+test('plan: "계획 더 다듬기" with words puts them in the box and sends them with Enter', async () => {
+  const { s, io } = cli({ ...PLAN });
+  const r = await drive(io, { kind: 'plan' }, { action: 'keep', option: '3', text: '스피커폰으로 할 계획이야' });
+  assert.deepEqual(r.steps, ['3', '스피커폰으로 할 계획이야', '\r']);
+  assert.equal(s.picked, 'box:스피커폰으로 할 계획이야');
+});
+
+test('plan: "계획 더 다듬기" from a box holding stray digits clears them first', async () => {
+  const { s, io } = cli({ ...PLAN, at: 2, typed: '111' });
+  await drive(io, { kind: 'plan' }, { action: 'keep', option: '3', text: '날짜를 바꿔 줘' });
+  assert.equal(s.picked, 'box:날짜를 바꿔 줘');
 });

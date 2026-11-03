@@ -77,7 +77,10 @@ export function Composer({ task, project, blocked }) {
   const setDraft = (v) => set((st) => ({ drafts: { ...st.drafts, [task.id]: v } }));
   // A screen only the terminal can answer (trusting a folder…): typed text would pick whatever is highlighted.
   const gated = task.ask === 'terminal';
-  const canSend = !gated && (!!s.draft.trim() || s.comments.length > 0 || s.images.length > 0);
+  // A card is waiting (permission, plan, question): typed into the CLI now, the words would land in
+  // its menu. They wait here until it's answered.
+  const carded = blocked && !gated && !!task.prompt;
+  const canSend = !gated && !carded && (!!s.draft.trim() || s.comments.length > 0 || s.images.length > 0);
 
   async function doSend() {
     if (!canSend || busy) return;
@@ -144,7 +147,7 @@ export function Composer({ task, project, blocked }) {
     const a = enterAction(e, { careful });
     if (!a || a === 'newline') return;
     e.preventDefault();
-    if (a === 'blocked') {
+    if (a === 'blocked' || (a === 'send' && carded)) {
       setNudge(true);
       setTimeout(() => setNudge(false), 1600);
       return;
@@ -173,7 +176,7 @@ export function Composer({ task, project, blocked }) {
 
   const popKeys = useRef();
   const planning = task.agent !== 'codex' && task.mode === 'plan';
-  const placeholder = task.watching ? '' : gated ? '원본 터미널에서 먼저 답해 주세요' : stopped ? '보내면 세션을 재개하고 이어서 지시해요' : planning ? '계획 모드 · 코드는 바꾸지 않고 계획만 세워요' : yourTurn ? '답장을 적어 주세요' : task.state === 'working' ? '작업 중이에요 · 보내면 다음 지시로 이어가요' : '에이전트에게 지시하기 · / 명령';
+  const placeholder = task.watching ? '' : gated ? '원본 터미널에서 먼저 답해 주세요' : carded ? '위 카드에서 먼저 답해 주세요 · 여기 쓴 글은 그다음에 보낼 수 있어요' : stopped ? '보내면 세션을 재개하고 이어서 지시해요' : planning ? '계획 모드 · 코드는 바꾸지 않고 계획만 세워요' : yourTurn ? '답장을 적어 주세요' : task.state === 'working' ? '작업 중이에요 · 보내면 다음 지시로 이어가요' : '에이전트에게 지시하기 · / 명령';
   const pills = s.comments.length + s.refs.length + s.images.length;
 
   return (
