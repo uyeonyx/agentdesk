@@ -68,7 +68,7 @@ function Pop({ anchor, title, sub, items, onPick, onClose, width = 340, children
   const list = items || [];
   const [active, setActive, onKeyDown] = useListNav(list.length, (i) => !list[i].disabled && onPick(list[i]));
   return createPortal(
-    <div ref={ref} class="pk-pop glass-3" style={{ left: (pos?.left ?? -9999) + 'px', top: (pos?.top ?? -9999) + 'px', width: width + 'px' }} tabIndex={-1} role="listbox" aria-label={title} onKeyDown={onKeyDown}>
+    <div ref={ref} class="pk-pop" style={{ left: (pos?.left ?? -9999) + 'px', top: (pos?.top ?? -9999) + 'px', width: width + 'px' }} tabIndex={-1} role="listbox" aria-label={title} onKeyDown={onKeyDown}>
       {title && (
         <div class="pk-h">
           {title}

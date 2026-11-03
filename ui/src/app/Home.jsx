@@ -19,7 +19,7 @@ export function Home() {
         <div class="home-c narrow">
           <h1>프로젝트부터 추가해 주세요</h1>
           <p class="muted">git 저장소를 고르면 작업마다 별도 worktree에서 에이전트가 일해요. 서로 부딪히지 않아요.</p>
-          <div class="home-add glass-2">
+          <div class="home-add">
             <AddProjectBody />
           </div>
         </div>
@@ -128,7 +128,7 @@ export function CheatSheet({ keys }) {
   const groups = [...new Set(keys.map((k) => k.group))];
   return (
     <div class="scrim" onMouseDown={(e) => e.target === e.currentTarget && set({ cheat: false })}>
-      <div class="sheet glass-3 wide cheat" role="dialog" aria-label="단축키">
+      <div class="sheet wide cheat" role="dialog" aria-label="단축키">
         <div class="sheet-h">
           <h2>단축키</h2>
           <span class="sp" style="flex:1" />

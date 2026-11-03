@@ -1,65 +1,64 @@
-/* The quick panel: the window itself is the glass (macOS popover material), drawn edge to edge,
-   tinted almost solid so it reads at once over whatever app is behind it. */
+/* The quick panel: a small solid window over whatever app is in front. What waits on me sits on one
+   plate, a cell per session, with the same lamp as everywhere. */
 @import 'pretendard/dist/web/variable/pretendardvariable.css';
 @import '@tabler/icons-webfont/dist/tabler-icons.min.css';
 @import './tokens.css';
 @import './base.css';
-@import './glass.css';
 @import './ui.css';
 @import './md.css';
 @import './layout.css';
 @import './rail.css';
 @import './task.css';
 
-:root.os-darwin body {
-  background: color-mix(in oklab, var(--bg-app) 90%, transparent);
-}
-:root:not(.os-darwin) body {
-  background: var(--bg-app);
-}
 body {
   overflow: hidden;
+  background: var(--bg);
 }
 .panel {
   display: flex;
   flex-direction: column;
   max-height: 640px;
-  --mark-ring: var(--bg-app);
 }
 .pn-h {
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 12px 10px 8px 14px;
+  gap: var(--sp-2);
+  padding: var(--sp-3) 10px var(--sp-2) var(--sp-4);
+  font-size: var(--t-lg);
   font-weight: var(--w-3);
 }
 .pn-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 0 10px 8px;
+  gap: 1px;
+  margin: 0 var(--sp-3) var(--sp-3);
+  border-radius: var(--r-2);
   overflow: auto;
   scrollbar-width: thin;
+  background: var(--surface);
+  box-shadow: var(--e-0);
+}
+.pn-list:has(.pn-empty) {
+  background: none;
+  box-shadow: none;
 }
 .pn-item {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: var(--r-3);
-  background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--line);
+  gap: 10px;
+  padding: var(--sp-3) var(--sp-4) 14px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line);
 }
 .pn-item.focused {
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-}
-.pn-item.blocked {
-  box-shadow: inset 0 0 0 1px var(--warn-line);
+  box-shadow:
+    0 0 0 1px var(--line),
+    inset 0 0 0 1px var(--accent-line);
 }
 .pn-ih {
   display: grid;
-  grid-template-columns: 22px minmax(0, 1fr) auto;
-  gap: 9px;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
 }
 .pn-id {
@@ -68,23 +67,23 @@ body {
   flex-direction: column;
 }
 .pn-p {
-  font-size: var(--fs-1);
+  font-size: var(--t-sm);
+  line-height: var(--lh-sm);
   color: var(--text-3);
 }
 .pn-t {
   text-align: left;
+  font-size: var(--t-lg);
+  line-height: var(--lh-lg);
   font-weight: var(--w-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.pn-tag {
-  font-size: var(--fs-1);
-  color: var(--text-2);
-}
 .pn-b p {
-  margin: 0 0 8px;
-  font-size: var(--fs-2);
+  margin: 0 0 10px;
+  font-size: var(--t-md);
+  line-height: var(--lh-md);
   color: var(--text-2);
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -95,25 +94,16 @@ body {
   padding: 0;
   background: none;
   box-shadow: none;
-  backdrop-filter: none;
   animation: none;
 }
 .pn-item .pcard::after {
   display: none;
 }
-.pn-item .pc-ic {
-  display: none;
-}
 .pn-item .pc-title {
-  font-size: var(--fs-3);
+  font-size: var(--t-md);
 }
 .pn-item .pc-b {
   margin-top: 0;
-}
-.qr .field {
-  height: 32px;
-  border-radius: var(--r-full);
-  padding: 0 14px;
 }
 .pn-empty {
   display: flex;
@@ -133,15 +123,15 @@ body {
   gap: 8px;
   padding: 8px 10px 10px 14px;
   border-top: 1px solid var(--line);
-  font-size: var(--fs-2);
+  font-size: var(--t-sm);
   color: var(--text-2);
 }
 .pn-toast {
   margin: 0 10px 8px;
   padding: 8px 12px;
   border-radius: var(--r-2);
-  font-size: var(--fs-2);
-  background: var(--bg-active);
+  font-size: var(--t-sm);
+  background: var(--pressed);
 }
 .pn-toast.err {
   color: var(--danger-text);

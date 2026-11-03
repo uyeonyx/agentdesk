@@ -71,10 +71,7 @@ export function McpTab() {
     <>
       <section class="st-sec">
         <div class="ac-h">
-          <div>
-            <h3>MCP 서버</h3>
-            <p class="muted">에이전트가 쓰는 도구 서버예요. Claude Code의 설정에 그대로 저장돼요(claude mcp add·remove).</p>
-          </div>
+          <p class="st-desc">에이전트가 쓰는 도구 서버예요. Claude Code의 설정에 그대로 저장돼요(claude mcp add·remove).</p>
           <span class="sp" />
           <button class="btn sm" onClick={runCheck} disabled={checking} data-tip="Claude Code가 서버를 하나씩 켜 보느라 30초쯤 걸릴 수 있어요" data-testid="mcp-check">
             {checking ? <span class="spin" /> : <I n="plug-connected" />} {checking ? '확인하는 중…' : '연결 확인'}
@@ -238,10 +235,7 @@ export function PermTab() {
   return (
     <section class="st-sec">
       <div class="ac-h">
-        <div>
-          <h3>권한</h3>
-          <p class="muted">에이전트가 묻지 않고 해도 되는 일과 절대 하면 안 되는 일이에요. 질문에 "다시 묻지 않기"로 답하면 여기에 쌓여요.</p>
-        </div>
+        <p class="st-desc">에이전트가 묻지 않고 해도 되는 일과 절대 하면 안 되는 일이에요. 질문에 "다시 묻지 않기"로 답하면 여기에 쌓여요.</p>
       </div>
       <ScopePick value={project} onChange={setProject} />
       <div class="ac-add">
@@ -317,10 +311,7 @@ export function UsageTab() {
   return (
     <section class="st-sec">
       <div class="ac-h">
-        <div>
-          <h3>사용량</h3>
-          <p class="muted">Claude Code의 /usage 화면에 나오는 값을 그대로 읽어요. 세션이 돌고 있으면 10분마다 다시 읽어요.</p>
-        </div>
+        <p class="st-desc">Claude Code의 /usage 화면에 나오는 값을 그대로 읽어요. 세션이 돌고 있으면 10분마다 다시 읽어요.</p>
         <span class="sp" />
         <button
           class="btn sm"

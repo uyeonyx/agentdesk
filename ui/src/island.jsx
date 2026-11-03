@@ -116,7 +116,7 @@ function Island() {
               .slice(0, 8)
               .map((t) => (
                 <button key={t.id} class="is-row" onClick={() => window.desk.open(t.id, t.state === 'review' ? 'review' : undefined)}>
-                  <Glyph project={projectOf(s, t.projectId)} size={18} task={t} />
+                  <Glyph project={projectOf(s, t.projectId)} size={18} />
                   <span class="t">{t.title}</span>
                   <span class={`s ${dotOf(t)}`}>{isBlocked(t) ? askOf(t)?.short || '허락' : t.state === 'needs_input' ? '답장 차례' : t.state === 'review' ? '새 결과' : firstLine(t.activity?.current, 40) || '작업 중'}</span>
                 </button>
@@ -140,12 +140,12 @@ function Island() {
 
 // Always dark: the person's own dark theme, or Desk's.
 async function darkTheme() {
-  let id = DEFAULT_DARK_ID;
+  let p = null;
   try {
-    id = (await window.desk.themePrefs())?.dark || id;
+    p = await window.desk.themePrefs();
   } catch {}
-  const t = findTheme(id) || findTheme(DEFAULT_DARK_ID);
-  applyTheme(deriveTokens(t, { glass: 'off' }), document.documentElement);
+  const t = findTheme(p?.dark) || findTheme(DEFAULT_DARK_ID);
+  applyTheme(deriveTokens(t, { accent: p?.accent }), document.documentElement);
 }
 
 // Settings changed in the main window reach this one through storage events (same origin).

@@ -110,7 +110,7 @@ export function ContextMenu() {
 
   if (!m) return null;
   return (
-    <div class="menu ctx glass-3" role="menu" ref={box} tabIndex={-1} style="visibility:hidden" onContextMenu={(e) => e.preventDefault()}>
+    <div class="menu ctx" role="menu" ref={box} tabIndex={-1} style="visibility:hidden" onContextMenu={(e) => e.preventDefault()}>
       <MenuItems items={m.items} close={closeMenu} />
     </div>
   );

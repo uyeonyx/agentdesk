@@ -6,11 +6,11 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { connect } from './api.js';
 import { useStore, projectOf } from './store.js';
 import { bootTheme } from './app/theme.js';
-import { isBlocked, isBusy, compareTasks, whyOf, askOf, firstLine } from './core/status.js';
+import { isBlocked, isBusy, compareTasks, whyOf, firstLine, lampOf, lampTimer } from './core/status.js';
 import { enterAction } from './core/sendPolicy.js';
 import { quickSend } from './actions.js';
 import { PromptCard } from './features/prompt/PromptCard.jsx';
-import { Glyph, I } from './ui/bits.jsx';
+import { Glyph, I, Lamp, useNow } from './ui/bits.jsx';
 import { Tooltip } from './ui/Tooltip.jsx';
 
 function Panel() {
@@ -96,18 +96,21 @@ function Panel() {
 
 function Item({ t, p, focused, onFocus }) {
   const blocked = isBlocked(t);
-  const ask = askOf(t);
+  const now = useNow();
+  const l = lampOf(t);
   return (
     <section class={`pn-item ${focused ? 'focused' : ''} ${blocked ? 'blocked' : ''}`} data-task-id={t.id} onMouseDown={onFocus}>
       <div class="pn-ih">
-        <Glyph project={p} size={22} task={t} />
+        <Glyph project={p} size={24} />
         <span class="pn-id">
           <span class="pn-p">{p?.name}</span>
           <button class="pn-t" onClick={() => window.desk.open(t.id)}>
             {t.title}
           </button>
         </span>
-        {ask ? <span class="askchip">{ask.short}</span> : t.state === 'review' ? <span class="pn-tag">새 결과</span> : <span class="pn-tag">답장</span>}
+        <Lamp s={l.s} word={l.word} sm>
+          {lampTimer(t, now)}
+        </Lamp>
       </div>
       {blocked && t.prompt ? (
         <PromptCard task={t} project={p} compact focus={focused} />

@@ -1,11 +1,11 @@
-// The person's theme, live: picked by system light/dark (one theme for each) or fixed, applied as
-// CSS variables, and handed to xterm, Monaco and the window chrome. The choice lives in the main
-// process, so every window (the quick panel too) follows it.
-import { deriveTokens, applyTheme, findTheme, withAccent, BUILTIN_THEMES, DEFAULT_DARK_ID, DEFAULT_LIGHT_ID } from '../theme/index.js';
+// The person's theme, live. The screen is light, dark, or follows the system; each screen kind has
+// its own code·terminal theme (pref.light / pref.dark). Applied as CSS variables and handed to xterm,
+// Monaco and the window chrome. The choice lives in the main process, so every window follows it.
+import { deriveTokens, applyTheme, findTheme, BUILTIN_THEMES, DEFAULT_DARK_ID, DEFAULT_LIGHT_ID } from '../theme/index.js';
 import { api } from '../api.js';
 import { set } from '../store.js';
 
-export const DEFAULT_PREF = { mode: 'system', light: DEFAULT_LIGHT_ID, dark: DEFAULT_DARK_ID, fixed: DEFAULT_DARK_ID, accent: 'theme', glass: 'rich', vibrancy: true, ambient: true };
+export const DEFAULT_PREF = { mode: 'system', light: DEFAULT_LIGHT_ID, dark: DEFAULT_DARK_ID, fixed: DEFAULT_DARK_ID, accent: 'blue' };
 
 let pref = { ...DEFAULT_PREF };
 let userThemes = [];
@@ -26,27 +26,37 @@ export const themePref = () => pref;
 export const currentThemeId = () => currentId;
 export const currentTokens = () => derived;
 
+/** Which screen is showing: 'light' or 'dark'. */
+export function screenKind() {
+  if (pref.mode === 'light' || pref.mode === 'dark') return pref.mode;
+  if (pref.mode === 'fixed') return findTheme(pref.fixed, userThemes)?.kind || pref.fixedKind || 'dark';
+  return systemDark ? 'dark' : 'light';
+}
+
 function resolveId() {
   if (previewId) return previewId;
   if (pref.mode === 'fixed') return pref.fixed;
-  return systemDark ? pref.dark : pref.light;
+  return screenKind() === 'dark' ? pref.dark : pref.light;
+}
+
+// 0.6 and before: "always this theme" (mode fixed). It becomes that screen with that theme on it.
+function migrate(p) {
+  if (p.mode !== 'fixed') return p;
+  const t = findTheme(p.fixed);
+  const kind = t?.kind || p.fixedKind;
+  if (kind !== 'light' && kind !== 'dark') return p;
+  return t ? { ...p, mode: kind, [kind]: t.id } : { ...p, mode: kind };
 }
 
 function apply({ animate = false } = {}) {
   const id = resolveId();
-  const theme = withAccent(findTheme(id, userThemes) || findTheme(systemDark ? DEFAULT_DARK_ID : DEFAULT_LIGHT_ID), pref.accent);
-  const glass = clearMq?.matches ? 'off' : pref.glass || 'rich';
-  derived = deriveTokens(theme, { glass });
+  const theme = findTheme(id, userThemes) || findTheme(systemDark ? DEFAULT_DARK_ID : DEFAULT_LIGHT_ID);
+  derived = deriveTokens(theme, { accent: pref.accent });
   currentId = theme.id;
   const commit = () => {
     const root = document.documentElement;
     applyTheme(derived, root);
-    root.dataset.glass = glass;
-    root.dataset.ambient = pref.ambient === false ? 'still' : 'on';
-    root.dataset.glow = theme.glass?.glow ? 'on' : 'off';
-    // macOS shows the desktop faintly through the window (only faintly: more of it muddies every
-    // theme's colors); elsewhere the backdrop is solid.
-    root.style.setProperty('--app-alpha', window.desk?.platform === 'darwin' && pref.vibrancy !== false && glass !== 'off' ? '0.93' : '1');
+    root.dataset.glass = 'off';
     for (const fn of listeners) fn(derived);
   };
   // A soft cross-fade between themes; previews switch at once so arrowing through stays quick.
@@ -58,7 +68,7 @@ function apply({ animate = false } = {}) {
 export async function bootTheme() {
   try {
     const p = await window.desk?.themePrefs?.();
-    if (p) pref = { ...DEFAULT_PREF, ...p };
+    if (p) pref = migrate({ ...DEFAULT_PREF, ...p });
   } catch {}
   apply();
   darkMq?.addEventListener('change', (e) => {
@@ -88,17 +98,17 @@ export function savePref(patch) {
   pref = { ...pref, ...patch };
   set({ theme: pref });
   // The app needs the fixed theme's kind to match its own menus and title bar to it.
-  window.desk?.setThemePrefs?.({ ...pref, fixedKind: findTheme(pref.fixed, userThemes)?.kind || 'dark' });
+  window.desk?.setThemePrefs?.({ ...pref, fixedKind: screenKind() });
   apply({ animate: true });
 }
 
-/** Pick a theme: in "system" mode it becomes the theme for its own kind (light or dark). */
+/** Pick a code·terminal theme: it becomes the theme of the screen of its own kind (light or dark). */
 export function chooseTheme(id) {
   previewId = null;
   const t = findTheme(id, userThemes);
   if (!t) return;
-  if (pref.mode === 'fixed') savePref({ fixed: id });
-  else savePref({ [t.kind === 'light' ? 'light' : 'dark']: id });
+  const kind = t.kind === 'light' ? 'light' : 'dark';
+  savePref(pref.mode === 'fixed' ? { mode: screenKind(), [kind]: id } : { [kind]: id });
 }
 
 export function previewTheme(id) {

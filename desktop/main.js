@@ -161,14 +161,20 @@ async function runApp() {
     for (const k of ['dark', 'light']) if (isHex(saved[k]?.bg) && isHex(saved[k]?.fg)) chrome[k] = { bg: saved[k].bg, fg: saved[k].fg };
   } catch {}
   // The person's theme choice (see ui/src/app/theme.js); only its shape is checked here.
-  let themePrefs = { mode: 'system', glass: 'rich', vibrancy: true, ambient: true };
+  let themePrefs = { mode: 'system' };
   try {
     themePrefs = { ...themePrefs, ...cleanPrefs(JSON.parse(fs.readFileSync(themeFile, 'utf8'))) };
   } catch {}
-  nativeTheme.themeSource = themePrefs.mode === 'fixed' && ['light', 'dark'].includes(themePrefs.fixedKind) ? themePrefs.fixedKind : 'system';
+  nativeTheme.themeSource = screenSource(themePrefs);
 
   function isHex(c) {
     return typeof c === 'string' && /^#[0-9a-f]{6}$/i.test(c);
+  }
+  // The screen the person picked: light, dark, or the system's (0.6's "fixed" carries its kind).
+  function screenSource(p) {
+    if (p.mode === 'light' || p.mode === 'dark') return p.mode;
+    if (p.mode === 'fixed' && ['light', 'dark'].includes(p.fixedKind)) return p.fixedKind;
+    return 'system';
   }
   function cleanPrefs(p) {
     const out = {};
@@ -179,8 +185,8 @@ async function runApp() {
     return out;
   }
   const scheme = () => (nativeTheme.shouldUseDarkColors ? 'dark' : 'light');
-  // macOS: the desktop shows faintly through the window (the page draws its own tint over it).
-  const seeThrough = () => mac && themePrefs.vibrancy !== false && themePrefs.glass !== 'off';
+  // The window is solid: the app paints its own background (0.7 standard, no glass or see-through).
+  const seeThrough = () => false;
 
   function applyChrome(w) {
     if (!w || w.isDestroyed()) return;
@@ -212,7 +218,7 @@ async function runApp() {
   ipcMain.on('desk:theme-set', (e, p) => {
     if (!isTrustedFrame(e.senderFrame) || !p || typeof p !== 'object') return;
     themePrefs = { ...themePrefs, ...cleanPrefs(p) };
-    nativeTheme.themeSource = themePrefs.mode === 'fixed' && ['light', 'dark'].includes(themePrefs.fixedKind) ? themePrefs.fixedKind : 'system';
+    nativeTheme.themeSource = screenSource(themePrefs);
     try {
       fs.writeFileSync(themeFile, JSON.stringify(themePrefs));
     } catch {}
@@ -325,7 +331,8 @@ async function runApp() {
       alwaysOnTop: true,
       hasShadow: true,
       title: 'Agent Desk',
-      ...(mac ? { type: 'panel', vibrancy: 'popover', visualEffectState: 'active', transparent: true, backgroundColor: '#00000000', roundedCorners: true } : { backgroundColor: chrome[scheme()].bg }),
+      ...(mac ? { type: 'panel', roundedCorners: true } : {}),
+      backgroundColor: chrome[scheme()].bg,
       webPreferences,
     });
     if (mac) panel.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });

@@ -1,35 +1,49 @@
-/* Primitives: buttons, fields, menus, sheets, toasts, marks. */
+/* Primitives, drawn to the 0.7 standard: buttons, fields, menus, sheets, toasts, marks, and the
+   instrument parts (lamp, meter, plate, readout strip). Values come from tokens only. */
 
-/* ---------------------------------------------------------------- buttons */
+/* ---------------------------------------------------------------- surfaces
+   The old glass classes, now plain: bars sit on the chrome color, cards are white with a soft edge,
+   popovers are white and lifted. */
+.glass {
+  background: var(--chrome);
+}
+.glass-2 {
+  background: var(--surface);
+  box-shadow: var(--e-0);
+}
+.glass-3 {
+  background: var(--surface);
+  box-shadow: var(--e-1);
+}
+
+/* ---------------------------------------------------------------- buttons
+   White and lifted by default; the one filled button is the main answer on what you're looking at.
+   .soft is the main answer everywhere else. */
 .btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--r-2);
-  font: var(--w-3) var(--fs-3) / 1 var(--font);
+  height: var(--h-md);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-1);
+  font: var(--w-2) var(--t-md) / 1 var(--font);
+  letter-spacing: -0.006em;
   color: var(--text);
-  /* A raised plate with a crisp edge, not a gray veil over the panel. */
-  background: var(--bg-raised);
-  box-shadow:
-    inset 0 0 0 1px var(--line-strong),
-    0 1px 1px rgb(0 0 0 / 0.05);
+  background: var(--surface);
+  box-shadow: var(--e-0);
   white-space: nowrap;
-  transition:
-    background var(--dur-2) var(--ease-out),
-    box-shadow var(--dur-2) var(--ease-out),
-    transform var(--dur-3) var(--ease-spring),
+  transition: background var(--dur-2) var(--ease),
+    box-shadow var(--dur-2) var(--ease),
+    transform var(--dur-2) var(--ease),
     opacity var(--dur-2);
 }
 .btn:hover {
-  background: linear-gradient(var(--bg-hover), var(--bg-hover)), var(--bg-raised);
+  background: var(--hover);
 }
 .btn:active {
-  transform: scale(0.97);
-  transition-duration: var(--dur-1);
+  transform: translateY(1px);
 }
 .btn:disabled {
   opacity: 0.45;
@@ -40,31 +54,41 @@
 }
 .btn kbd {
   margin-left: 2px;
-  background: rgb(0 0 0 / 0.12);
+  background: transparent;
   box-shadow: none;
   color: inherit;
-  opacity: 0.7;
+  opacity: 0.72;
 }
 .btn.primary {
-  color: var(--accent-ink);
-  background: var(--accent);
-  box-shadow: 0 1px 1px rgb(0 0 0 / 0.12);
+  color: var(--accent-fill-ink);
+  background: var(--accent-fill);
+  box-shadow: none;
+  font-weight: var(--w-3);
 }
 .btn.primary:hover {
-  background: color-mix(in oklab, var(--accent) 86%, var(--bg-surface));
+  background: color-mix(in oklab, var(--accent-fill) 90%, var(--text));
+}
+.btn.soft {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  box-shadow: none;
 }
 .btn.warn {
-  color: var(--warn-fill-ink);
-  background: var(--warn-fill);
+  color: var(--warn-text);
+  background: var(--warn-soft);
+  box-shadow: none;
 }
 .btn.danger {
   color: var(--danger-text);
+  background: var(--surface);
+}
+.btn.danger:hover {
   background: var(--danger-soft);
-  box-shadow: inset 0 0 0 1px var(--danger-line);
 }
 .btn.danger.solid {
   color: var(--danger-ink);
   background: var(--danger);
+  box-shadow: none;
 }
 .btn.ghost {
   background: transparent;
@@ -73,97 +97,79 @@
 }
 .btn.ghost:hover {
   color: var(--text);
-  background: var(--bg-hover);
+  background: var(--hover);
 }
 .btn.sm {
-  height: 26px;
-  padding: 0 9px;
-  font-size: var(--fs-2);
-  border-radius: var(--r-1);
+  height: var(--h-sm);
+  padding: 0 10px;
+  font-size: var(--t-sm);
 }
 .btn.lg {
-  height: 38px;
-  padding: 0 16px;
-  font-size: var(--fs-4);
-  border-radius: var(--r-3);
-}
-.btn.pill {
-  border-radius: var(--r-full);
+  height: 40px;
+  padding: 0 var(--sp-4);
+  font-size: var(--t-lg);
 }
 /* A careful project's first press only arms the button. */
 .btn.armed {
-  animation: armed 1.2s var(--ease-in-out) infinite;
-}
-@keyframes armed {
-  50% {
-    box-shadow: 0 0 0 3px var(--warn-line);
-  }
+  box-shadow: 0 0 0 2px var(--warn);
 }
 
 .ibtn {
   display: inline-grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--r-2);
+  width: var(--h-md);
+  height: var(--h-md);
+  border-radius: var(--r-1);
   color: var(--text-2);
   font-size: 17px;
-  transition:
-    background var(--dur-2),
-    color var(--dur-2),
-    transform var(--dur-3) var(--ease-spring);
+  transition: background var(--dur-2),
+    color var(--dur-2);
 }
 .ibtn:hover {
   color: var(--text);
-  background: var(--bg-hover);
-}
-.ibtn:active {
-  transform: scale(0.92);
+  background: var(--hover);
 }
 .ibtn.on {
   color: var(--text);
-  background: var(--bg-active);
+  background: var(--pressed);
 }
 .ibtn.sm {
-  width: 26px;
-  height: 26px;
+  width: var(--h-sm);
+  height: var(--h-sm);
   font-size: 15px;
-  border-radius: var(--r-1);
 }
 
 /* ---------------------------------------------------------------- fields */
 .field {
   width: 100%;
-  height: 34px;
-  padding: 0 12px;
-  border-radius: var(--r-2);
+  height: var(--h-md);
+  padding: 0 var(--sp-3);
   border: 0;
-  background: var(--bg-inset);
-  box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: var(--r-1);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+  font-size: var(--t-md);
   transition: box-shadow var(--dur-2);
 }
 textarea.field {
   height: auto;
-  padding: 10px 12px;
+  padding: 10px var(--sp-3);
   resize: none;
-  line-height: var(--lh-3);
+  line-height: var(--lh-md);
 }
 .field::placeholder {
   color: var(--text-3);
 }
-:root[data-theme-kind='light'] .field {
-  background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+.field:focus {
+  box-shadow: inset 0 0 0 1px var(--accent-line),
+    0 0 0 3px var(--accent-soft);
 }
-/* A select drawn like the other fields, with its own chevron in the text color. */
 select.field {
   -webkit-appearance: none;
   appearance: none;
-  padding-right: 32px;
+  padding-right: var(--sp-6);
   cursor: pointer;
-  font: inherit;
   color: var(--text);
-  background-image: none;
 }
 .sel {
   position: relative;
@@ -183,33 +189,26 @@ select.field {
   color: var(--text-3);
   pointer-events: none;
 }
-.field:focus {
-  box-shadow:
-    inset 0 0 0 1px var(--accent),
-    0 0 0 3px var(--accent-soft);
-}
 
-/* Segmented control: the chosen one sits on a raised plate. */
+/* Segmented control: the chosen one sits on a white key. */
 .seg {
   display: inline-flex;
-  padding: 3px;
+  padding: 4px;
   gap: 2px;
   border-radius: var(--r-2);
-  background: var(--bg-inset);
-  box-shadow: inset 0 0 0 1px var(--line);
+  background: var(--surface-2);
 }
 .seg button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 26px;
-  padding: 0 11px;
-  border-radius: 7px;
-  font-size: var(--fs-2);
-  font-weight: var(--w-3);
+  padding: 0 var(--sp-3);
+  border-radius: var(--r-1);
+  font-size: var(--t-md);
+  font-weight: var(--w-2);
   color: var(--text-2);
-  transition:
-    background var(--dur-2),
+  transition: background var(--dur-2),
     color var(--dur-2),
     box-shadow var(--dur-2);
 }
@@ -219,14 +218,12 @@ select.field {
 .seg button[aria-pressed='true'],
 .seg button[aria-selected='true'] {
   color: var(--text);
-  background: var(--bg-overlay);
-  box-shadow:
-    inset 0 1px 0 var(--glass-edge),
-    0 1px 3px rgb(0 0 0 / 0.18);
+  background: var(--surface);
+  box-shadow: var(--e-0);
 }
 .seg .n {
   color: var(--text-3);
-  font-weight: var(--w-2);
+  font-weight: var(--w-1);
 }
 
 .switch {
@@ -234,9 +231,8 @@ select.field {
   width: 34px;
   height: 20px;
   flex: none;
-  border-radius: var(--r-full);
-  background: var(--bg-active);
-  box-shadow: inset 0 0 0 1px var(--line);
+  border-radius: var(--r-3);
+  background: var(--line-2);
   transition: background var(--dur-2);
 }
 .switch::after {
@@ -247,16 +243,12 @@ select.field {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 1px 3px rgb(0 0 0 / 0.3);
-  transition: transform var(--dur-3) var(--ease-spring);
+  background: var(--surface);
+  box-shadow: var(--e-0);
+  transition: transform var(--dur-3) var(--ease);
 }
 .switch[aria-checked='true'] {
-  background: var(--accent);
-  box-shadow: none;
-}
-.switch[aria-checked='true']::after {
-  background: #fff;
+  background: var(--accent-fill);
 }
 .switch[aria-checked='true']::after {
   transform: translateX(14px);
@@ -264,28 +256,30 @@ select.field {
 
 /* ---------------------------------------------------------------- menus & popovers */
 .menu {
-  min-width: 236px;
-  padding: 5px;
+  min-width: 224px;
+  padding: 6px;
   border-radius: var(--r-3);
+  background: var(--surface);
+  box-shadow: var(--e-1);
   z-index: var(--z-menu);
 }
 .menu.ctx {
   position: fixed;
   max-height: calc(100vh - 12px);
   overflow-y: auto;
-  animation: pop var(--dur-2) var(--ease-out);
+  animation: pop var(--dur-2) var(--ease);
 }
 .li {
   display: grid;
-  grid-template-columns: 22px 1fr auto;
+  grid-template-columns: 20px 1fr auto;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   width: 100%;
-  min-height: 32px;
-  padding: 0 9px;
-  border-radius: 9px;
+  min-height: var(--h-md);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-1);
   text-align: left;
-  font-size: var(--fs-3);
+  font-size: var(--t-md);
   color: var(--text);
 }
 .li .ti {
@@ -294,12 +288,11 @@ select.field {
 }
 .li:hover,
 .li:focus-visible {
-  background: var(--bg-active);
+  background: var(--hover);
   box-shadow: none;
 }
-/* The chosen one in a list (settings sections, projects): in the accent, the way a Mac sidebar is. */
+/* The chosen one in a list (settings sections, projects). */
 .li.on {
-  color: var(--accent-text);
   font-weight: var(--w-3);
   background: var(--accent-soft);
 }
@@ -332,12 +325,12 @@ select.field {
   border: 0;
   height: 1px;
   background: var(--line);
-  margin: 5px 6px;
+  margin: 6px var(--sp-1);
 }
 @keyframes pop {
   from {
     opacity: 0;
-    transform: scale(0.97) translateY(-2px);
+    transform: translateY(-2px);
   }
 }
 
@@ -346,16 +339,23 @@ select.field {
   z-index: var(--z-menu);
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   width: max-content;
   max-width: min(320px, calc(100vw - 20px));
   word-break: keep-all;
-  padding: 6px 9px;
-  border-radius: var(--r-2);
-  font-size: var(--fs-2);
-  line-height: var(--lh-2);
+  padding: 6px var(--sp-2);
+  border-radius: var(--r-1);
+  font-size: var(--t-sm);
+  line-height: var(--lh-sm);
+  color: var(--surface);
+  background: var(--text);
   pointer-events: none;
-  animation: fadein var(--dur-2) var(--ease-out);
+  animation: fadein var(--dur-2) var(--ease);
+}
+.tip kbd {
+  color: inherit;
+  background: color-mix(in oklab, var(--surface) 18%, transparent);
+  box-shadow: none;
 }
 @keyframes fadein {
   from {
@@ -371,20 +371,18 @@ select.field {
   display: grid;
   place-items: start center;
   padding-top: 12vh;
-  background: rgb(0 0 0 / 0.26);
-  backdrop-filter: blur(2px);
-  animation: fadein var(--dur-2) var(--ease-out);
-}
-:root[data-theme-kind='light'] .scrim {
-  background: rgb(20 22 30 / 0.12);
+  background: var(--scrim);
+  animation: fadein var(--dur-2) var(--ease);
 }
 .sheet {
   width: min(560px, calc(100vw - 48px));
   max-height: 76vh;
   display: flex;
   flex-direction: column;
-  border-radius: var(--r-4);
-  animation: rise var(--dur-3) var(--ease-spring);
+  border-radius: var(--r-3);
+  background: var(--surface);
+  box-shadow: var(--e-2);
+  animation: rise var(--dur-3) var(--ease);
 }
 .sheet.wide {
   width: min(720px, calc(100vw - 48px));
@@ -392,32 +390,32 @@ select.field {
 .sheet-h {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 18px 20px 6px;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-4) var(--sp-2) var(--sp-5);
 }
 .sheet-h h2 {
   margin: 0;
-  font-size: var(--fs-5);
-  line-height: var(--lh-5);
-  font-weight: var(--w-4);
-  letter-spacing: -0.01em;
+  font-size: var(--t-title);
+  line-height: var(--lh-title);
+  font-weight: var(--w-3);
+  letter-spacing: -0.015em;
 }
 .sheet-h .sub {
-  color: var(--text-2);
-  font-size: var(--fs-2);
+  color: var(--text-3);
+  font-size: var(--t-sm);
 }
 .sheet-b {
-  padding: 10px 20px 16px;
+  padding: var(--sp-2) var(--sp-5) var(--sp-5);
   overflow: auto;
-  font-size: var(--fs-4);
-  line-height: var(--lh-4);
+  font-size: var(--t-lg);
+  line-height: var(--lh-lg);
 }
 .sheet-f {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--line);
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  box-shadow: inset 0 1px 0 var(--line);
 }
 .sheet-f .sp {
   flex: 1;
@@ -425,7 +423,7 @@ select.field {
 @keyframes rise {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.98);
+    transform: translateY(8px);
   }
 }
 
@@ -433,43 +431,44 @@ select.field {
 .toasts {
   position: fixed;
   left: 50%;
-  bottom: 18px;
+  bottom: var(--sp-5);
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   transform: translateX(-50%);
   pointer-events: none;
 }
 .toast {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-3);
   max-width: min(560px, 90vw);
-  min-height: 40px;
-  padding: 6px 6px 6px 14px;
-  border-radius: var(--r-full);
-  font-size: var(--fs-3);
+  min-height: 44px;
+  padding: 6px 6px 6px var(--sp-4);
+  border-radius: var(--r-3);
+  font-size: var(--t-md);
+  background: var(--surface);
+  box-shadow: var(--e-1);
   pointer-events: auto;
-  animation: rise var(--dur-3) var(--ease-spring);
+  animation: rise var(--dur-3) var(--ease);
 }
 .toast > .ti {
   font-size: 16px;
-  color: var(--text-2);
+  color: var(--ok);
 }
 .toast.err > .ti {
   color: var(--danger-text);
 }
 .toast .msg {
-  padding-right: 8px;
+  padding-right: var(--sp-2);
 }
 .toast .btn {
-  height: 28px;
-  border-radius: var(--r-full);
+  height: var(--h-sm);
 }
 
-/* ---------------------------------------------------------------- marks */
+/* ---------------------------------------------------------------- project glyph and its lamp */
 .glyph {
   position: relative;
   display: inline-grid;
@@ -477,11 +476,10 @@ select.field {
   flex: none;
   width: 22px;
   height: 22px;
-  border-radius: 6px;
+  border-radius: var(--r-1);
   font-size: 13px;
-  color: var(--room-ink, #fff);
-  background: var(--room);
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  color: var(--room-ink);
+  background: color-mix(in oklab, var(--room) 88%, var(--surface));
 }
 .glyph img {
   width: 100%;
@@ -490,10 +488,9 @@ select.field {
   border-radius: inherit;
 }
 .glyph.has-logo {
-  background: var(--bg-raised);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+  background: var(--surface);
 }
-/* A hairline over the logo's edge, so a white logo doesn't melt into a light theme. */
+/* A hairline over the logo's edge, so a white logo doesn't melt into a light screen. */
 .glyph.has-logo::after {
   content: '';
   position: absolute;
@@ -503,49 +500,6 @@ select.field {
   pointer-events: none;
 }
 
-/* Status, at the corner of a project glyph: a turning ring while working, amber when stuck. */
-.mark {
-  position: absolute;
-  right: -3px;
-  bottom: -3px;
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  background: var(--text-3);
-  box-shadow: 0 0 0 2px var(--mark-ring, var(--bg-app));
-}
-.mark.working {
-  background: var(--mark-ring, var(--bg-app));
-  border: 2px solid var(--accent);
-  border-right-color: transparent;
-  animation: turn 0.9s linear infinite;
-}
-.mark.waiting {
-  background: transparent;
-  box-shadow:
-    0 0 0 2px var(--mark-ring, var(--bg-app)),
-    inset 0 0 0 1.5px var(--text-2);
-}
-.mark.blocked {
-  background: var(--warn-fill);
-}
-@keyframes pulse {
-  50% {
-    opacity: 0.35;
-  }
-}
-.mark.yours {
-  background: var(--accent);
-}
-.mark.review {
-  background: var(--ok);
-}
-.mark.stopped {
-  background: transparent;
-  box-shadow:
-    0 0 0 2px var(--mark-ring, var(--bg-app)),
-    inset 0 0 0 1.5px var(--text-3);
-}
 @keyframes turn {
   to {
     transform: rotate(1turn);
@@ -557,41 +511,19 @@ select.field {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 1.5px solid var(--line-strong);
+  border: 1.5px solid var(--line-2);
   border-top-color: var(--text-2);
   animation: turn 0.8s linear infinite;
 }
 .spin.xs {
-  width: 9px;
-  height: 9px;
-  border-width: 1.5px;
+  width: 10px;
+  height: 10px;
   border-color: var(--accent-soft);
-  border-top-color: var(--accent);
+  border-top-color: var(--accent-mark);
 }
 
-.count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: var(--r-full);
-  font: var(--w-3) var(--fs-1) / 1 var(--font);
-  font-variant-numeric: tabular-nums;
-  color: var(--text-2);
-  background: var(--bg-active);
-}
-.count.hot,
-.count.warn {
-  color: var(--warn-fill-ink);
-  background: var(--warn-fill);
-}
-.count.info {
-  color: var(--accent-ink);
-  background: var(--accent);
-}
-
-/* A number that has to be seen: solid, in the color of what it counts. */
+/* ---------------------------------------------------------------- counts, tags, lamps */
+.count,
 .badge {
   display: inline-grid;
   place-items: center;
@@ -599,46 +531,45 @@ select.field {
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  border-radius: 6px;
-  font: var(--w-4) var(--fs-1) / 1 var(--font);
+  border-radius: var(--r-1);
+  font: var(--w-3) var(--t-sm) / 1 var(--font);
   font-variant-numeric: tabular-nums;
-  color: var(--text);
-  background: var(--bg-active);
-}
-.badge.warn {
-  color: var(--warn-fill-ink);
-  background: var(--warn-fill);
-}
-.badge.info {
-  color: var(--accent-ink);
-  background: var(--accent);
-}
-.badge.ok {
-  color: var(--ok-fill-ink);
-  background: var(--ok-fill);
-}
-
-/* A state in one word: tinted, or solid when it's waiting on me. */
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  flex: none;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 5px;
-  font: var(--w-4) 11px / 1 var(--font);
-  vertical-align: 1px;
   color: var(--text-2);
-  background: var(--bg-active);
+  background: var(--surface-2);
 }
-.tag.warn {
+.count.hot,
+.count.warn,
+.badge.warn {
   color: var(--warn-text);
   background: var(--warn-soft);
 }
+.count.info,
+.badge.info {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+.badge.ok {
+  color: var(--ok-text);
+  background: var(--ok-soft);
+}
+
+/* A state in one word. Prefer .lamp; tags stay for the few places a word needs a ground. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  flex: none;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-1);
+  font: var(--w-2) var(--t-sm) / 1 var(--font);
+  color: var(--text-2);
+  background: var(--surface-2);
+}
+.tag.warn,
 .tag.warn.solid {
-  color: var(--warn-fill-ink);
-  background: var(--warn-fill);
+  color: var(--warn-text);
+  background: var(--warn-soft);
 }
 .tag.info {
   color: var(--accent-text);
@@ -656,17 +587,126 @@ select.field {
   font-size: 12px;
 }
 
+/* Lamp: one dot and one word, the only colored thing about an item. */
+.lamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-md);
+  line-height: var(--lh-md);
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.lamp > i {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--lamp, var(--idle));
+}
+.lamp.sm {
+  font-size: var(--t-sm);
+  line-height: var(--lh-sm);
+}
+.lamp .num {
+  color: var(--text-3);
+}
+.lamp[data-s='wait'] {
+  --lamp: var(--warn);
+}
+.lamp[data-s='reply'],
+.lamp[data-s='work'] {
+  --lamp: var(--info);
+}
+.lamp[data-s='result'] {
+  --lamp: var(--ok);
+}
+.lamp[data-s='fail'] {
+  --lamp: var(--danger);
+  color: var(--danger-text);
+}
+
+/* Segment meter: a few segments and a reading (context, usage, to-dos). */
+.segmeter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-sm);
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.segmeter .bars {
+  display: inline-flex;
+  gap: 2px;
+}
+.segmeter .bars i {
+  width: 4px;
+  height: 10px;
+  border-radius: 1px;
+  background: var(--line-2);
+}
+.segmeter .bars i.on {
+  background: var(--accent-mark);
+}
+.segmeter.hi .bars i.on {
+  background: var(--warn);
+}
+.segmeter .num {
+  color: var(--text);
+  font-weight: var(--w-2);
+}
+
+/* Plate: one surface split into cells by hairlines (no card per item). Each cell draws its own
+   hairline into the 1px gaps, so a short last row leaves plain white, not a gray hole. */
+.plate {
+  display: grid;
+  gap: 1px;
+  background: var(--surface);
+  border-radius: var(--r-2);
+  overflow: hidden;
+  box-shadow: var(--e-0);
+}
+.plate > .cell {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line);
+}
+/* A standalone group (settings, sheets): white, a soft edge. */
+.card {
+  background: var(--surface);
+  border-radius: var(--r-2);
+  box-shadow: var(--e-0);
+}
+
+/* Section label above a group: name and a quiet count. */
+.label {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  font-size: var(--t-md);
+  line-height: var(--lh-md);
+  font-weight: var(--w-3);
+  color: var(--text-2);
+}
+.label .num {
+  font-weight: var(--w-1);
+  color: var(--text-3);
+}
+
 .empty {
   display: grid;
   place-items: center;
   gap: 10px;
-  padding: 48px 24px;
+  padding: 48px var(--sp-5);
   text-align: center;
   color: var(--text-2);
 }
 .empty h3 {
   margin: 0;
   color: var(--text);
-  font-size: var(--fs-5);
+  font-size: var(--t-title);
   font-weight: var(--w-3);
 }

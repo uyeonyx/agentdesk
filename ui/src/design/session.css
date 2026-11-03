@@ -27,9 +27,9 @@
   align-items: center;
   gap: 6px;
   height: 28px;
-  padding: 0 9px;
-  border-radius: 9px;
-  font-size: 12.5px;
+  padding: 0 8px;
+  border-radius: var(--r-3);
+  font-size: var(--t-sm);
   font-weight: var(--w-3);
   color: var(--text-2);
   white-space: nowrap;
@@ -38,20 +38,20 @@
 .chip2:hover,
 .ctxm:hover {
   color: var(--text);
-  background: var(--bg-hover);
+  background: var(--hover);
 }
 .chip2 .dn {
   font-size: 12px;
   color: var(--text-3);
 }
 .mchip {
-  font-weight: var(--w-4);
+  font-weight: var(--w-3);
   color: var(--mc);
   background: color-mix(in oklab, var(--mc) 13%, transparent);
   box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--mc) 38%, transparent);
 }
 .mchip.m- {
-  background: var(--bg-active);
+  background: var(--pressed);
   box-shadow: none;
 }
 .mchip:hover {
@@ -59,7 +59,9 @@
 }
 .mchip .k {
   margin-left: 2px;
-  font: var(--w-3) 11px var(--font);
+  font-family: var(--font);
+  font-size: var(--t-sm);
+  font-weight: var(--w-3);
   color: color-mix(in oklab, var(--mc) 70%, var(--text-3));
 }
 .mchip.ico {
@@ -69,7 +71,7 @@
   justify-content: center;
 }
 .ctxm b {
-  font-weight: var(--w-4);
+  font-weight: var(--w-3);
 }
 .ctxm.hi,
 .ctxmini.hi {
@@ -85,7 +87,7 @@
 }
 .ring circle {
   fill: none;
-  stroke: var(--bg-active);
+  stroke: var(--pressed);
   stroke-width: 3.2;
 }
 .ring .fg {
@@ -98,16 +100,16 @@
   align-items: center;
   gap: 4px;
   flex: none;
-  font-size: 11.5px;
+  font-size: var(--t-sm);
   font-weight: var(--w-3);
   color: var(--text-3);
 }
 .mm {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   flex: none;
-  font-weight: var(--w-4);
+  font-weight: var(--w-3);
   color: var(--mc);
 }
 .mm .ti {
@@ -122,6 +124,8 @@
   border-radius: var(--r-3);
   outline: none;
   animation: pop-in var(--dur-2) var(--ease-out);
+  background: var(--surface);
+  box-shadow: var(--e-1);
 }
 @keyframes pop-in {
   from {
@@ -134,8 +138,8 @@
   align-items: baseline;
   gap: 8px;
   padding: 6px 10px 8px;
-  font-size: 12px;
-  font-weight: var(--w-4);
+  font-size: var(--t-sm);
+  font-weight: var(--w-3);
   color: var(--text-3);
 }
 .pk-h span {
@@ -148,14 +152,14 @@
   gap: 10px;
   width: 100%;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--r-3);
   text-align: left;
 }
 .pk-li.on {
-  background: var(--bg-hover);
+  background: var(--hover);
 }
 .pk-li[aria-selected='true'] {
-  background: var(--bg-active);
+  background: var(--pressed);
 }
 .pk-li:disabled {
   opacity: 0.55;
@@ -167,7 +171,7 @@
   place-items: center;
   width: 26px;
   height: 26px;
-  border-radius: 7px;
+  border-radius: var(--r-2);
   color: var(--mc, var(--text-2));
   background: color-mix(in oklab, var(--mc, var(--text-2)) 14%, transparent);
 }
@@ -179,16 +183,16 @@
   min-width: 0;
 }
 .pk-t b {
-  font-size: 13.5px;
-  font-weight: var(--w-4);
+  font-size: var(--t-md);
+  font-weight: var(--w-3);
 }
 .pk-t span {
-  font-size: 12px;
+  font-size: var(--t-sm);
   line-height: 17px;
   color: var(--text-2);
 }
 .pk-ck {
-  margin-top: 5px;
+  margin-top: 6px;
   color: var(--accent-text);
 }
 .pk-ctx {
@@ -198,24 +202,24 @@
   padding: 4px 10px 8px;
 }
 .pk-ctx-n {
-  font-size: 13.5px;
+  font-size: var(--t-md);
   color: var(--text-2);
 }
 .pk-ctx-n b {
-  font-size: 16px;
+  font-size: var(--t-title);
   color: var(--text);
 }
 .pk-ctx p {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--t-sm);
   line-height: 18px;
   color: var(--text-3);
 }
 .pk-bar {
   display: block;
   height: 8px;
-  border-radius: 4px;
-  background: var(--bg-active);
+  border-radius: var(--r-1);
+  background: var(--pressed);
   overflow: hidden;
 }
 .pk-bar i {
@@ -225,7 +229,7 @@
   background: var(--act-edit);
 }
 .pk-bar.hi i {
-  background: var(--warn-fill);
+  background: var(--warn-soft);
 }
 .pk-bar.max i {
   background: var(--danger);
@@ -248,9 +252,9 @@
   white-space: nowrap;
   flex: none;
   height: 26px;
-  padding: 0 11px;
+  padding: 0 12px;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--t-md);
 }
 
 /* ---------------------------------------------------------------- plan usage (Claude Code's /usage) */
@@ -259,19 +263,19 @@
   align-items: center;
   gap: 6px;
   height: 28px;
-  padding: 0 9px;
+  padding: 0 8px;
   border-radius: var(--r-2);
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--text-2);
   white-space: nowrap;
 }
 .usage:hover,
 .usage[aria-expanded='true'] {
-  background: var(--bg-hover);
+  background: var(--hover);
   color: var(--text);
 }
 .usage b {
-  font-weight: 600;
+  font-weight: var(--w-3);
   color: var(--text);
 }
 .usage .sep2 {
@@ -293,8 +297,10 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  border-radius: 14px;
+  border-radius: var(--r-3);
   outline: none;
+  background: var(--surface);
+  box-shadow: var(--e-1);
 }
 .ug {
   display: flex;
@@ -306,41 +312,41 @@
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--t-md);
+  font-weight: var(--w-3);
   color: var(--text);
 }
 .ug h4 span {
-  font-size: 11.5px;
-  font-weight: 400;
+  font-size: var(--t-sm);
+  font-weight: var(--w-1);
   color: var(--text-3);
 }
 .ur {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  row-gap: 5px;
+  row-gap: 6px;
   align-items: baseline;
-  font-size: 12.5px;
+  font-size: var(--t-sm);
 }
 .ur-l {
   color: var(--text-2);
 }
 .ur b {
-  font-size: 13px;
+  font-size: var(--t-md);
   color: var(--text);
 }
 .ur .meter {
   grid-column: 1 / -1;
   height: 6px;
-  border-radius: 3px;
-  background: var(--bg-active);
+  border-radius: var(--r-1);
+  background: var(--pressed);
   overflow: hidden;
 }
 .ur .meter i {
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--accent);
+  background: var(--accent-fill);
 }
 .ur.hi .meter i {
   background: var(--warn);
@@ -356,13 +362,13 @@
 }
 .ur-s {
   grid-column: 1 / -1;
-  font-size: 11.5px;
+  font-size: var(--t-sm);
   color: var(--text-3);
 }
 .ur-empty,
 .ur-err {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--t-sm);
   color: var(--text-3);
 }
 .ur-err {
@@ -374,7 +380,7 @@
   gap: 10px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-  font-size: 11.5px;
+  font-size: var(--t-sm);
   line-height: 1.5;
   color: var(--text-3);
 }

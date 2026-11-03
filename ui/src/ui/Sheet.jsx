@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'preact/hooks';
 import { closeModal } from '../store.js';
 
-/** A dialog on glass: Esc or a press on the backdrop closes it; focus comes back where it was. */
+/** A dialog: Esc or a press on the backdrop closes it; focus comes back where it was. */
 export function Sheet({ children, wide, onClose = closeModal, label, class: cls = '' }) {
   const ref = useRef();
   useEffect(() => {
@@ -26,7 +26,7 @@ export function Sheet({ children, wide, onClose = closeModal, label, class: cls 
   }, [onClose]);
   return (
     <div class="scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div class={`sheet glass-3 ${wide ? 'wide' : ''} ${cls}`} ref={ref} role="dialog" aria-modal="true" aria-label={label}>
+      <div class={`sheet ${wide ? 'wide' : ''} ${cls}`} ref={ref} role="dialog" aria-modal="true" aria-label={label}>
         {children}
       </div>
     </div>

@@ -106,7 +106,7 @@ function UsagePop({ anchor, u, busy, onClose }) {
   }, []);
   useDismiss(true, onClose, ref);
   return createPortal(
-    <div ref={ref} class="usage-pop glass-3" tabIndex={-1} role="dialog" aria-label="사용량" style={{ left: (pos?.left ?? -9999) + 'px', top: (pos?.top ?? -9999) + 'px' }} data-testid="usage-pop">
+    <div ref={ref} class="usage-pop" tabIndex={-1} role="dialog" aria-label="사용량" style={{ left: (pos?.left ?? -9999) + 'px', top: (pos?.top ?? -9999) + 'px' }} data-testid="usage-pop">
       <UsageRows u={u} />
       <div class="up-f">
         <span>Claude Code의 /usage 화면 값을 그대로 읽어요 · 앱이 따로 API를 부르지 않아요</span>

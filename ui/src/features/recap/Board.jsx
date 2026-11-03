@@ -2,10 +2,9 @@
 // itself when I come back to the window after a while and new ones came in meanwhile.
 import { useEffect } from 'preact/hooks';
 import { useStore, set, get, projectOf } from '../../store.js';
-import { isLive, isBlocked, compareTasks } from '../../core/status.js';
+import { isLive, isBlocked, compareTasks, lampOf } from '../../core/status.js';
 import { openTask } from '../../actions.js';
-import { StateChip } from '../overview/Overview.jsx';
-import { Glyph, I, ago } from '../../ui/bits.jsx';
+import { Glyph, I, Lamp, ago } from '../../ui/bits.jsx';
 
 const AWAY_MS = 2 * 60_000;
 
@@ -55,7 +54,7 @@ export function Board() {
   const close = () => set({ board: null });
   return (
     <div class="board" onMouseDown={(e) => e.target === e.currentTarget && close()} data-testid="board">
-      <div class="board-w glass-3" role="dialog" aria-label="세션 요약">
+      <div class="board-w" role="dialog" aria-label="세션 요약">
         <header class="bd-h">
           <div>
             <h3>{away ? `자리 비운 ${ago(s.since)} 동안` : '세션 요약'}</h3>
@@ -72,14 +71,14 @@ export function Board() {
             return (
               <div key={t.id} class={`bc ${isBlocked(t) ? 'b' : ''}`}>
                 <div class="bc-h">
-                  <Glyph project={p} size={28} task={t} />
+                  <Glyph project={p} size={28} />
                   <div class="tt">
                     <b>{t.title}</b>
                     <span>
                       {p?.name} · {t.agent === 'codex' ? 'Codex' : 'Claude Code'}
                     </span>
                   </div>
-                  <StateChip t={t} />
+                  <Lamp {...lampOf(t)} />
                 </div>
                 <p>{t.recap.text}</p>
                 <div class="bc-f">

@@ -1,54 +1,58 @@
-/* Everything that isn't a color. Colors come from the theme engine (ui/src/theme), which sets them
-   on :root before the first frame; the values below only cover the moment before that. */
+/* Everything that isn't a color. Colors come from the theme engine (ui/src/theme/base.js for the
+   app, the picked theme for code), set on :root before the first frame. test/design-lint.test.js
+   holds every stylesheet to these names. */
 
 :root {
-  /* Type: six sizes, four weights. 13 is the UI, 15 is for reading and writing. */
+  /* 0.7 standard (instrument panel). Type: 12 13 14 15 22 28, weights 400 500 600 (300 only for the
+     big readout numbers). Spacing in 4px steps. Radii 4 6 10. Controls 28 and 32 high. */
+  --t-sm: 12px;
+  --t-md: 13px;
+  --t-lg: 14px;
+  --t-title: 15px;
+  --t-xl: 22px;
+  --t-num: 28px;
+  --lh-sm: 16px;
+  --lh-md: 20px;
+  --lh-lg: 22px;
+  --lh-title: 22px;
+  --lh-read: 26px;
+  --lh-xl: 30px;
+  --lh-num: 32px;
+  /* The readout strip's big numbers (weight 300). */
+  --t-dial: 40px;
+  --lh-dial: 44px;
+  --w-0: 300;
+  --w-1: 400;
+  --w-2: 500;
+  --w-3: 600;
+
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 40px;
+
+  --r-1: 4px;
+  --r-2: 6px;
+  --r-3: 10px;
+  --r-full: 999px;
+
+  --h-sm: 28px;
+  --h-md: 32px;
+
   --font: 'Pretendard Variable', Pretendard, -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', system-ui, sans-serif;
   /* Hangul in code-ish lines falls back to the UI face: a fixed-width Hangul looks letter-spaced. */
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, 'Pretendard Variable', Pretendard, monospace;
   /* The terminal needs Hangul exactly two cells wide. */
   --font-term: 'Desk Mono', 'D2Coding', ui-monospace, Menlo, monospace;
-  --fs-1: 11px;
-  --lh-1: 16px;
-  --fs-2: 12px;
-  --lh-2: 18px;
-  --fs-3: 13px;
-  --lh-3: 20px;
-  --fs-4: 15px;
-  --lh-4: 26px;
-  --fs-5: 18px;
-  --lh-5: 26px;
-  --fs-6: 24px;
-  --lh-6: 32px;
-  --w-1: 400;
-  --w-2: 520;
-  --w-3: 620;
-  --w-4: 720;
-
-  --s-1: 2px;
-  --s-2: 4px;
-  --s-3: 6px;
-  --s-4: 8px;
-  --s-5: 12px;
-  --s-6: 16px;
-  --s-7: 20px;
-  --s-8: 24px;
-  --s-9: 32px;
-  --s-10: 40px;
-  --s-11: 56px;
-
-  /* Concentric: each level inset by its padding keeps the same center of curvature. */
-  --r-1: 5px;
-  --r-2: 8px;
-  --r-3: 11px;
-  --r-4: 14px;
-  --r-5: 20px;
-  --r-full: 999px;
 
   --dur-1: 90ms;
   --dur-2: 160ms;
   --dur-3: 240ms;
   --dur-4: 320ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   /* A soft spring: overshoots a little and settles. */
@@ -61,46 +65,15 @@
   --z-toast: 200;
   --z-menu: 300;
 
-  --bar-h: 44px;
+  --bar-h: 48px;
   --rail-w: 300px;
   --gap: 8px;
   --col: 760px;
 
-  /* Before the theme arrives: Desk Glass Dark. */
-  --bg-app: #121318;
-  --bg-surface: #17181d;
-  --bg-raised: #1e1f25;
-  --bg-overlay: #24262d;
-  --bg-hover: rgba(255, 255, 255, 0.05);
-  --bg-active: rgba(255, 255, 255, 0.08);
-  --bg-inset: #111216;
-  --line: rgba(255, 255, 255, 0.07);
-  --line-strong: rgba(255, 255, 255, 0.12);
-  --text: #ececf1;
-  --text-2: #a5a7b2;
-  --text-3: #80828d;
-  --accent: #7c8cff;
-  --accent-ink: #0b0d1c;
-  --accent-soft: rgba(124, 140, 255, 0.14);
-  --accent-line: rgba(124, 140, 255, 0.45);
-  --accent-text: #a3aeff;
-  --focus: #7c8cff;
-  --glass-tint: rgba(23, 24, 29, 0.6);
-  --glass-tint-strong: rgba(30, 31, 37, 0.88);
-  --glass-float: rgba(36, 38, 45, 0.94);
-  --glass-blur: 28px;
-  --glass-sat: 180%;
-  --glass-edge: rgba(255, 255, 255, 0.14);
-  --glass-shadow: rgba(0, 0, 0, 0.45);
-  --glow: 0;
-  --glow-color: transparent;
-  --amb-1: #3b3f9e;
-  --amb-2: #1f6f78;
-  --amb-3: #6a3c9c;
-  --amb-4: #2a2d6b;
-  --amb-speed: 60s;
-  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.35);
-  --shadow-3: 0 24px 64px rgba(0, 0, 0, 0.5);
+  /* Before the palette arrives (one frame at most): the dark screen. */
+  --bg: #0f1218;
+  --chrome: #12161d;
+  --surface: #181d25;
+  --text: #edf0f4;
   color-scheme: dark;
 }

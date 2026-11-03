@@ -122,11 +122,8 @@ export function PromptCard({ task, project, compact = false, focus = false }) {
 
   const ready = p.screen?.ready !== false;
   return (
-    <div class={`pcard glass-2 ${compact ? 'compact' : ''} ${careful ? 'careful' : ''}`} ref={box} role="region" aria-label={ask.label} data-testid="prompt-card" data-kind={kind}>
+    <div class={`pcard ${compact ? 'compact' : ''} ${careful ? 'careful' : ''}`} ref={box} role="region" aria-label={ask.label} data-testid="prompt-card" data-kind={kind}>
       <div class="pc-h">
-        <span class="pc-ic">
-          <I n={ask.icon} />
-        </span>
         <span class="pc-title">{p.title || task.reason || ask.label}</span>
         {p.by?.agentId && <span class="pc-by">서브에이전트 · {p.by.type || 'agent'}</span>}
         {careful && (
@@ -249,11 +246,8 @@ function QuestionCard({ task, p, careful, compact, send, busy, focus }) {
     return () => window.removeEventListener('keydown', onKey);
   });
   return (
-    <div class={`pcard glass-2 q ${compact ? 'compact' : ''}`} ref={box} role="region" aria-label="질문" data-testid="prompt-card" data-kind="question">
+    <div class={`pcard q ${compact ? 'compact' : ''}`} ref={box} role="region" aria-label="질문" data-testid="prompt-card" data-kind="question">
       <div class="pc-h">
-        <span class="pc-ic">
-          <I n="message-circle-question" />
-        </span>
         <span class="pc-title">{q.question}</span>
         {qs.length > 1 && (
           <span class="pc-step num">

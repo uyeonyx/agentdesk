@@ -1,20 +1,20 @@
 # Themes
 
-Agent Desk ships the themes below and can import more from other apps. A theme only supplies a
-background, a foreground, the 16 terminal colors and (optionally) syntax colors, an accent and
-glass settings. `ui/src/theme/derive.js` turns that into the full token set (surfaces, text
-levels, status colors, diff, syntax, terminal, Monaco, glass, shadows) and adjusts text lightness
-until it passes WCAG against every surface it can land on, glass included: primary text at 7:1,
-secondary at 5.6:1 and the small tertiary text (times, paths, labels) at 4.5:1.
+The app itself has two hand-set screens, light and dark (`ui/src/theme/base.js`): every surface,
+line, text level and signal color comes from there, whatever theme is picked. Settings > 테마 picks
+the screen (시스템 따라, 밝게, 어둡게), an accent, and one code·terminal theme for each screen.
 
-The activity strip's four colors (`--act-read`, `--act-edit`, `--act-cmd`, `--act-web`: reading,
-editing, commands, web) come from the theme's own terminal colors. Editing, commands and web are
-kept at least 40° apart in hue and at 3:1 against the surface; reading is the quiet one, a gray at
-2:1. `test/theme.test.js` checks this for every built-in theme.
+A theme colors code only: the raw terminal (xterm), the editor and diff view (Monaco) and syntax
+tokens. It supplies a background, a foreground, the 16 terminal colors and (optionally) syntax
+colors; `ui/src/theme/derive.js` turns that into the terminal palette, the Monaco theme and the
+`--syn-*` / `--term-*` variables, and lifts the editor's text until it reads on the theme's own
+background. Agent Desk ships the themes below and can import more from other apps (VS Code,
+Ghostty, kitty, iTerm2, Windows Terminal).
 
-Settings > 강조색 lays one accent over any theme, the way macOS does (`ui/src/theme/accents.js`):
-blue, purple, pink, red, orange, green, teal or graphite, each with a dark-theme and a light-theme
-shade that carries white text on a filled button. "테마" keeps the theme's own accent.
+The accent (`ui/src/theme/accents.js`) is blue, teal, green, orange, rose or graphite, each with a
+light-screen and a dark-screen shade; the soft fill, text color and ink on a filled button are
+worked out so they read on the app's own surfaces. `test/theme.test.js` holds both screens and every
+accent to WCAG AA: text, secondary and tertiary text at 4.5:1 on every surface they sit on.
 
 ## Built-in themes
 
@@ -23,8 +23,8 @@ filled as noted. Palettes are used under the licenses listed.
 
 | Theme | id | Kind | Source | License | Notes |
 | --- | --- | --- | --- | --- | --- |
-| Desk Glass Dark | `desk-glass-dark` | dark | this repo | MIT | Original. Default dark theme: graphite with a blue accent. |
-| Desk Glass Light | `desk-glass-light` | light | this repo | MIT | Original. Default light theme: warm paper with a blue accent. |
+| Desk Dark | `desk-glass-dark` | dark | this repo | MIT | Original. Default code·terminal theme for the dark screen. |
+| Desk Light | `desk-glass-light` | light | this repo | MIT | Original. Default code·terminal theme for the light screen. |
 | Cyberpunk | `cyberpunk` | dark | https://github.com/prometheux-ar/cyberpunk | GPL-3.0 | Color values only. The theme has no terminal palette; the 16 colors come from its syntax colors, and its yellow stands in for "waiting on me". |
 | Cyberpunk Umbra | `cyberpunk-umbra` | dark | https://github.com/prometheux-ar/cyberpunk | GPL-3.0 | As above. |
 | Cyberpunk Scarlet | `cyberpunk-scarlet` | dark | https://github.com/prometheux-ar/cyberpunk | GPL-3.0 | As above. |

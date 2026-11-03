@@ -1,11 +1,11 @@
-// Settings, as a screen: themes (with a gallery that previews the whole app), glass, sounds and
-// notifications, shortcuts, agents, projects.
+// Settings, as a screen: the screen (light, dark, system), accent and code·terminal themes, sounds
+// and notifications, shortcuts, agents, projects.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api, updateAction } from '../../api.js';
 import { useStore, get, set, setSettings, toast, openModal, projectOf } from '../../store.js';
 import { isMac, mod } from '../../util.js';
-import { deriveTokens, detectAndImport, findTheme, ACCENTS } from '../../theme/index.js';
-import { themeList, chooseTheme, previewTheme, endPreview, savePref, saveUserTheme, removeUserTheme, currentThemeId } from '../../app/theme.js';
+import { detectAndImport, ACCENTS } from '../../theme/index.js';
+import { themeList, chooseTheme, savePref, saveUserTheme, removeUserTheme, screenKind } from '../../app/theme.js';
 import { sound } from '../../app/sounds.js';
 import { KEYS, keyLabel } from '../../app/keys.js';
 import { Glyph, I, roomVars } from '../../ui/bits.jsx';
@@ -28,8 +28,8 @@ export function Settings() {
   const tab = useStore((s) => s.settingsTab);
   return (
     <div class="settings">
-      <nav class="st-nav glass" aria-label="설정">
-        <h2>설정</h2>
+      <nav class="st-nav" aria-label="설정">
+        <h1>설정</h1>
         {TABS.map((t) => (
           <button key={t.key} class={`li ${tab === t.key ? 'on' : ''}`} onClick={() => set({ settingsTab: t.key })} aria-current={tab === t.key ? 'page' : undefined}>
             <I n={t.icon} />
@@ -39,6 +39,7 @@ export function Settings() {
         ))}
       </nav>
       <main class="st-main scroll">
+        <h2 class="st-title">{TABS.find((t) => t.key === tab)?.label}</h2>
         {tab === 'theme' && <ThemeTab />}
         {tab === 'notify' && <NotifyTab />}
         {tab === 'keys' && <KeysTab />}
@@ -53,12 +54,15 @@ export function Settings() {
   );
 }
 
-function Section({ title, desc, children }) {
+function Section({ title, desc, tools, children }) {
   return (
     <section class="st-sec">
-      <h3>{title}</h3>
-      {desc && <p class="muted">{desc}</p>}
-      {children}
+      <header class="st-sh">
+        <h3>{title}</h3>
+        {tools}
+      </header>
+      {desc && <p class="st-desc">{desc}</p>}
+      <div class="card st-card">{children}</div>
     </section>
   );
 }
@@ -92,115 +96,84 @@ function Switch({ on, onChange, label, desc }) {
 function ThemeTab() {
   const s = useStore((s) => ({ theme: s.theme, userThemes: s.userThemes }));
   const pref = s.theme || {};
-  const [q, setQ] = useState('');
-  const [kind, setKind] = useState('all');
+  const now = screenKind();
+  const mode = pref.mode === 'fixed' ? now : pref.mode || 'system';
   const list = useMemo(() => themeList(), [s.userThemes]);
-  const shown = list.filter((t) => (kind === 'all' || t.kind === kind) && (!q || t.name.toLowerCase().includes(q.toLowerCase())));
-  const hover = useRef();
-  const enter = (id) => {
-    clearTimeout(hover.current);
-    hover.current = setTimeout(() => previewTheme(id), 220);
-  };
-  const leave = () => {
-    clearTimeout(hover.current);
-    hover.current = setTimeout(endPreview, 120);
-  };
-  useEffect(() => () => (clearTimeout(hover.current), endPreview()), []);
-  const slotOf = (t) => (pref.mode === 'fixed' ? (pref.fixed === t.id ? '사용 중' : '') : pref.light === t.id ? '밝을 때' : pref.dark === t.id ? '어두울 때' : '');
+  const kinds = now === 'light' ? ['light', 'dark'] : ['dark', 'light'];
+  const accent = ACCENTS.some((a) => a.id === pref.accent) ? pref.accent : 'blue';
   return (
     <>
-      <Section title="테마" desc="시스템 설정을 따라 밝을 때와 어두울 때 테마를 따로 고르거나, 하나로 고정해요. 카드에 마우스를 올리면 앱 전체로 미리 보여요.">
-        <div class="st-row">
-          <Seg value={pref.mode || 'system'} options={[['system', '시스템 따름'], ['fixed', '항상 이 테마']]} onChange={(v) => savePref({ mode: v, fixed: v === 'fixed' ? currentThemeId() : pref.fixed })} />
-          {pref.mode !== 'fixed' && (
-            <span class="slots muted">
-              밝을 때 <b>{findTheme(pref.light, s.userThemes)?.name}</b> · 어두울 때 <b>{findTheme(pref.dark, s.userThemes)?.name}</b>
-            </span>
-          )}
-        </div>
-        <div class="st-row">
-          <input class="field" placeholder="테마 찾기" value={q} onInput={(e) => setQ(e.currentTarget.value)} style="max-width:260px" />
-          <Seg value={kind} options={[['all', '모두'], ['dark', '어두운'], ['light', '밝은']]} onChange={setKind} />
-        </div>
-        <div class="gallery" onMouseLeave={leave}>
-          {shown.map((t) => (
-            <ThemeCard key={t.id} t={t} slot={slotOf(t)} onEnter={() => enter(t.id)} onPick={() => chooseTheme(t.id)} />
-          ))}
-        </div>
-      </Section>
-      <Section title="강조색" desc="누르는 버튼, 선택한 탭, 작업 중 표시의 색이에요. 어느 테마에서나 같은 색을 쓰거나 테마의 색을 따라요.">
-        <div class="accents" role="radiogroup" aria-label="강조색">
-          <button class={`acc theme ${!pref.accent || pref.accent === 'theme' ? 'on' : ''}`} role="radio" aria-checked={!pref.accent || pref.accent === 'theme'} onClick={() => savePref({ accent: 'theme' })} data-tip="테마의 색">
-            <span class="sw">
-              <I n="palette" />
-            </span>
-            <small>테마</small>
-          </button>
-          {ACCENTS.map((a) => (
-            <button key={a.id} class={`acc ${pref.accent === a.id ? 'on' : ''}`} role="radio" aria-checked={pref.accent === a.id} onClick={() => savePref({ accent: a.id })} aria-label={a.name}>
-              <span class="sw" style={{ background: `linear-gradient(135deg, ${a.dark} 50%, ${a.light} 50%)` }} />
-              <small>{a.name}</small>
-            </button>
-          ))}
-        </div>
-      </Section>
-      <ImportTheme />
-      <Section title="유리와 빛" desc="떠 있는 막대와 카드가 뒤를 흐리게 비춰요. 느리거나 눈이 피로하면 줄여 주세요. macOS '투명도 줄이기'를 켜면 자동으로 꺼져요.">
+      <Section title="화면과 강조색" desc="앱 화면은 밝은 것과 어두운 것 두 벌이에요. 테마는 터미널·코드·바뀐 내용의 색에만 써요.">
         <div class="st-row">
           <span class="st-l">
-            <b>유리 효과</b>
+            <b>화면</b>
+            <small>시스템을 고르면 macOS·Windows 설정을 따라 바뀌어요</small>
           </span>
-          <Seg value={pref.glass || 'rich'} options={[['rich', '풍부하게'], ['light', '가볍게'], ['off', '끄기']]} onChange={(v) => savePref({ glass: v })} />
+          <div class="seg" role="radiogroup" aria-label="화면">
+            {[
+              ['system', '시스템 따라'],
+              ['light', '밝게'],
+              ['dark', '어둡게'],
+            ].map(([v, label]) => (
+              <button key={v} role="radio" aria-checked={mode === v} aria-pressed={mode === v} onClick={() => savePref({ mode: v })} data-testid={`screen-${v}`}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-        {isMac && <Switch on={pref.vibrancy !== false} onChange={(v) => savePref({ vibrancy: v })} label="창 뒤 비치기" desc="바탕화면 색이 창 뒤로 은은하게 비쳐요" />}
+        <div class="st-row">
+          <span class="st-l">
+            <b>강조색</b>
+            <small>주 버튼, 고른 항목, 작업 중 표시에 써요</small>
+          </span>
+          <div class="accents" role="radiogroup" aria-label="강조색">
+            {ACCENTS.map((a) => (
+              <button key={a.id} class={`acc ${accent === a.id ? 'on' : ''}`} role="radio" aria-checked={accent === a.id} onClick={() => savePref({ accent: a.id })} aria-label={a.name} data-tip={a.name}>
+                <span class="dot" style={{ background: now === 'light' ? a.light : a.dark }} />
+              </button>
+            ))}
+          </div>
+        </div>
       </Section>
+      {kinds.map((k) => (
+        <Section key={k} title={`코드·터미널 테마 · ${k === 'light' ? '밝은 화면' : '어두운 화면'}`} desc={k === now ? '지금 화면에 쓰는 테마예요.' : `${k === 'light' ? '밝은' : '어두운'} 화면으로 바꾸면 쓰는 테마예요.`}>
+          <div class="gallery" data-kind={k}>
+            {list
+              .filter((t) => t.kind === k)
+              .map((t) => (
+                <ThemeCard key={t.id} t={t} on={pref[k] === t.id} onPick={() => chooseTheme(t.id)} />
+              ))}
+          </div>
+        </Section>
+      ))}
+      <ImportTheme />
     </>
   );
 }
 
-function ThemeCard({ t, slot, onEnter, onPick }) {
-  const style = useMemo(() => cardVars(t), [t.id]);
+/** A code·terminal theme as it will look: a few lines of a session in its own colors. */
+function ThemeCard({ t, on, onPick }) {
+  const c = t.preview;
   return (
-    <button class={`tcard ${slot ? 'on' : ''}`} style={style} onMouseEnter={onEnter} onFocus={onEnter} onClick={onPick} aria-pressed={!!slot} data-testid="theme-card" data-theme-id={t.id}>
-      <span class="tc-mini" aria-hidden="true">
-        <span class="tc-amb" />
-        <span class="tc-rail">
-          <i />
-          <i class="hot" />
-          <i />
+    <button class={`tcard ${on ? 'on' : ''}`} onClick={onPick} aria-pressed={on} data-testid="theme-card" data-theme-id={t.id}>
+      <span class="tc-code" style={{ background: c.bg, color: c.fg }} aria-hidden="true">
+        <span>
+          <i style={{ color: c.accent }}>$</i> pnpm test
         </span>
-        <span class="tc-main">
-          <i class="u" />
-          <i class="r" />
-          <i class="r short" />
-          <span class="tc-card">
-            <i class="a" />
-            <i class="b" />
-          </span>
+        <span>
+          <i style={{ color: c.ok }}>✓</i> 12 passed
+        </span>
+        <span>
+          <i style={{ color: c.danger }}>✗</i> <i style={{ color: c.warn }}>coupon</i>.test.ts
         </span>
       </span>
       <span class="tc-name">
         {t.name}
-        {t.user && <small> · 가져옴</small>}
+        {t.user && <small>가져옴</small>}
+        {on && <I n="check" />}
       </span>
-      {slot && <span class="tc-slot">{slot}</span>}
     </button>
   );
-}
-
-// A theme card paints its mini app with its own tokens, scoped to the card.
-const cardCache = new Map();
-function cardVars(t) {
-  if (cardCache.has(t.id)) return cardCache.get(t.id);
-  const th = findTheme(t.id, get().userThemes) || null;
-  let v = {};
-  try {
-    const d = th ? deriveTokens(th, { glass: 'rich' }).vars : null;
-    if (d) v = { '--c-app': d['--bg-app'], '--c-surface': d['--bg-surface'], '--c-raised': d['--bg-raised'], '--c-line': d['--line'], '--c-text': d['--text'], '--c-text2': d['--text-3'], '--c-accent': d['--accent'], '--c-warn': d['--warn'], '--c-amb1': d['--amb-1'], '--c-amb2': d['--amb-2'], '--c-tint': d['--glass-tint'] };
-    else v = { '--c-app': t.preview.bg, '--c-surface': t.preview.bg, '--c-raised': t.preview.bg, '--c-line': 'rgba(127,127,127,.2)', '--c-text': t.preview.fg, '--c-text2': t.preview.fg, '--c-accent': t.preview.accent, '--c-warn': t.preview.warn, '--c-amb1': t.preview.amb[0], '--c-amb2': t.preview.amb[1], '--c-tint': t.preview.bg };
-  } catch {}
-  cardCache.set(t.id, v);
-  return v;
 }
 
 function ImportTheme() {
@@ -238,10 +211,17 @@ function ImportTheme() {
   const userThemes = useStore((s) => s.userThemes);
   const FORMAT = { vscode: 'VS Code', ghostty: 'Ghostty', iterm: 'iTerm2', wterm: 'Windows Terminal', kitty: 'kitty' };
   return (
-    <Section title="테마 가져오기" desc="VS Code 테마(.json), Ghostty·kitty 색 구성, iTerm2(.itermcolors), Windows Terminal 색 구성을 가져올 수 있어요. 터미널 색만 있는 파일도 앱 전체에 맞게 채워요.">
+    <Section title="테마 가져오기" desc="VS Code 테마(.json), Ghostty·kitty 색 구성, iTerm2(.itermcolors), Windows Terminal 색 구성을 가져올 수 있어요. 가져온 테마는 터미널·코드·바뀐 내용에 써요.">
       {found ? (
-        <div class="imp-found glass-2">
-          <span class="tc-mini small" style={cardVars({ id: '__x', preview: { bg: found.theme.base.bg, fg: found.theme.base.fg, accent: found.theme.base.accent || found.theme.ansi[4], warn: found.theme.ansi[3], amb: [found.theme.ansi[5], found.theme.ansi[6]] } })} />
+        <div class="imp-found">
+          <span class="tc-code small" style={{ background: found.theme.base.bg, color: found.theme.base.fg }} aria-hidden="true">
+            <span>
+              <i style={{ color: found.theme.ansi[4] }}>$</i> pnpm test
+            </span>
+            <span>
+              <i style={{ color: found.theme.ansi[2] }}>✓</i> 12 passed
+            </span>
+          </span>
           <div class="if-m">
             <b>{found.theme.name}</b>
             <small class="muted">

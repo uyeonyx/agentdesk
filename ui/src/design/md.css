@@ -1,7 +1,7 @@
 /* Reading: agent replies set like a good document, code and diffs crisp on inset plates. */
 
 .md {
-  font-size: var(--fs-4);
+  font-size: var(--t-title);
   line-height: 1.72;
   color: var(--text);
   overflow-wrap: anywhere;
@@ -20,21 +20,21 @@
 .md h3,
 .md h4 {
   margin: 1.5em 0 0.5em;
-  font-weight: var(--w-4);
+  font-weight: var(--w-3);
   letter-spacing: -0.01em;
   line-height: 1.35;
 }
 .md h1 {
-  font-size: 20px;
+  font-size: var(--t-xl);
 }
 .md h2 {
-  font-size: 18px;
+  font-size: var(--t-title);
 }
 .md h3 {
-  font-size: 16px;
+  font-size: var(--t-title);
 }
 .md h4 {
-  font-size: var(--fs-4);
+  font-size: var(--t-title);
   color: var(--text-2);
 }
 .md ul,
@@ -54,11 +54,11 @@
 }
 .md li.task input {
   margin: 0 8px 0 0;
-  accent-color: var(--accent);
+  accent-color: var(--accent-fill);
   vertical-align: -1px;
 }
 .md strong {
-  font-weight: var(--w-4);
+  font-weight: var(--w-3);
 }
 .md em {
   font-style: italic;
@@ -69,7 +69,7 @@
 .md blockquote {
   margin: 0 0 0.75em;
   padding: 2px 0 2px 14px;
-  border-left: 2px solid var(--line-strong);
+  border-left: 2px solid var(--line-2);
   color: var(--text-2);
 }
 .md hr {
@@ -87,9 +87,11 @@
 .md code,
 .md .fileref code {
   padding: 1px 6px;
-  border-radius: 6px;
-  font: 0.86em/1.5 var(--font-mono);
-  background: var(--bg-inset);
+  border-radius: var(--r-2);
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  line-height: 1.5;
+  background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--line);
 }
 .md pre code {
@@ -119,13 +121,13 @@
 }
 .md table {
   border-collapse: collapse;
-  font-size: var(--fs-3);
-  line-height: var(--lh-3);
+  font-size: var(--t-md);
+  line-height: var(--lh-md);
   min-width: 100%;
 }
 .md th,
 .md td {
-  padding: 7px 12px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: top;
@@ -133,19 +135,19 @@
 .md th {
   font-weight: var(--w-3);
   color: var(--text-2);
-  background: var(--bg-hover);
+  background: var(--hover);
 }
 .md tr:last-child td {
   border-bottom: 0;
 }
 .md.compact {
-  font-size: var(--fs-3);
+  font-size: var(--t-md);
   line-height: 1.6;
 }
 .md.compact h1,
 .md.compact h2,
 .md.compact h3 {
-  font-size: var(--fs-3);
+  font-size: var(--t-md);
   margin: 0.6em 0 0.2em;
 }
 
@@ -153,7 +155,7 @@
 .codeblock {
   margin: 0 0 1em;
   border-radius: var(--r-3);
-  background: var(--bg-inset);
+  background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: hidden;
 }
@@ -164,15 +166,15 @@
   height: 30px;
   padding: 0 6px 0 12px;
   border-bottom: 1px solid var(--line);
-  font-size: var(--fs-1);
+  font-size: var(--t-sm);
   color: var(--text-3);
   text-transform: lowercase;
 }
 .codebar .copy {
   height: 22px;
   padding: 0 8px;
-  border-radius: 6px;
-  font-size: var(--fs-1);
+  border-radius: var(--r-2);
+  font-size: var(--t-sm);
   color: var(--text-2);
   opacity: 0;
   transition: opacity var(--dur-2), background var(--dur-2);
@@ -182,7 +184,7 @@
   opacity: 1;
 }
 .codebar .copy:hover {
-  background: var(--bg-hover);
+  background: var(--hover);
   color: var(--text);
 }
 .codeblock pre {
@@ -193,7 +195,9 @@
 }
 .codeblock code,
 .hl {
-  font: 12.5px/1.65 var(--font-mono);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  line-height: var(--lh-md);
   tab-size: 2;
 }
 .tok-keyword {
@@ -233,20 +237,22 @@
   color: var(--syn-comment);
 }
 .tok-add {
-  color: var(--diff-add-text);
+  color: var(--add);
 }
 .tok-del {
-  color: var(--diff-del-text);
+  color: var(--del);
 }
 
 /* ---------------------------------------------------------------- terminal output */
 .ansi {
   white-space: pre-wrap;
-  font: 12px/1.6 var(--font-mono);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  line-height: var(--lh-md);
   color: var(--text-2);
 }
 .ansi .bold {
-  font-weight: 700;
+  font-weight: var(--w-3);
 }
 .ansi .dim {
   opacity: 0.6;
@@ -260,9 +266,11 @@
 
 /* ---------------------------------------------------------------- diffs */
 .diff {
-  font: 12px/1.6 var(--font-mono);
+  font-family: var(--font-mono);
+  font-size: var(--t-sm);
+  line-height: var(--lh-md);
   border-radius: var(--r-2);
-  background: var(--bg-inset);
+  background: var(--surface-2);
   box-shadow: inset 0 0 0 1px var(--line);
   overflow: auto;
   scrollbar-width: thin;
@@ -291,31 +299,31 @@
   white-space: pre;
 }
 .dl.add {
-  background: var(--diff-add-bg);
+  background: var(--add-bg);
 }
 .dl.add .sig,
 .dl.add .tx {
-  color: var(--diff-add-text);
+  color: var(--add);
 }
 .dl.del {
-  background: var(--diff-del-bg);
+  background: var(--del-bg);
 }
 .dl.del .sig,
 .dl.del .tx {
-  color: var(--diff-del-text);
+  color: var(--del);
 }
 .dl mark {
   color: inherit;
-  border-radius: 3px;
+  border-radius: var(--r-1);
 }
 .dl.add mark {
-  background: var(--diff-add-mark);
+  background: var(--add-mark);
 }
 .dl.del mark {
-  background: var(--diff-del-mark);
+  background: var(--del-mark);
 }
 .dl.gap {
-  height: 10px;
+  height: 8px;
   margin: 2px 0;
-  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line) 6px 7px);
+  background: var(--surface-2);
 }

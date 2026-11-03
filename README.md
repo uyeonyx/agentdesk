@@ -42,7 +42,7 @@ Coming from 0.2.x (the `agentdesk` CLI)? The first launch stops the old backgrou
 - **Several repos in one task.** Group projects (프로젝트 추가 → 여러 저장소 묶기) or add repos when starting a task. Each repo gets a worktree on the same branch inside one task folder; review groups files by repo; merge checks every repo for conflicts before touching any.
 - **Review = instruction.** 변경 shows a Monaco diff. Hover a line and click `+` (or select lines and press `C`) to comment; comments go to the agent as one message with file and line references. Merging and PRs are the agent's job: ask it. 머지 and PR 만들기 are still in ⌘K for when you want to do it yourself.
 - **Files on demand.** 파일 opens a viewer, not an editor, with a version switch to compare the same file in this task, the main checkout, where the task started, or another task's worktree. Select lines and press `A` to point the agent at them. "VS Code" opens the exact file and line.
-- **Themes.** Desk Light and Dark, Cyberpunk (with Umbra and Scarlet), SynthWave '84, Dracula, Nord, Catppuccin, Tokyo Night, Rosé Pine, Gruvbox, Solarized, One, GitHub, Kanagawa, Everforest, Ayu and Monokai, following the system's light/dark or fixed. Import your own from a VS Code theme, Ghostty, iTerm2, Windows Terminal or kitty. Text is kept readable on every surface whatever the colors. Sources and licenses: [THEMES.md](THEMES.md).
+- **Screen and themes.** The app has two hand-set screens, light and dark, following the system or fixed, with an accent of your choice. Code themes color the raw terminal, the editor and diffs: Desk Light and Dark, Cyberpunk (with Umbra and Scarlet), SynthWave '84, Dracula, Nord, Catppuccin, Tokyo Night, Rosé Pine, Gruvbox, Solarized, One, GitHub, Kanagawa, Everforest, Ayu and Monokai, one for each screen. Import your own from a VS Code theme, Ghostty, iTerm2, Windows Terminal or kitty. Sources and licenses: [THEMES.md](THEMES.md).
 
 Keys (`?` shows them all): `⌘K` find and commands · `⌘N` new task · `Space` 차례로 · `J`/`K` move · `R` or `↵` reply · `1`–`9` answer the card · `E` archive · `B` 관제 ↔ 집중 · `N` new session (관제) · `⇧Tab` permission mode · `/` commands · `⌘1/2/3` 대화/변경/파일 · `⌘J` raw terminal · `` ⌃` `` shell · `⌘.` stop this turn · `⌘Z` undo the last send · `⌘\` hide the list.
 
@@ -81,9 +81,12 @@ Turn on 폰에서 이어하기 for a task (or as a project default) and Claude C
 ```bash
 pnpm install
 pnpm dev        # build the UI and open the app (data in ~/.agentdesk-dev)
-pnpm test       # core, hook socket and app-shell rules, with mock agents
+pnpm test       # core, hook socket, app-shell and design rules, with mock agents
 pnpm test:e2e   # the real app end to end (AGENTDESK_E2E_EXE=<packaged binary> for a build)
+pnpm shots      # every screen with mock sessions, into shots/ (-- --dark, --size 1100x720)
 pnpm dist       # installers for this OS in release/
 ```
+
+Design: every stylesheet in `ui/src/design` uses the tokens in `tokens.css` and the two screen palettes in `ui/src/theme/base.js`. `test/design-lint.test.js` fails on a raw color, an off-scale size, weight or radius, odd spacing, or a name from before 0.7; its `ALLOW` list holds the few exceptions with their reasons.
 
 Data lives in `~/.agentdesk` (`AGENTDESK_HOME` to change it; another data dir is a separate app instance). Worktrees are created under `<repo>/.agentdesk/worktrees/` and hidden from the main checkout's `git status`. Releasing: [docs/release.md](docs/release.md).

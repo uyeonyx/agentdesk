@@ -1,6 +1,6 @@
 {
   "name": "agentdesk",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "One inbox for all your coding agents (Claude Code, Codex) across projects. Desktop app for macOS and Windows: real terminals, git worktrees.",
   "main": "desktop/main.js",
   "scripts": {
@@ -8,6 +8,7 @@
     "dev": "node ui/build.mjs && AGENTDESK_HOME=${AGENTDESK_HOME:-$HOME/.agentdesk-dev} electron .",
     "test": "node --test --test-concurrency=1 --test-timeout=180000 --test-force-exit test/*.test.js",
     "test:e2e": "playwright test",
+    "shots": "node ui/build.mjs && node scripts/shots.mjs",
     "dist": "node ui/build.mjs && electron-builder"
   },
   "author": "uyeon",

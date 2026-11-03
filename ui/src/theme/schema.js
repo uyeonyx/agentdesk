@@ -1,6 +1,7 @@
 // Theme definition shape and its validator. Everything that comes in (built-in, imported, saved)
 // passes through normalizeTheme, so later stages only ever see clean hex colors and bounded numbers.
 import { parseColor, toHex, over, isDark, WHITE, BLACK } from './color.js';
+import { UI_TOKENS } from './base.js';
 
 export class ThemeError extends Error {
   name = 'ThemeError';
@@ -13,8 +14,9 @@ export const ANSI_NAMES = [
 export const SYNTAX_KEYS = ['keyword', 'string', 'number', 'comment', 'function', 'type', 'tag', 'attr', 'punct', 'variable', 'constant'];
 export const SEMANTIC = ['ok', 'warn', 'danger', 'info'];
 
-// Every CSS variable deriveTokens emits, without the leading "--".
-export const COLOR_TOKENS = [
+// Keys a theme file may pin in its "ui" section. Older themes and imports name the app's surfaces
+// too; derive.js only reads the ones that color code (editor, terminal, syntax, diff).
+export const UI_KEYS = [
   'bg-app', 'bg-surface', 'bg-raised', 'bg-overlay', 'bg-hover', 'bg-active', 'bg-inset',
   'line', 'line-strong', 'text', 'text-2', 'text-3', 'selection', 'focus',
   'accent', 'accent-ink', 'accent-soft', 'accent-line', 'accent-text',
@@ -23,15 +25,15 @@ export const COLOR_TOKENS = [
   'act-read', 'act-edit', 'act-cmd', 'act-web',
   ...SYNTAX_KEYS.map((k) => `syn-${k}`),
   'term-bg', 'term-fg', 'term-cursor', 'term-selection', ...ANSI_NAMES.map((_, i) => `term-${i}`),
-  'glass-tint', 'glass-tint-strong', 'glass-float', 'glass-edge', 'glass-shadow', 'glow-color',
-  'amb-1', 'amb-2', 'amb-3', 'amb-4',
+  'amb-1', 'amb-2', 'amb-3', 'amb-4', 'glow-color',
 ];
-export const VALUE_TOKENS = ['glass-blur', 'glass-sat', 'glow', 'amb-speed'];
-export const SHADOW_TOKENS = ['shadow-1', 'shadow-2', 'shadow-3'];
-export const TOKEN_NAMES = [...COLOR_TOKENS, ...VALUE_TOKENS, ...SHADOW_TOKENS].map((n) => `--${n}`);
 
-// Glass layers are computed together with text contrast, so they can't be pinned from outside.
-export const UI_KEYS = COLOR_TOKENS.filter((n) => !n.startsWith('glass-'));
+// Every CSS variable deriveTokens emits, without the leading "--": the app's own palette (base.js)
+// and the colors of code from the theme.
+export const CODE_TOKENS = [...SYNTAX_KEYS.map((k) => `syn-${k}`), 'term-bg', 'term-fg', 'term-cursor', 'term-selection', ...ANSI_NAMES.map((_, i) => `term-${i}`)];
+export const SHADOW_TOKENS = ['e-0', 'e-1', 'e-2'];
+export const COLOR_TOKENS = [...UI_TOKENS.filter((n) => !SHADOW_TOKENS.includes(n)), ...CODE_TOKENS];
+export const TOKEN_NAMES = [...COLOR_TOKENS, ...SHADOW_TOKENS].map((n) => `--${n}`);
 
 // VS Code's default terminal palettes: what a terminal shows when a theme leaves a slot empty.
 const DEFAULT_ANSI = {

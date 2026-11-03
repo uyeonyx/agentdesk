@@ -50,7 +50,7 @@ export function Tooltip() {
   }, [tip]);
   if (!tip) return null;
   return (
-    <div ref={box} class="tip glass-3" role="tooltip" style={{ left: '0px', top: tip.y + 'px', visibility: 'hidden', transform: tip.below ? 'none' : 'translateY(-100%)' }}>
+    <div ref={box} class="tip" role="tooltip" style={{ left: '0px', top: tip.y + 'px', visibility: 'hidden', transform: tip.below ? 'none' : 'translateY(-100%)' }}>
       <span>{tip.text}</span>
       {tip.kbd && <kbd>{tip.kbd}</kbd>}
     </div>

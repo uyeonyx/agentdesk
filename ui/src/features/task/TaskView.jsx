@@ -2,7 +2,7 @@
 // now, what it waits on, and where I answer.
 import { useEffect, useState } from 'preact/hooks';
 import { useStore, set, setView, openModal } from '../../store.js';
-import { isLive, isBusy, isBlocked, labelOf, markOf } from '../../core/status.js';
+import { isLive, isBusy, isBlocked, labelOf, markOf, lampOf, lampTimer } from '../../core/status.js';
 import { duration } from '../../core/turns.js';
 import { interrupt, resume, toggleDrawer, openDrawer, rename, setRemote } from '../../actions.js';
 import { api } from '../../api.js';
@@ -17,7 +17,7 @@ import { Drawer } from '../terminal/Drawer.jsx';
 import { FocusSide } from './FocusSide.jsx';
 import { TriageBar } from '../triage/TriageBar.jsx';
 import { openMenuAt } from '../../ui/Menu.jsx';
-import { Glyph, I, Spinner, roomVars, useNow } from '../../ui/bits.jsx';
+import { Glyph, I, Lamp, Spinner, roomVars, useNow } from '../../ui/bits.jsx';
 import { keyLabel } from '../../app/keys.js';
 import { taskItems } from './taskActions.js';
 
@@ -60,7 +60,7 @@ function Header({ task, project, view }) {
   const menuBtn = (e) => openMenuAt(e.currentTarget, taskItems(task));
   return (
     <header class="th">
-      <Glyph project={project} size={38} />
+      <Glyph project={project} size={28} />
       <div class="th-id">
         {editing ? (
           <input
@@ -86,10 +86,6 @@ function Header({ task, project, view }) {
           </h1>
         )}
         <div class="th-meta">
-          <span class={`state-pill ${markOf(task)}`}>
-            <span class="d" />
-            {labelOf(task)}
-          </span>
           {project && <span class="meta-i meta-p">{project.name}</span>}
           {task.branch && (
             <span class="meta-i mono" data-tip={task.worktree}>
@@ -119,6 +115,7 @@ function Header({ task, project, view }) {
           )}
         </div>
       </div>
+      <HeadLamp task={task} />
       <div class="seg tabs" role="tablist" aria-label="보기">
         {TABS.map((t, i) => (
           <button key={t.key} role="tab" aria-selected={view === t.key} onClick={() => setView(task.id, t.key)} data-tip={t.label} data-kbd={keyLabel(`tab${i + 1}`)}>
@@ -142,6 +139,18 @@ function Header({ task, project, view }) {
         </button>
       </div>
     </header>
+  );
+}
+
+/** The session's one status signal in the header: a lamp, a word, how long. */
+function HeadLamp({ task }) {
+  const now = useNow();
+  const l = lampOf(task);
+  const t = lampTimer(task, now);
+  return (
+    <span data-testid="task-state">
+      <Lamp s={l.s} word={l.word}>{t}</Lamp>
+    </span>
   );
 }
 
@@ -171,7 +180,7 @@ function TerminalNeeded({ task }) {
     if (task.ask === 'terminal') openDrawer('agent', task.id);
   }, [task.id, task.ask === 'terminal']);
   return (
-    <div class="pcard glass-2" role="region" aria-label="터미널에서 답하기">
+    <div class="pcard" role="region" aria-label="터미널에서 답하기">
       <div class="pc-h">
         <span class="pc-ic">
           <I n="terminal-2" />
@@ -189,7 +198,7 @@ function TerminalNeeded({ task }) {
 
 function Finished({ task }) {
   return (
-    <div class="finished glass">
+    <div class="finished">
       <I n={task.state === 'merged' ? 'git-merge' : 'trash'} />
       <span>{task.state === 'merged' ? `${task.mergedInto || '메인'}에 머지했어요` : '버린 작업이에요'}</span>
     </div>
@@ -221,7 +230,7 @@ function WatchBar({ task, project }) {
   };
   const status = { busy: '작업 중', waiting: '선택을 기다림', idle: '다음 지시를 기다림', gone: '닫힘' }[w.status] || '작업 중';
   return (
-    <div class="watchbar glass-2">
+    <div class="watchbar">
       <span class={`wst ${w.status || 'busy'}`}>
         <span class="d" /> {w.where}에서 {status}
       </span>

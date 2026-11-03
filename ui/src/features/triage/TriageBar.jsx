@@ -9,7 +9,7 @@ export function TriageBar() {
   const tr = useStore((s) => s.triage);
   if (!tr) return null;
   return (
-    <div class="triagebar glass" role="toolbar" aria-label="차례로 처리" data-testid="triage">
+    <div class="triagebar" role="toolbar" aria-label="차례로 처리" data-testid="triage">
       <span class="tr-n num">
         차례로 <b>{Math.min(tr.at + 1, tr.queue.length)}</b>/{tr.queue.length}
       </span>
@@ -44,7 +44,7 @@ export function TriageDone() {
   const parts = [t.answered && `허락·선택 ${t.answered}`, t.denied && `거절 ${t.denied}`, t.replied && `답장 ${t.replied}`, t.skipped && `넘김 ${t.skipped}`].filter(Boolean);
   return (
     <div class="triage-done" role="status">
-      <div class="td-card glass-2">
+      <div class="td-card">
         <span class="td-ic">
           <I n="circle-check" />
         </span>

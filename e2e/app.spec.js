@@ -152,7 +152,7 @@ test('an Edit permission is a card with its diff; 허락 answers it in the CLI',
   await expect(card()).toContainText('# 원래 제목');
   await expect(card()).toContainText('# 바뀐 제목');
   await page.screenshot({ path: shots('permission-edit') });
-  await card().getByRole('button', { name: /^1\s*허락$/ }).click();
+  await card().getByRole('button', { name: /^(1\s*)?허락$/ }).click();
   await until(t.id, (x) => x?.state === 'review');
   await expect(card()).toHaveCount(0);
   await call('POST', `/api/tasks/${t.id}/discard`);
@@ -240,28 +240,31 @@ test('관제탑: a stuck task is answered right on its tile', async () => {
   const tile = page.locator(`[data-testid="tile"][data-task-id="${t.id}"]`);
   await expect(tile).toHaveAttribute('data-state', 'blocked');
   await page.screenshot({ path: shots('overview') });
-  await tile.getByRole('button', { name: /^1\s*허락$/ }).click();
+  await tile.getByRole('button', { name: /^(1\s*)?허락$/ }).click();
   await until(t.id, (x) => x?.state !== 'needs_input');
   await page.keyboard.press('b');
   await call('POST', `/api/tasks/${t.id}/discard`);
 });
 
-test('관제 mosaic: a stuck session gets the big tile, and shrinks back once answered', async () => {
+test('관제: a stuck session sits in the first plate with what it did before asking, and leaves it once answered', async () => {
   const p = await project('repo-mosaic');
-  // "test": the mock runs `npm test` first, so the big tile has something to show under the card.
+  // "test": the mock runs `npm test` first, so the cell has something to show above the card.
   const stuck = await start(p.id, 'ask before deleting build, run test first');
   const quiet = await start(p.id, 'just answer: 조용히');
   await until(stuck.id, (x) => !!x?.prompt?.screen?.ready);
   await until(quiet.id, (x) => x?.state === 'needs_input');
   await page.getByTestId('view-overview').click();
-  const big = page.locator(`[data-testid="tile"][data-task-id="${stuck.id}"]`);
-  await expect(big).toHaveAttribute('data-z', 'l');
-  await expect(page.locator(`[data-testid="tile"][data-task-id="${quiet.id}"]`)).toHaveAttribute('data-z', 'm');
-  await expect(big.locator('.before')).toContainText('npm test');
+  const waiting = page.locator('section[data-group="wait"]');
+  const cell = waiting.locator(`[data-testid="tile"][data-task-id="${stuck.id}"]`);
+  await expect(cell).toBeVisible();
+  await expect(page.locator(`section[data-group="turn"] [data-testid="tile"][data-task-id="${quiet.id}"]`)).toBeVisible();
+  await expect(page.getByTestId('count-wait')).toContainText('1');
+  await expect(cell.locator('.before')).toContainText('npm test');
+  await expect(cell.getByTestId('prompt-card')).toBeVisible();
   await page.screenshot({ path: shots('mosaic') });
-  await big.getByRole('button', { name: /^1\s*허락$/ }).click();
+  await cell.getByRole('button', { name: /허락$/ }).first().click();
   await until(stuck.id, (x) => x?.state !== 'needs_input');
-  await expect(big).not.toHaveAttribute('data-z', 'l');
+  await expect(waiting.locator(`[data-task-id="${stuck.id}"]`)).toHaveCount(0);
   for (const t of [stuck, quiet]) await call('POST', `/api/tasks/${t.id}/discard`);
 });
 
@@ -398,7 +401,7 @@ test('island: with another app in front it shows what waits, unfolds for a permi
   await expect.poll(islandShown, { timeout: 15_000 }).toBe(true);
   const isl = app.windows().find((w) => w.url().endsWith('/island.html'));
   await expect(isl.getByTestId('island-card')).toContainText('이 명령을 실행할까요?', { timeout: 15_000 });
-  await isl.getByTestId('island-card').getByRole('button', { name: /^1\s*허락$/ }).click();
+  await isl.getByTestId('island-card').getByRole('button', { name: /^(1\s*)?허락$/ }).click();
   await until(t.id, (x) => x?.state !== 'needs_input');
   await expect(isl.getByTestId('island-card')).toHaveCount(0);
   await app.evaluate(({ BrowserWindow }) => {
@@ -570,20 +573,27 @@ test('⌘J opens the raw terminal of the agent', async () => {
   await call('POST', `/api/tasks/${t.id}/discard`);
 });
 
-test('themes: a fixed theme from the gallery reaches the page and the window', async () => {
+test('themes: the screen is light or dark, and a code theme colors the terminal only', async () => {
   // Settings open on the tab used last; the theme tab, whatever came before.
   if (!(await page.locator('.settings').isVisible())) await page.keyboard.press(`${MOD}+Comma`);
   await page.locator('.st-nav').getByRole('button', { name: '테마' }).click();
-  await page.getByRole('button', { name: '항상 이 테마' }).click();
-  await page.locator('[data-testid="theme-card"][data-theme-id="cyberpunk"]').click();
+  const vars = () => page.evaluate(() => {
+    const cs = getComputedStyle(document.documentElement);
+    return { bg: cs.getPropertyValue('--bg').trim(), surface: cs.getPropertyValue('--surface').trim(), term: cs.getPropertyValue('--term-bg').trim() };
+  });
+  await page.getByTestId('screen-dark').click();
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.themeKind)).toBe('dark');
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--accent').trim())).not.toBe('');
-  await page.screenshot({ path: shots('theme-cyberpunk') });
-  await page.locator('[data-testid="theme-card"][data-theme-id="catppuccin-latte"]').click();
+  const before = await vars();
+  await page.locator('[data-testid="theme-card"][data-theme-id="cyberpunk"]').click();
+  await expect.poll(async () => (await vars()).term).not.toBe(before.term);
+  // The app's own surfaces stay the hand-set dark screen, whatever the code theme.
+  expect((await vars()).surface).toBe(before.surface);
+  await page.screenshot({ path: shots('theme-dark') });
+  await page.getByTestId('screen-light').click();
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.themeKind)).toBe('light');
   const chrome = path.join(tmp, 'home', 'electron', 'chrome.json');
   await expect.poll(() => fs.existsSync(chrome) && JSON.parse(fs.readFileSync(chrome, 'utf8')).light?.bg).toMatch(/^#[0-9a-f]{6}$/);
-  await page.screenshot({ path: shots('theme-latte') });
+  await page.screenshot({ path: shots('theme-light') });
 });
 
 test('a Ghostty theme pasted into settings becomes a theme of its own', async () => {
@@ -594,7 +604,9 @@ test('a Ghostty theme pasted into settings becomes a theme of its own', async ()
   await page.getByRole('button', { name: '읽기' }).click();
   await page.getByRole('button', { name: '가져와서 쓰기' }).click();
   await expect.poll(async () => (await call('GET', '/api/themes')).themes.length).toBe(1);
-  await expect.poll(() => page.evaluate(() => document.documentElement.dataset.themeKind)).toBe('dark');
+  // A dark theme becomes the dark screen's code theme.
+  const id = (await call('GET', '/api/themes')).themes[0].id;
+  await expect.poll(() => page.evaluate(() => window.desk.themePrefs().then((p) => p.dark))).toBe(id);
   await page.keyboard.press(`${MOD}+Comma`);
 });
 

@@ -37,7 +37,6 @@ export function App() {
 
   return (
     <div class={`app screen-${s.screen}`}>
-      <div class="ambient" aria-hidden="true" />
       <Titlebar />
       <div class={`stage ${s.railHidden ? 'no-rail' : ''}`}>
         {s.screen === 'overview' ? (
@@ -71,7 +70,7 @@ function Toasts() {
       {s.toasts.map((t) => {
         const p = t.projectId && projectOf(s, t.projectId);
         return (
-          <div key={t.id} class={`toast glass-3 ${t.kind === 'err' ? 'err' : ''}`} role={t.kind === 'err' ? 'alert' : 'status'}>
+          <div key={t.id} class={`toast ${t.kind === 'err' ? 'err' : ''}`} role={t.kind === 'err' ? 'alert' : 'status'}>
             {t.kind === 'err' ? <I n="alert-triangle" /> : p ? <Glyph project={p} size={20} /> : <I n="info-circle" />}
             <span class="msg">{t.text}</span>
             {t.link && (

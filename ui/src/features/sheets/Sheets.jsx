@@ -592,7 +592,7 @@ export function AddProjectBody({ onAdded }) {
             추가
           </button>
           {dirs.length > 0 && (
-            <div class="dd glass-3">
+            <div class="dd">
               {dirs.map((d, i) => (
                 <button key={d.path} class={`li ${i === di ? 'on' : ''}`} onMouseDown={(e) => (e.preventDefault(), setPath(d.display))}>
                   <I n={d.git ? 'git-branch' : 'folder'} />

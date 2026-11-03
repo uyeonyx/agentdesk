@@ -4,10 +4,10 @@ import { memo } from 'preact/compat';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { useStore, get, set, projectOf } from '../../store.js';
 import { isMac } from '../../util.js';
-import { GROUPS, grouped, whyOf, tagOf, isBlocked, labelOf, groupOf } from '../../core/status.js';
+import { GROUPS, grouped, whyOf, lampOf, lampTimer, isBlocked, labelOf, groupOf } from '../../core/status.js';
 import { select, archive, archiveAsk, archiveMany, resumeMany, togglePick, pickRange, clearPicks, shelved, newTask, restore, startTriage } from '../../actions.js';
 import { openMenu } from '../../ui/Menu.jsx';
-import { Glyph, I, TimeAgo, useDismiss, useListNav, roomVars } from '../../ui/bits.jsx';
+import { Glyph, I, Lamp, TimeAgo, useDismiss, useListNav, useNow, roomVars } from '../../ui/bits.jsx';
 import { useFlip } from '../../ui/useFlip.js';
 import { taskItems, pickedItems, projectItems } from '../task/taskActions.js';
 import { keyLabel } from '../../app/keys.js';
@@ -27,7 +27,7 @@ export function Rail() {
   const toggle = (k) => set((st) => ({ collapsed: { ...st.collapsed, [k]: !st.collapsed[k] } }));
 
   return (
-    <aside class="rail glass" style={{ width: s.railW + 'px' }} aria-label="작업 목록" data-testid="rail">
+    <aside class="rail" style={{ width: s.railW + 'px' }} aria-label="작업 목록" data-testid="rail">
       <ProjectFilter projects={s.projects} tasks={s.tasks} filter={s.filter} />
       {picked.length > 0 && <PickBar tasks={picked} />}
       {s.railView === 'shelf' ? (
@@ -90,7 +90,8 @@ export function Rail() {
 
 const Row = memo(function Row({ t, p, sel, picked, group }) {
   const blocked = isBlocked(t);
-  const tag = tagOf(t);
+  const lamp = lampOf(t);
+  const now = useNow();
   const why = whyOf(t);
   const plan = t.activity?.plan || [];
   const done = plan.filter((x) => x.status === 'done').length;
@@ -117,7 +118,7 @@ const Row = memo(function Row({ t, p, sel, picked, group }) {
         data-task-id={t.id}
         data-state={blocked ? 'blocked' : t.state}
       >
-        <Glyph project={p} size={30} task={t} />
+        <Glyph project={p} size={24} />
         {picked && (
           <span class="pk">
             <I n="check" />
@@ -130,7 +131,9 @@ const Row = memo(function Row({ t, p, sel, picked, group }) {
             {t.title}
           </span>
           <span class="rr-s">
-            {tag && <span class={`tag ${tag.tone} ${tag.solid ? 'solid' : ''}`}>{tag.label}</span>}
+            <Lamp s={lamp.s} word={lamp.word} sm>
+              {lampTimer(t, now)}
+            </Lamp>
             <span class="why">{why.replace(/^(허락|질문|계획|선택|터미널) · /, '')}</span>
           </span>
           {plan.length > 0 && !finished && (

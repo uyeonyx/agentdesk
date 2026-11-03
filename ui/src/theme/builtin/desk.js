@@ -3,7 +3,7 @@
 // color is meaning (waiting, done, failed) and each project's own mark.
 export const deskGlassDark = {
   id: 'desk-glass-dark',
-  name: 'Desk Glass Dark',
+  name: 'Desk Dark',
   kind: 'dark',
   author: 'Agent Desk',
   license: 'MIT',
@@ -21,7 +21,7 @@ export const deskGlassDark = {
 
 export const deskGlassLight = {
   id: 'desk-glass-light',
-  name: 'Desk Glass Light',
+  name: 'Desk Light',
   kind: 'light',
   author: 'Agent Desk',
   license: 'MIT',

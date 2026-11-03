@@ -1,8 +1,18 @@
 import { useEffect, useLayoutEffect, useReducer, useRef } from 'preact/hooks';
 import { useLogo } from '../logos.js';
-import { markOf } from '../core/status.js';
 
 export const I = ({ n, style, class: cls = '' }) => <i class={`ti ti-${n} ${cls}`} style={style} aria-hidden="true" />;
+
+/** One status signal: a lamp and a word, with an optional reading (a timer, a count) after it. */
+export function Lamp({ s, word, sm = false, children }) {
+  return (
+    <span class={`lamp ${sm ? 'sm' : ''}`} data-s={s}>
+      <i />
+      {word}
+      {children != null && children !== false && <span class="num">{children}</span>}
+    </span>
+  );
+}
 
 /** The project color on an element: everything inside derives its tints from it (room.css). */
 export function roomVars(color = '#7D8FA3') {
@@ -12,14 +22,13 @@ export function roomVars(color = '#7D8FA3') {
   return { '--room': color, '--room-ink': lum > 0.42 ? 'rgb(0 0 0 / 0.78)' : '#fff' };
 }
 
-/** The project's mark: its own logo, or its icon on its color. With `task`, a status mark at the corner. */
-export function Glyph({ project, size = 22, task, class: cls = '' }) {
+/** The project's mark: its own logo, or its icon on its color. A session's state is its lamp, not a dot here. */
+export function Glyph({ project, size = 22, class: cls = '' }) {
   const logo = useLogo(project);
   const st = { ...roomVars(project?.color), width: size + 'px', height: size + 'px', fontSize: Math.round(size * 0.56) + 'px', borderRadius: Math.round(size * 0.3) + 'px' };
   return (
     <span class={`glyph room-scope ${logo ? 'has-logo' : ''} ${cls}`} style={st}>
       {logo ? <img src={logo} alt="" draggable={false} /> : <I n={project?.icon || 'folder'} />}
-      {task && <span class={`mark ${markOf(task)}`} aria-hidden="true" />}
     </span>
   );
 }

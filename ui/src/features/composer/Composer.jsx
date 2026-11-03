@@ -177,7 +177,7 @@ export function Composer({ task, project, blocked }) {
   const pills = s.comments.length + s.refs.length + s.images.length;
 
   return (
-    <div class={`composer glass-2 lens ${nudge ? 'nudge' : ''} ${task.agent !== 'codex' ? `m-${modeOf(task.mode || 'default').tone}` : ''}`} data-testid="composer" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
+    <div class={`composer ${nudge ? 'nudge' : ''} ${task.agent !== 'codex' ? `m-${modeOf(task.mode || 'default').tone}` : ''}`} data-testid="composer" onDrop={onDrop} onDragOver={(e) => e.preventDefault()}>
       {pills > 0 && (
         <div class="cp-pills">
           {s.comments.map((c) => (
@@ -284,7 +284,7 @@ function Pop({ items, onPick, keys, empty }) {
     return false;
   };
   return (
-    <div class="cp-pop glass-3" role="listbox">
+    <div class="cp-pop" role="listbox">
       {!items.length && <div class="cp-pop-empty">{empty}</div>}
       {items.map((it, i) => (
         <button key={it.key} class={`li ${i === active ? 'on' : ''}`} role="option" aria-selected={i === active} onMouseDown={(e) => (e.preventDefault(), onPick(it))} onMouseEnter={() => setActive(i)}>

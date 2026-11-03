@@ -1,12 +1,10 @@
-// 관제: every live session on one screen, as a mosaic where space follows attention. A session
-// stuck on me gets a big tile with its question card; one waiting for my reply or a new result a
-// wide one; quiet work a small one that shows what it's doing this second.
+// 관제: every live session on one screen, as an instrument panel. On top, a readout strip (how many
+// wait on me, want a reply, are working, have stopped) and the plan's usage gauges; below, one plate
+// per group, split into cells by hairlines. What waits on me comes first and carries its card.
 import { memo } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { useStore, set, get, projectOf, toast } from '../../store.js';
-import { isLive, isBlocked, isBusy, whyOf, markOf, grouped, stateSince, waited } from '../../core/status.js';
-import { arrange, colsFor, rowHeight, SPAN } from '../../core/mosaic.js';
-import { duration } from '../../core/turns.js';
+import { useStore, set, projectOf, toast } from '../../store.js';
+import { isLive, isBlocked, whyOf, markOf, grouped, lampOf, lampTimer, clockOf } from '../../core/status.js';
 import { MODES, CYCLE, MODELS, nextMode, modeOf } from '../../core/session.js';
 import { openTask, quickSend, archiveAsk, resume, openDrawer } from '../../actions.js';
 import { enterAction } from '../../core/sendPolicy.js';
@@ -15,39 +13,36 @@ import { PromptCard } from '../prompt/PromptCard.jsx';
 import { Markdown } from '../../md/Markdown.jsx';
 import { openMenu, openMenuAt } from '../../ui/Menu.jsx';
 import { taskItems } from '../task/taskActions.js';
-import { ModeChip, ModeTag, CtxMini } from '../session/Pickers.jsx';
-import { Strip } from './Strip.jsx';
+import { ModeChip } from '../session/Pickers.jsx';
 import { ClashLine } from '../talk/Clash.jsx';
-import { Glyph, I, useNow, roomVars, ago } from '../../ui/bits.jsx';
+import { headline } from '../usage/Usage.jsx';
+import { Glyph, I, Lamp, useNow, roomVars, ago } from '../../ui/bits.jsx';
 import { sound } from '../../app/sounds.js';
 
+const OV_GROUPS = [
+  { key: 'wait', title: '허락·선택할 것', short: '나를 기다림', z: 'l' },
+  { key: 'turn', title: '답장·결과', short: '답장·결과', z: 'm' },
+  { key: 'work', title: '작업 중', short: '작업 중', z: 'l' },
+  { key: 'stop', title: '멈춤', short: '멈춤', z: 'm' },
+];
+const LAMP_OF_GROUP = { wait: 'wait', turn: 'reply', work: 'work', stop: 'stop' };
+
 export function Overview() {
-  const s = useStore((s) => ({ tasks: s.tasks, projects: s.projects, filter: s.filter, layout: s.ovLayout, pins: s.ovPins, showDone: s.ovDone, composing: s.composing }));
+  const s = useStore((s) => ({ tasks: s.tasks, projects: s.projects, filter: s.filter, showDone: s.ovDone, composing: s.composing, usage: s.usage }));
   const mine = s.tasks.filter((t) => !t.archived && (!s.filter || t.projectId === s.filter));
   const g = grouped(mine);
-  const live = mine.filter((t) => isLive(t) || (s.showDone && !t.archived));
-  const shown = s.showDone ? live : live.filter(isLive);
-  const pins = new Set(s.pins || []);
-  const mosaic = s.layout !== 'grid';
-  const items = mosaic ? arrange(shown, pins) : shown.map((t) => ({ t, z: 'l' }));
+  const groups = {
+    wait: g.yours.filter(isBlocked),
+    turn: g.yours.filter((t) => !isBlocked(t)),
+    work: g.working,
+    stop: s.showDone ? [...g.stopped, ...g.done] : g.stopped,
+  };
+  const order = OV_GROUPS.flatMap((x) => groups[x.key]);
   const grid = useRef();
-  const [box, setBox] = useState({ w: 1200, h: 700 });
   const [focus, setFocus] = useState(null);
-  const focusId = focus && items.some((x) => x.t.id === focus) ? focus : items[0]?.t.id;
+  const focusId = focus && order.some((t) => t.id === focus) ? focus : order[0]?.id;
 
-  // The grid's own size decides columns and row height.
-  useLayoutEffect(() => {
-    const el = grid.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => setBox({ w: el.clientWidth, h: el.clientHeight }));
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
-  const cols = colsFor(box.w);
-  const all = s.composing ? [{ z: 'l' }, ...items] : items;
-  const rowH = mosaic ? rowHeight(all, cols, box.h - 6) : null;
-
-  // Arrows move to the tile that is really in that direction; ↵ opens it; digits answer its card.
+  // Arrows move to the cell that is really in that direction; ↵ opens it; digits answer its card.
   useEffect(() => {
     const onKey = (e) => {
       const el = document.activeElement;
@@ -59,7 +54,7 @@ export function Overview() {
         if (next) setFocus(next);
         return;
       }
-      const t = items.find((x) => x.t.id === focusId)?.t;
+      const t = order.find((x) => x.id === focusId);
       if (!t) return;
       if (e.code === 'KeyO' || e.key === 'Enter') {
         e.preventDefault();
@@ -74,58 +69,92 @@ export function Overview() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [items.map((x) => x.t.id).join(), focusId]);
+  }, [order.map((t) => t.id).join(), focusId]);
   useEffect(() => {
     grid.current?.querySelector(`[data-task-id="${focusId}"]`)?.scrollIntoView({ block: 'nearest' });
   }, [focusId]);
 
-  const pin = (id) => set((st) => ({ ovPins: (st.ovPins || []).includes(id) ? st.ovPins.filter((x) => x !== id) : [...(st.ovPins || []), id] }));
   const project = s.filter && projectOf(s, s.filter);
-
+  const use = headline(s.usage);
+  let i = 0;
+  const tools = (
+    <div class="ov-tools">
+      <button class="scope-mini" data-tip="볼 프로젝트" onClick={(e) => openMenuAt(e.currentTarget, [{ icon: 'stack-2', label: '모든 프로젝트', run: () => set({ filter: null }) }, '-', ...s.projects.map((p) => ({ icon: p.icon || 'folder', label: p.name, run: () => set({ filter: p.id }) }))], 'end')}>
+        {project ? <Glyph project={project} size={18} /> : <I n="stack-2" />}
+        <span>{project ? project.name : '모든 프로젝트'}</span>
+        <I n="selector" class="dn" />
+      </button>
+      <button class="btn sm ghost" onClick={() => set({ board: 'all' })} data-testid="recaps">
+        <I n="message-2" /> 요약 모아 보기
+      </button>
+      {g.done.length > 0 && (
+        <button class="btn sm ghost" onClick={() => set({ ovDone: !s.showDone })}>
+          <I n={s.showDone ? 'chevron-down' : 'chevron-right'} /> 끝남 <span class="num">{g.done.length}</span>
+        </button>
+      )}
+      <button class="btn sm" onClick={() => set({ composing: true })} data-testid="new-tile-btn" data-tip="새 작업 · N">
+        <I n="plus" /> 새 작업
+      </button>
+    </div>
+  );
+  const first = s.composing ? 'new' : OV_GROUPS.find((x) => groups[x.key].length)?.key;
   return (
     <div class="overview" data-testid="overview">
-      <div class="ov-bar">
-        <button class="scope" onClick={(e) => openMenuAt(e.currentTarget, [{ icon: 'stack-2', label: '모든 프로젝트', run: () => set({ filter: null }) }, '-', ...s.projects.map((p) => ({ icon: p.icon || 'folder', label: p.name, run: () => set({ filter: p.id }) }))], 'start')}>
-          {project ? <Glyph project={project} size={22} /> : <I n="stack-2" />}
-          <span>{project ? project.name : '모든 프로젝트'}</span>
-          <I n="selector" class="dn" />
-        </button>
-        <span class="ov-sum">
-          <span class="count warn num">{g.yours.length}</span>내 차례
-          <span class="count info num">{g.working.length}</span>작업 중
-          {g.stopped.length > 0 && (
-            <>
-              <span class="count num">{g.stopped.length}</span>멈춤
-            </>
+      <div class="ov-scroll scroll" ref={grid}>
+        <header class="ov-head">
+          <div class="ov-title">
+            <h1>관제</h1>
+            <Clock />
+          </div>
+          <div class="cluster" role="group" aria-label="세션 수">
+            {OV_GROUPS.map((x) => (
+              <div key={x.key} class={`win ${x.key === 'wait' ? 'w' : x.key === 'stop' ? '' : 'i'}`} data-testid={`count-${x.key}`}>
+                <small>
+                  <Lamp s={LAMP_OF_GROUP[x.key]} word={x.short} sm />
+                </small>
+                <b class="num">{groups[x.key].length}</b>
+              </div>
+            ))}
+          </div>
+          <span class="sp" />
+          {(use.h5 || use.wk) && (
+            <div class="gauges">
+              {use.h5 && <Gauge label="5시간" pct={use.h5.pct} />}
+              {use.wk && <Gauge label="주간" pct={use.wk.pct} />}
+            </div>
           )}
-        </span>
-        <span class="sp" />
-        <div class="seg ov-sizes" role="group" aria-label="칸 크기">
-          <button aria-pressed={mosaic} onClick={() => set({ ovLayout: 'mosaic' })} data-tip="나를 기다리는 세션은 크게, 조용히 일하는 세션은 작게">
-            자동 크기
-          </button>
-          <button aria-pressed={!mosaic} onClick={() => set({ ovLayout: 'grid' })}>
-            같은 크기
-          </button>
-        </div>
-        <button class="btn sm ghost" onClick={() => set({ board: 'all' })} data-testid="recaps">
-          <I n="message-2" /> 요약 모아 보기
-        </button>
-        {g.done.length > 0 && (
-          <button class="btn sm ghost" onClick={() => set({ ovDone: !s.showDone })}>
-            <I n={s.showDone ? 'chevron-down' : 'chevron-right'} /> 끝남 {g.done.length}
-          </button>
+        </header>
+        {s.composing && (
+          <section class="ov-grp" aria-label="새 작업">
+            <div class="ov-gh">
+              <h2 class="label">새 작업</h2>
+              {tools}
+            </div>
+            <NewTile />
+          </section>
         )}
-        <button class="btn sm" onClick={() => set({ composing: true })} data-testid="new-tile-btn">
-          <I n="plus" /> 새 작업 <kbd>N</kbd>
-        </button>
-      </div>
-      <div class={`ov-grid ${mosaic ? 'mosaic' : ''}`} ref={grid} style={mosaic ? { gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gridAutoRows: `${rowH}px` } : undefined}>
-        {s.composing && <NewTile cols={cols} rowH={rowH} />}
-        {items.map(({ t, z }) => (
-          <Panel key={t.id} t={t} p={projectOf(s, t.projectId)} z={z} cols={cols} mosaic={mosaic} pinned={pins.has(t.id)} focused={t.id === focusId} onFocus={() => setFocus(t.id)} onPin={() => pin(t.id)} />
-        ))}
-        {!items.length && !s.composing && (
+        {OV_GROUPS.map((x) => {
+          const list = groups[x.key];
+          if (!list.length) return null;
+          return (
+            <section key={x.key} class="ov-grp" aria-label={x.title} data-group={x.key}>
+              <div class="ov-gh">
+                <h2 class="label">
+                  {x.title}
+                  <span class="num">{list.length}</span>
+                </h2>
+                {first === x.key && tools}
+              </div>
+              <div class="plate ov-plate" style={{ '--i': i++ }}>
+                {list.map((t) => (
+                  <Cell key={t.id} t={t} p={projectOf(s, t.projectId)} z={x.key === 'stop' && !isLive(t) ? 's' : x.z} focused={t.id === focusId} onFocus={() => setFocus(t.id)} />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+        {!order.length && !s.composing && <div class="ov-gh">{tools}</div>}
+        {!order.length && !s.composing && (
           <div class="ov-empty">
             <I n="layout-dashboard" />
             <h3>돌아가는 세션이 없어요</h3>
@@ -139,11 +168,48 @@ export function Overview() {
   );
 }
 
-/** The tile whose center lies in direction `dir` ([dx, dy]) from the focused one, nearest first. */
+/** Today's date and the time, for the head of the panel. */
+function Clock() {
+  const now = useNow(15000);
+  const d = new Date(now);
+  const date = d.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'long' });
+  const time = d.toLocaleTimeString('ko-KR', { hour: 'numeric', minute: '2-digit' });
+  return (
+    <span class="when num">
+      {date} · {time}
+    </span>
+  );
+}
+
+/** A half-dial gauge for one usage limit, with quarter ticks; it turns warm past 80%. */
+function Gauge({ label, pct }) {
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => {
+    const a = Math.PI * (1 - f);
+    return [46 + Math.cos(a) * 30, 48 - Math.sin(a) * 30, 46 + Math.cos(a) * 26, 48 - Math.sin(a) * 26];
+  });
+  return (
+    <div class={`gauge ${pct >= 80 ? 'hi' : ''}`} data-tip={`${label} 한도의 ${pct}%를 썼어요`}>
+      <svg viewBox="0 0 92 52" aria-hidden="true">
+        <path class="track" d="M8 48a38 38 0 0 1 76 0" />
+        <path class="val" d="M8 48a38 38 0 0 1 76 0" pathLength="100" stroke-dasharray={`${Math.max(0, Math.min(100, pct))} 100`} />
+        {ticks.map(([x1, y1, x2, y2], k) => (
+          <line key={k} class="tick" x1={x1.toFixed(1)} y1={y1.toFixed(1)} x2={x2.toFixed(1)} y2={y2.toFixed(1)} />
+        ))}
+      </svg>
+      <b class="num">
+        {pct}
+        <small>%</small>
+      </b>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+// The cell nearest in the direction of an arrow key, by where cells really are on screen.
 function neighbor(root, id, [dx, dy]) {
-  const els = [...(root?.querySelectorAll('[data-task-id]') || [])];
-  const cur = els.find((e) => e.dataset.taskId === id) || els[0];
-  if (!cur) return null;
+  const els = [...(root?.querySelectorAll('[data-testid="tile"]') || [])];
+  const cur = els.find((e) => e.dataset.taskId === id);
+  if (!cur) return els[0]?.dataset.taskId || null;
   const c = (e) => {
     const r = e.getBoundingClientRect();
     return [r.left + r.width / 2, r.top + r.height / 2, r.height];
@@ -166,75 +232,41 @@ function neighbor(root, id, [dx, dy]) {
   return best?.dataset.taskId || null;
 }
 
-const Panel = memo(function Panel({ t, p, z, cols, mosaic, pinned, focused, onFocus, onPin }) {
+const Cell = memo(function Cell({ t, p, z, focused, onFocus }) {
   const blocked = isBlocked(t);
-  const [c, r] = SPAN[z];
-  const style = { ...roomVars(p?.color), viewTransitionName: `task-${t.id}` };
-  if (mosaic) Object.assign(style, { gridColumn: `span ${Math.min(c, cols)}`, gridRow: `span ${r}` });
+  const now = useNow();
+  const l = lampOf(t);
+  const timer = lampTimer(t, now);
+  const meta = [p?.name, t.agent === 'codex' ? 'Codex' : null, ['reply', 'result', 'stop'].includes(l.s) ? `${ago(t.updatedAt)} 전` : null].filter(Boolean).join(' · ');
   return (
     <article
-      class={`pn glass-2 z-${z} ${focused ? 'focused' : ''} ${blocked ? 'blocked' : ''} ${markOf(t)}`}
+      class={`cell oc z-${z} ${focused ? 'focused' : ''} ${blocked ? 'blocked' : ''} ${markOf(t)}`}
       data-task-id={t.id}
       data-testid="tile"
       data-state={blocked ? 'blocked' : t.state}
       data-z={z}
-      style={style}
+      style={{ ...roomVars(p?.color), viewTransitionName: `task-${t.id}` }}
       onMouseDown={onFocus}
       onContextMenu={(e) => !e.target.closest('input, textarea') && openMenu(e, taskItems(t))}
     >
-      <button class="pn-h" onClick={() => openTask(t.id)} data-tip="집중해서 보기 ↵" aria-label={`${p?.name || ''} · ${t.title} 집중해서 보기`}>
-        <Glyph project={p} size={z === 's' ? 26 : 30} task={t} />
-        <span class="pn-tt">
-          <span class="pn-title">{t.title}</span>
-          <span class="pn-meta">
-            <span class="pj">
-              {p?.name}
-              {t.agent === 'codex' ? ' · Codex' : ''}
-            </span>
-            {isLive(t) && t.state !== 'exited' && <ModeTag task={t} short={z === 's'} />}
-            {isLive(t) && t.state !== 'exited' && <CtxMini task={t} />}
+      <button class="oc-h pn-h" onClick={() => openTask(t.id)} data-tip="집중해서 보기 ↵" aria-label={`${p?.name || ''} · ${t.title} 집중해서 보기`}>
+        <Glyph project={p} size={28} />
+        <span class="oc-tt">
+          <span class="oc-title" title={t.title}>
+            {t.title}
           </span>
+          <span class="oc-meta">{meta}</span>
         </span>
-        {!(z === 's' && isBusy(t)) && <StateChip t={t} />}
+        <Lamp s={l.s} word={l.word}>{timer}</Lamp>
       </button>
-      <Strip t={t} class="pn-strip" />
-      <div class="pn-body">
+      <div class="oc-b">
         <Body t={t} p={p} z={z} focused={focused} />
       </div>
       {t.clash?.length > 0 && z !== 's' && isLive(t) && <ClashLine t={t} />}
-      <Foot t={t} p={p} z={z} mosaic={mosaic} pinned={pinned} onPin={onPin} />
+      <Foot t={t} p={p} z={z} />
     </article>
   );
 });
-
-export function StateChip({ t }) {
-  const now = useNow();
-  if (isBlocked(t))
-    return (
-      <span class="st b">
-        <i class="dia" />
-        <span class="num">{waited(now - stateSince(t))}</span>
-      </span>
-    );
-  if (t.state === 'needs_input') return <span class="st r">답장 차례</span>;
-  if (t.state === 'review') return <span class="st v">새 결과</span>;
-  if (t.state === 'exited') return <span class="st x">멈춤</span>;
-  if (t.state === 'waiting') return <span class="st w">대기 중</span>;
-  if (isBusy(t))
-    return (
-      <span class="st w">
-        작업 중 <span class="num">{clock(now - turnStart(t))}</span>
-      </span>
-    );
-  return <span class="st x">{t.state === 'merged' ? '머지함' : '끝남'}</span>;
-}
-
-const turnStart = (t) => t.messages?.at(-1)?.at || t.activity?.since || t.updatedAt;
-const pad = (n) => String(n).padStart(2, '0');
-function clock(ms) {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return s >= 3600 ? `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}` : `${Math.floor(s / 60)}:${pad(s % 60)}`;
-}
 
 function Body({ t, p, z, focused }) {
   if (isBlocked(t)) {
@@ -364,18 +396,13 @@ function Now({ t, z }) {
     <div class="nowl">
       <i class={`kd k-${run ? kindOf(run.kind) : 'think'}`} />
       <b>{what}</b>
-      {t.activity?.current && <span class="num el">{clock(now - since)}</span>}
+      {t.activity?.current && <span class="num el">{clockOf(now - since)}</span>}
     </div>
   );
 }
 
-function Foot({ t, p, z, mosaic, pinned, onPin }) {
-  const pinBtn =
-    mosaic && !isBlocked(t) ? (
-      <button class="ibtn sm" onClick={onPin} data-tip={pinned ? '원래 크기로' : '크게 보기'} aria-label={pinned ? '원래 크기로' : '크게 보기'}>
-        <I n={pinned ? 'arrows-minimize' : 'arrows-maximize'} />
-      </button>
-    ) : null;
+function Foot({ t, p, z }) {
+  const pinBtn = null;
   if (isBlocked(t)) return null;
   const c = t.changes || {};
   const files = c.files ? (
@@ -478,7 +505,7 @@ function QuickReply({ t, p }) {
 }
 
 /** A new session: what to ask, where, with which agent, starting in which mode and model. */
-function NewTile({ cols, rowH }) {
+function NewTile() {
   const s = useStore((s) => ({ projects: s.projects, filter: s.filter, agents: s.agents, draft: s.newDraft }));
   const d = { projectId: s.filter || s.projects[0]?.id, agent: 'claude', mode: 'default', model: '', ...(s.draft || {}) };
   const ta = useRef();
@@ -505,12 +532,7 @@ function NewTile({ cols, rowH }) {
   };
   const m = modeOf(d.mode);
   return (
-    <article
-      class={`pn glass-2 new z-l m-${claude ? m.tone : ''}`}
-      // Wide enough for a row of choices on one line, tall enough for all of them.
-      style={{ ...roomVars(p?.color), gridColumn: `span ${cols >= 6 ? 3 : Math.min(2, cols)}`, gridRow: `span ${rowH && rowH < 200 ? 3 : 2}` }}
-      data-testid="new-tile"
-    >
+    <article class={`pn new ov-new m-${claude ? m.tone : ''}`} style={roomVars(p?.color)} data-testid="new-tile">
       <div class="pn-h">
         <Glyph project={p} size={30} />
         <span class="pn-tt">

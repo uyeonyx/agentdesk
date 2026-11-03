@@ -74,6 +74,36 @@ export function tagOf(t) {
   return null;
 }
 
+/**
+ * A session's one status signal for the 0.7 standard: which lamp (wait · reply · result · work ·
+ * bg · stop) and the word beside it.
+ */
+export function lampOf(t) {
+  const ask = askOf(t);
+  if (ask) return { s: 'wait', word: `${ask.short} 대기` };
+  if (t.state === 'needs_input') return { s: 'reply', word: '답장 차례' };
+  if (t.state === 'review') return { s: 'result', word: '새 결과' };
+  if (t.state === 'working' || t.state === 'starting') return { s: 'work', word: t.state === 'starting' ? '시작하는 중' : '작업 중' };
+  if (t.state === 'waiting') return { s: 'bg', word: '대기 중' };
+  if (t.state === 'exited') return { s: 'stop', word: '멈춤' };
+  return { s: 'stop', word: STATE_LABEL[t.state] || '끝남' };
+}
+
+const pad2 = (n) => String(n).padStart(2, '0');
+/** A running clock, m:ss or h:mm:ss. */
+export function clockOf(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return s >= 3600 ? `${Math.floor(s / 3600)}:${pad2(Math.floor((s % 3600) / 60))}:${pad2(s % 60)}` : `${Math.floor(s / 60)}:${pad2(s % 60)}`;
+}
+
+/** The live timer a lamp carries: how long it has waited on me, or how long this turn has run. */
+export function lampTimer(t, now) {
+  const s = lampOf(t).s;
+  if (s === 'wait') return clockOf(now - stateSince(t));
+  if (s === 'work') return clockOf(now - (t.messages?.at(-1)?.at || t.activity?.since || t.updatedAt));
+  return null;
+}
+
 export const STATE_LABEL = {
   starting: '시작하는 중',
   working: '작업 중',

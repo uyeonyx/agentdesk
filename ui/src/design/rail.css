@@ -1,4 +1,5 @@
-/* The rail: sessions grouped by what they need from me. */
+/* The rail: sessions grouped by what they need from me. A chrome-colored compartment on the left,
+   rows with a project tile, a title and one lamp; the open one sits on a soft accent ground. */
 
 .rail {
   position: relative;
@@ -6,19 +7,20 @@
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-radius: var(--r-4);
-  --mark-ring: color-mix(in oklab, var(--bg-app) 85%, var(--bg-raised));
+  background: var(--chrome);
+  box-shadow: inset -1px 0 0 var(--line);
+  --mark-ring: var(--chrome);
 }
 .rail-list {
   flex: 1;
   min-height: 0;
-  padding: 2px 8px 10px;
+  padding: 0 var(--sp-3) var(--sp-3);
 }
 .rail-resize {
   position: absolute;
-  top: 16px;
-  bottom: 16px;
-  right: -6px;
+  top: 0;
+  bottom: 0;
+  right: -4px;
   width: 8px;
   cursor: col-resize;
   -webkit-app-region: no-drag;
@@ -27,68 +29,58 @@
 /* Project switch: which project the rail shows, by name; a searchable list below it. */
 .scope {
   position: relative;
-  padding: 10px 10px 4px;
+  padding: var(--sp-3) var(--sp-3) var(--sp-1);
 }
 .scope-btn {
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 7px 10px 7px 7px;
-  border-radius: var(--r-3);
+  padding: var(--sp-2);
+  border-radius: var(--r-2);
   text-align: left;
-  background: var(--bg-hover);
-  box-shadow: inset 0 0 0 1px var(--line);
-  transition:
-    background var(--dur-2),
-    box-shadow var(--dur-2),
-    transform var(--dur-3) var(--ease-spring);
+  background: var(--surface);
+  box-shadow: var(--e-0);
+  transition: background var(--dur-2);
 }
 .scope-btn:hover,
 .scope-btn.on {
-  background: var(--bg-active);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-}
-.scope-btn:active {
-  transform: scale(0.985);
+  background: var(--hover);
 }
 .scope-all {
   display: grid;
   place-items: center;
   flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  font-size: 17px;
-  color: var(--text);
-  background: var(--bg-active);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-}
-.scope-all.sm {
   width: 28px;
   height: 28px;
+  border-radius: var(--r-2);
   font-size: 16px;
-  border-radius: 8px;
+  color: var(--text-2);
+  background: var(--surface-2);
+}
+.scope-all.sm {
+  width: 24px;
+  height: 24px;
+  font-size: 14px;
+  border-radius: var(--r-1);
 }
 .scope-m {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 1px;
 }
 .scope-m b {
-  font-size: 14px;
-  line-height: 19px;
-  font-weight: var(--w-4);
-  letter-spacing: -0.01em;
+  font-size: var(--t-md);
+  line-height: var(--lh-md);
+  font-weight: var(--w-3);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .scope-m small {
-  font-size: 11.5px;
-  line-height: 15px;
+  font-size: var(--t-sm);
+  line-height: var(--lh-sm);
   color: var(--text-3);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -102,29 +94,25 @@
 .scope-pop {
   position: absolute;
   top: calc(100% + 2px);
-  left: 8px;
-  right: 8px;
+  left: var(--sp-2);
+  right: var(--sp-2);
   z-index: var(--z-pop);
   display: flex;
   flex-direction: column;
   max-height: min(540px, 72vh);
-  border-radius: var(--r-4);
+  border-radius: var(--r-3);
   overflow: hidden;
-  /* Solid: rows of the rail right under it would otherwise read through. */
-  background: var(--bg-overlay);
-  box-shadow:
-    0 0 0 1px var(--line-strong),
-    inset 0 1px 0 var(--glass-edge),
-    var(--shadow-3);
-  animation: pop var(--dur-2) var(--ease-out);
+  background: var(--surface);
+  box-shadow: var(--e-1);
+  animation: pop var(--dur-2) var(--ease);
 }
 .scope-q {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 12px;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3);
   height: 40px;
-  border-bottom: 1px solid var(--line);
+  box-shadow: inset 0 -1px 0 var(--line);
   color: var(--text-3);
 }
 .scope-q input {
@@ -134,7 +122,7 @@
   outline: 0;
   background: none;
   font: inherit;
-  font-size: var(--fs-3);
+  font-size: var(--t-md);
   color: var(--text);
 }
 .scope-list {
@@ -148,19 +136,15 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 7px 8px;
-  border-radius: var(--r-2);
+  padding: 6px var(--sp-2);
+  border-radius: var(--r-1);
   text-align: left;
 }
 .scope-li.active {
-  background: var(--bg-active);
-}
-.scope-li .scope-m b {
-  font-size: 13.5px;
-  font-weight: var(--w-3);
+  background: var(--hover);
 }
 .scope-li.cur .scope-m b {
-  font-weight: var(--w-4);
+  color: var(--accent-text);
 }
 .scope-li kbd {
   flex: none;
@@ -173,9 +157,8 @@
 .scope-c .busy {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  font-size: var(--fs-1);
-  font-weight: var(--w-3);
+  gap: var(--sp-1);
+  font-size: var(--t-sm);
   color: var(--accent-text);
 }
 .scope-ok {
@@ -186,17 +169,17 @@
 .scope-foot {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
   padding: 6px;
-  border-top: 1px solid var(--line);
+  box-shadow: inset 0 1px 0 var(--line);
 }
 
-/* Groups. */
+/* Groups: a small name and a quiet count. */
 .grp-h {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 12px 4px 4px 6px;
+  gap: var(--sp-1);
+  padding: var(--sp-4) var(--sp-1) 6px var(--sp-2);
 }
 .grp-t {
   display: inline-flex;
@@ -204,27 +187,34 @@
   gap: 6px;
   flex: 1;
   min-width: 0;
-  font-size: 12.5px;
-  font-weight: var(--w-4);
-  color: var(--text);
+  font-size: var(--t-sm);
+  line-height: var(--lh-sm);
+  font-weight: var(--w-2);
+  color: var(--text-3);
 }
 .grp-t .ti {
-  font-size: 13px;
-  color: var(--text-3);
-  transition: transform var(--dur-2) var(--ease-out);
+  font-size: 12px;
+  transition: transform var(--dur-2) var(--ease);
 }
 .grp-t.closed .ti {
   transform: rotate(-90deg);
 }
+.grp-t .count {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  background: none;
+  font-weight: var(--w-1);
+  color: var(--text-3);
+}
 .grp-x {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--sp-1);
   height: 22px;
-  padding: 0 8px;
-  border-radius: 7px;
-  font-size: var(--fs-1);
-  font-weight: var(--w-3);
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-1);
+  font-size: var(--t-sm);
   color: var(--text-3);
   opacity: 0;
   transition: opacity var(--dur-2);
@@ -239,9 +229,8 @@ section[data-group='yours'] .grp-x {
 }
 .grp-x:hover {
   color: var(--text);
-  background: var(--bg-hover);
+  background: var(--hover);
 }
-
 
 /* Rows. */
 .rrow-wrap {
@@ -250,47 +239,41 @@ section[data-group='yours'] .grp-x {
 .rrow {
   position: relative;
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
-  gap: 11px;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: start;
   width: 100%;
-  padding: 9px 10px;
-  border-radius: var(--r-3);
+  padding: var(--sp-2) 10px;
+  border-radius: var(--r-1);
   text-align: left;
-  transition:
-    background var(--dur-2),
-    box-shadow var(--dur-2);
+  transition: background var(--dur-2);
 }
 .rrow:hover {
-  background: var(--bg-hover);
+  background: var(--hover);
 }
-/* The open task takes on its project's color, faintly: you can tell where you are at a glance. */
 .rrow.sel {
-  background: color-mix(in oklab, var(--room) 14%, var(--bg-surface));
-  box-shadow:
-    inset 0 0 0 1px color-mix(in oklab, var(--room) 42%, transparent),
-    inset 0 1px 0 var(--glass-edge),
-    0 6px 18px -10px color-mix(in oklab, var(--room) 60%, transparent);
+  background: var(--accent-soft);
+}
+.rrow.sel .rr-t {
+  font-weight: var(--w-3);
 }
 .rrow.picked {
-  box-shadow: inset 0 0 0 1px var(--line-strong);
-  background: var(--bg-active);
+  background: var(--pressed);
 }
 .rrow.finished {
-  opacity: 0.55;
+  opacity: 0.6;
 }
-
 .rrow .pk {
   position: absolute;
-  left: 4px;
-  top: 4px;
+  left: var(--sp-1);
+  top: var(--sp-1);
   display: grid;
   place-items: center;
   width: 16px;
   height: 16px;
   border-radius: 50%;
   font-size: 11px;
-  color: var(--bg-surface);
+  color: var(--surface);
   background: var(--text);
   box-shadow: 0 0 0 2px var(--mark-ring);
 }
@@ -301,92 +284,92 @@ section[data-group='yours'] .grp-x {
   gap: 2px;
 }
 .rr-t {
-  font-size: 14px;
-  font-weight: var(--w-3);
-  line-height: 20px;
+  font-size: var(--t-md);
+  line-height: var(--lh-md);
+  font-weight: var(--w-2);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .rr-t .rm {
   color: var(--ok-text);
-  font-size: 12px;
-  margin-right: 4px;
+  font-size: var(--t-sm);
+  margin-right: var(--sp-1);
 }
 .rr-t .where {
-  margin-right: 5px;
-  padding: 0 5px;
-  border-radius: 5px;
-  font-size: 10.5px;
-  font-weight: var(--w-3);
+  margin-right: 6px;
+  padding: 0 6px;
+  border-radius: var(--r-1);
+  font-size: var(--t-sm);
+  font-weight: var(--w-2);
   color: var(--text-2);
-  box-shadow: inset 0 0 0 1px var(--line-strong);
+  background: var(--surface-2);
 }
 .rr-s {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  font-size: 12.5px;
-  line-height: 18px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  font-size: var(--t-sm);
+  line-height: var(--lh-sm);
+  color: var(--text-3);
+}
+.rr-s .lamp {
+  flex: none;
   color: var(--text-2);
 }
-.rr-s .tag {
-  margin-right: 6px;
+.rr-s .why {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .rrow.blocked .why {
-  color: var(--text);
+  color: var(--text-2);
 }
 .rr-plan {
   height: 2px;
-  margin-top: 5px;
-  border-radius: 2px;
+  margin-top: 6px;
+  border-radius: 1px;
   background: var(--line);
   overflow: hidden;
 }
 .rr-plan i {
   display: block;
   height: 100%;
-  background: var(--accent);
-  border-radius: inherit;
-  transition: width var(--dur-4) var(--ease-out);
+  background: var(--accent-mark);
+  transition: width var(--dur-4) var(--ease);
 }
 .rr-meta {
-  font-size: var(--fs-1);
+  font-size: var(--t-sm);
+  line-height: var(--lh-md);
   color: var(--text-3);
-  padding-top: 2px;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 .diffstat b {
-  font-size: var(--fs-1);
+  font-weight: var(--w-1);
 }
 .rrow-x {
   position: absolute;
-  right: 8px;
-  bottom: 8px;
+  right: 6px;
+  top: 6px;
   display: grid;
   place-items: center;
-  width: 26px;
-  height: 26px;
-  border-radius: 8px;
+  width: var(--h-sm);
+  height: var(--h-sm);
+  border-radius: var(--r-1);
   color: var(--text-2);
-  background: var(--bg-overlay);
-  box-shadow:
-    0 0 0 1px var(--line-strong),
-    var(--shadow-1);
+  background: var(--surface);
+  box-shadow: var(--e-0);
   font-size: 15px;
   opacity: 0;
   pointer-events: none;
-  transform: scale(0.9);
-  transition:
-    opacity var(--dur-2),
-    transform var(--dur-3) var(--ease-spring);
+  transition: opacity var(--dur-2);
 }
 .rrow-wrap:hover .rrow-x,
 .rrow-x:focus-visible {
   opacity: 1;
   pointer-events: auto;
-  transform: none;
 }
 .rrow-wrap:hover .rr-meta {
   visibility: hidden;
@@ -399,20 +382,20 @@ section[data-group='yours'] .grp-x {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 8px;
-  border-top: 1px solid var(--line);
+  padding: var(--sp-2);
+  box-shadow: inset 0 1px 0 var(--line);
 }
 .rail-foot .btn.on {
   color: var(--text);
-  background: var(--bg-active);
+  background: var(--pressed);
 }
 .rail-foot .n {
   color: var(--text-3);
   margin-left: 2px;
 }
 .rail-empty {
-  padding: 40px 16px;
-  font-size: var(--fs-3);
+  padding: 40px var(--sp-4);
+  font-size: var(--t-md);
 }
 .rail-empty p {
   margin: 0;
@@ -422,36 +405,36 @@ section[data-group='yours'] .grp-x {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 2px 8px 4px;
-  padding: 6px 6px 6px 12px;
-  border-radius: var(--r-3);
-  background: var(--bg-active);
-  box-shadow: inset 0 0 0 1px var(--line);
-  font-size: var(--fs-2);
+  margin: 2px var(--sp-3) var(--sp-1);
+  padding: 6px 6px 6px var(--sp-3);
+  border-radius: var(--r-2);
+  background: var(--surface);
+  box-shadow: var(--e-0);
+  font-size: var(--t-sm);
   font-weight: var(--w-3);
-  animation: rise var(--dur-3) var(--ease-spring);
+  animation: rise var(--dur-3) var(--ease);
 }
 .pickbar .n {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .shelf {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--sp-2);
   flex: 1;
   min-height: 0;
-  padding: 2px 8px 0;
+  padding: 2px var(--sp-3) 0;
 }
 .shelf-h {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--sp-2);
   font-weight: var(--w-3);
 }
 .rrow.shelved {
-  grid-template-columns: 30px minmax(0, 1fr) auto auto;
+  grid-template-columns: 24px minmax(0, 1fr) auto auto;
   align-items: center;
 }

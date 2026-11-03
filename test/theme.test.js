@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import {
   parseColor, isColor, toHex, toRgba, contrast, over, mix, toOklch, fromOklch, ensureContrast, luminance,
 } from '../ui/src/theme/color.js';
-import { normalizeTheme, TOKEN_NAMES, COLOR_TOKENS, VALUE_TOKENS, SHADOW_TOKENS, ThemeError } from '../ui/src/theme/schema.js';
+import { normalizeTheme, TOKEN_NAMES, COLOR_TOKENS, SHADOW_TOKENS, ThemeError } from '../ui/src/theme/schema.js';
 import { deriveTokens } from '../ui/src/theme/derive.js';
 import { applyTheme, isSafeValue } from '../ui/src/theme/apply.js';
 import { BUILTIN_THEMES, DEFAULT_DARK_ID, DEFAULT_LIGHT_ID } from '../ui/src/theme/builtin/index.js';
@@ -19,7 +19,6 @@ import * as themeApi from '../ui/src/theme/index.js';
 
 const FIX = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'themes');
 const fixture = (f) => fs.readFileSync(path.join(FIX, f), 'utf8');
-const GLASS = ['rich', 'light', 'off'];
 const XTERM_KEYS = [
   'background', 'foreground', 'cursor', 'cursorAccent', 'selectionBackground',
   'black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white',
@@ -36,38 +35,31 @@ function assertComplete(d, label) {
     assert.ok(isSafeValue(v), `${label}: ${name} = ${v} is not a safe CSS value`);
   }
   for (const n of COLOR_TOKENS) assert.ok(isColor(d.vars[`--${n}`]), `${label}: --${n} not a color`);
-  assert.match(d.vars['--glass-blur'], /^\d+px$/);
-  assert.match(d.vars['--glass-sat'], /^\d+%$/);
-  assert.match(d.vars['--glow'], /^[01]$/);
-  assert.match(d.vars['--amb-speed'], /^\d+(\.\d+)?s$/);
   for (const n of SHADOW_TOKENS) assert.match(d.vars[`--${n}`], /rgba\(/);
 
   const c = (n) => parseColor(d.vars[n]);
-  const surfaces = ['--bg-surface', '--bg-raised', '--bg-overlay'].map(c);
-  // Glass sits over the flat app background (no aurora behind it any more).
-  const glass = [c('--bg-app')].flatMap((b) => [over(c('--glass-tint'), b), over(c('--glass-tint-strong'), b)]);
-  const all = [...surfaces, ...glass];
+  // Every place text sits: white panels, the chrome, the sunken fills, hover and selected rows.
+  const all = ['--surface', '--chrome', '--bg', '--surface-2', '--hover', '--pressed', '--accent-soft'].map(c);
   const min = (fg, bgs) => Math.min(...bgs.map((b) => contrast(fg, b)));
   assert.ok(min(c('--text'), all) >= 4.5, `${label}: --text ${min(c('--text'), all).toFixed(2)}`);
   assert.ok(min(c('--text-2'), all) >= 4.5, `${label}: --text-2 ${min(c('--text-2'), all).toFixed(2)}`);
   // Tertiary text is small (times, paths, labels): it gets the AA bar too.
   assert.ok(min(c('--text-3'), all) >= 4.5, `${label}: --text-3 ${min(c('--text-3'), all).toFixed(2)}`);
-  // Hierarchy survives the correction: primary reads at least as strongly as secondary, secondary as tertiary.
-  const onSurface = (n) => contrast(c(n), c('--bg-surface'));
+  const onSurface = (n) => contrast(c(n), c('--surface'));
   assert.ok(onSurface('--text') >= onSurface('--text-2') && onSurface('--text-2') >= onSurface('--text-3'), `${label}: text hierarchy`);
-  assert.ok(contrast(c('--accent-ink'), c('--accent')) >= 4.5, `${label}: accent-ink`);
-  assert.ok(contrast(c('--accent-text'), c('--bg-surface')) >= 4.5, `${label}: accent-text`);
-  for (const s of ['ok', 'warn', 'danger', 'info']) {
-    assert.ok(contrast(c(`--${s}-text`), c('--bg-surface')) >= 4.5, `${label}: ${s}-text`);
+  assert.ok(contrast(c('--accent-fill-ink'), c('--accent-fill')) >= 4.5, `${label}: accent-fill-ink`);
+  assert.ok(min(c('--accent-text'), [c('--surface'), c('--accent-soft')]) >= 4.5, `${label}: accent-text`);
+  for (const s of ['ok', 'warn', 'danger']) {
+    assert.ok(min(c(`--${s}-text`), [c('--surface'), c(`--${s}-soft`)]) >= 4.5, `${label}: ${s}-text`);
     assert.ok(contrast(c(`--${s}-ink`), c(`--${s}`)) >= 4.5, `${label}: ${s}-ink`);
-    assert.ok(contrast(c(`--${s}-fill-ink`), c(`--${s}-fill`)) >= 4.5, `${label}: ${s}-fill-ink`);
   }
-  for (const k of ['add', 'del']) {
-    const under = over(c(`--diff-${k}-bg`), c('--bg-surface'));
-    assert.ok(contrast(c(`--diff-${k}-text`), under) >= 4.5, `${label}: diff-${k}-text`);
-  }
+  for (const k of ['add', 'del']) assert.ok(contrast(c(`--${k}`), c(`--${k}-bg`)) >= 4.5, `${label}: diff ${k}`);
+  // The readout windows carry big numbers and small labels.
+  for (const w of ['--win', '--warn-win', '--info-win']) assert.ok(contrast(c('--text-2'), c(w)) >= 4.5, `${label}: text-2 on ${w}`);
+  // Its big numbers (34px and up) are large text: 3:1.
+  assert.ok(contrast(c('--warn-text'), c('--warn-win')) >= 3, `${label}: warn-text on warn-win`);
+  assert.ok(contrast(c('--accent-line'), c('--surface')) >= 3, `${label}: focus ring`);
   assert.ok(contrast(c('--term-fg'), c('--term-bg')) >= 4.5, `${label}: term-fg`);
-  assert.ok(contrast(c('--focus'), c('--bg-surface')) >= 3, `${label}: focus ring`);
 
   for (const k of XTERM_KEYS) assert.ok(isColor(d.xterm[k]), `${label}: xterm.${k}`);
   assert.ok(d.monaco.base === 'vs' || d.monaco.base === 'vs-dark');
@@ -80,7 +72,8 @@ function assertComplete(d, label) {
   const ruleTokens = new Set(d.monaco.rules.map((r) => r.token));
   for (const t of MONACO_TOKENS) assert.ok(ruleTokens.has(t), `${label}: monaco rule ${t}`);
   for (const [k, v] of Object.entries(d.monaco.colors)) assert.match(v, /^#[0-9a-f]{6}([0-9a-f]{2})?$/, `${label}: monaco ${k}`);
-  assert.equal(d.monaco.colors['editor.background'], d.vars['--bg-surface']);
+  // The editor and terminal keep the code theme's own background; the app around them doesn't.
+  assert.equal(d.monaco.colors['editor.background'], d.vars['--term-bg']);
   assert.match(d.chrome.bg, /^#[0-9a-f]{6}$/);
   assert.match(d.chrome.fg, /^#[0-9a-f]{6}$/);
 }
@@ -139,59 +132,43 @@ test('built-ins: ids are unique, defaults exist, every definition normalizes cle
 });
 
 for (const t of BUILTIN_THEMES) {
-  test(`derive: ${t.id} is complete and readable in every glass mode`, () => {
-    for (const glass of GLASS) assertComplete(deriveTokens(t, { glass }), `${t.id}/${glass}`);
+  test(`derive: ${t.id} is complete, readable, and leaves the app's own palette alone`, () => {
+    const d = deriveTokens(t);
+    assertComplete(d, t.id);
+    // Surfaces, lines and text are the hand-set palette for this kind of screen, whatever the theme.
+    const own = themeApi.BASE[t.kind];
+    for (const k of ['bg', 'surface', 'line', 'text', 'text-2', 'text-3', 'accent-fill', 'warn', 'ok']) assert.equal(d.vars[`--${k}`], own[k], `${t.id}: --${k}`);
   });
 }
 
-test('accents: every accent on every built-in keeps the contract; unknown ids change nothing', () => {
-  for (const t of BUILTIN_THEMES) {
+test('accents: every accent keeps the contract on both screens; blue and unknown ids are the standard', () => {
+  for (const kind of ['light', 'dark']) {
+    const t = BUILTIN_THEMES.find((x) => x.kind === kind);
     for (const a of themeApi.ACCENTS) {
-      const d = deriveTokens(themeApi.withAccent(t, a.id));
-      assertComplete(d, `${t.id}+${a.id}`);
-      // The accent is the picked one (contrast correction only touches text colors).
-      assert.equal(d.vars['--accent'], t.kind === 'light' ? a.light : a.dark, `${t.id}+${a.id}: accent`);
+      const d = deriveTokens(t, { accent: a.id });
+      assertComplete(d, `${kind}+${a.id}`);
+      assert.equal(d.vars['--accent-fill'], kind === 'light' ? a.light : a.dark, `${kind}+${a.id}: accent`);
     }
+    const std = deriveTokens(t).vars;
+    assert.deepEqual(deriveTokens(t, { accent: 'nope' }).vars, std);
+    assert.deepEqual(deriveTokens(t, { accent: 'blue' }).vars, std);
   }
-  const cp = themeApi.findTheme('cyberpunk');
-  assert.equal(themeApi.withAccent(cp, 'theme'), cp);
-  assert.equal(themeApi.withAccent(cp, 'nope'), cp);
-  // A theme's own accent tokens give way to the picked accent.
-  const own = { ...cp, ui: { ...(cp.ui || {}), accent: '#ff0000', 'accent-text': '#ff0000', 'bg-raised': '#222233' } };
-  const d = deriveTokens(themeApi.withAccent(own, 'teal'));
-  assert.equal(d.vars['--accent'], '#0f766e');
-  assert.notEqual(d.vars['--accent-text'], '#ff0000');
-  assert.equal(d.vars['--bg-raised'], '#222233');
 });
 
-test('derive: glass modes differ the way the controls promise', () => {
-  const rich = deriveTokens(BUILTIN_THEMES[0], { glass: 'rich' }).vars;
-  const light = deriveTokens(BUILTIN_THEMES[0], { glass: 'light' }).vars;
-  const off = deriveTokens(BUILTIN_THEMES[0], { glass: 'off' }).vars;
-  assert.equal(rich['--glass-blur'], '28px');
-  assert.equal(rich['--glass-sat'], '180%');
-  assert.equal(light['--glass-blur'], '16px');
-  assert.ok(parseColor(light['--glass-tint']).a > parseColor(rich['--glass-tint']).a);
-  assert.equal(off['--glass-blur'], '0px');
-  assert.equal(parseColor(off['--glass-tint']).a, 1);
-  assert.equal(deriveTokens(BUILTIN_THEMES.find((x) => x.id === 'synthwave-84')).vars['--glow'], '1');
-  assert.equal(rich['--glow'], '0');
-  // Unknown modes (including prototype names) fall back to 'rich'.
-  assert.deepEqual(deriveTokens(BUILTIN_THEMES[0], { glass: 'toString' }).vars, rich);
-});
-
-test('derive: ui overrides win, but text overrides are still held to contrast', () => {
+test('derive: a theme cannot repaint the app, only its code', () => {
   const base = BUILTIN_THEMES[0];
-  const d = deriveTokens({ ...base, ui: { 'syn-keyword': '#ff00aa', 'text-3': '#17181d', accent: '#33cc99' } });
+  const d = deriveTokens({ ...base, ui: { 'syn-keyword': '#ff00aa', 'text-3': '#17181d', accent: '#33cc99', 'bg-raised': '#222233' } });
   assert.equal(d.vars['--syn-keyword'], '#ff00aa');
-  assert.equal(d.vars['--accent'], '#33cc99');
-  assert.ok(contrast(d.vars['--text-3'], d.vars['--bg-surface']) >= 3, 'an invisible text-3 override is corrected');
+  assert.equal(d.vars['--accent-fill'], themeApi.BASE[base.kind]['accent-fill']);
+  assert.equal(d.vars['--text-3'], themeApi.BASE[base.kind]['text-3']);
+  assert.equal(d.vars['--surface'], themeApi.BASE[base.kind].surface);
+  assert.equal(d.vars['--bg-raised'], undefined);
 });
 
 test('derive: a theme without syntax, ambient or accent still yields everything', () => {
   const d = deriveTokens({ name: 'Bare', base: { bg: '#202020', fg: '#d0d0d0' } });
   assertComplete(d, 'bare');
-  const light = deriveTokens({ name: 'Bare light', base: { bg: '#fafafa', fg: '#333333' } }, { glass: 'light' });
+  const light = deriveTokens({ name: 'Bare light', base: { bg: '#fafafa', fg: '#333333' } });
   assertComplete(light, 'bare-light');
   // Even a theme whose fg is unreadable on its own bg comes out readable.
   assertComplete(deriveTokens({ name: 'Mud', base: { bg: '#555555', fg: '#606060' } }), 'mud');
@@ -246,7 +223,7 @@ test('apply: writes only whitelisted names and values, sets color scheme', () =>
     root,
   );
   assert.deepEqual(rejected.sort(), ['--Upper', '--a;b', '--evil', '--x', '--y', '--z', 'color'].sort());
-  assert.equal(calls.length, TOKEN_NAMES.length);
+  assert.equal(calls.length, Object.keys(d.vars).length);
   for (const [n, v] of calls) assert.ok(/^--[a-z0-9-]+$/.test(n) && !/[;{}]|url\(|expression/i.test(v), `${n}: ${v}`);
   assert.equal(root.style.colorScheme, 'light');
   assert.equal(root.dataset.themeKind, 'light');
@@ -290,7 +267,7 @@ test('import: Ghostty theme (terminal palette only) yields a complete token set'
   assert.equal(theme.base.selection, '#373b41');
   assert.equal(theme.ansi[12], '#7aa6da');
   assert.equal(theme.syntax, undefined);
-  for (const g of GLASS) assertComplete(deriveTokens(theme, { glass: g }), `ghostty/${g}`);
+  assertComplete(deriveTokens(theme), 'ghostty');
 });
 
 test('import: iTerm2 .itermcolors via the pure plist reader', () => {
@@ -338,7 +315,7 @@ test('import: kitty conf with metadata, and a bare 16-color palette', () => {
   const bare = detectAndImport(fixture('palette-only.conf'), 'palette-only.conf');
   assert.equal(bare.theme.ansi[4], '#268bd2');
   assert.ok(bare.warnings.length >= 1, 'missing bg/fg is reported');
-  for (const g of GLASS) assertComplete(deriveTokens(bare.theme, { glass: g }), `kitty-bare/${g}`);
+  assertComplete(deriveTokens(bare.theme), 'kitty-bare');
 });
 
 test('import: hostile and broken files are rejected or neutralized', () => {
@@ -375,7 +352,7 @@ test('import: hostile and broken files are rejected or neutralized', () => {
 test('activity colors: every built-in tells reads, edits, commands and web apart, and each shows on its surface', () => {
   for (const t of BUILTIN_THEMES) {
     const v = deriveTokens(t).vars;
-    const surface = parseColor(v['--bg-surface']);
+    const surface = parseColor(v['--surface']);
     const hues = ['--act-edit', '--act-cmd', '--act-web'].map((k) => {
       const c = parseColor(v[k]);
       assert.ok(contrast(c, surface) >= 3 - 0.05, `${t.name} ${k} on surface: ${contrast(c, surface).toFixed(2)}`);

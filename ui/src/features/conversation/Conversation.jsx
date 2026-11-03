@@ -98,7 +98,7 @@ export function Conversation({ task, project, dock }) {
         </div>
       </div>
       {fresh > 0 && (
-        <button class="fresh glass-2" onClick={toBottom}>
+        <button class="fresh" onClick={toBottom}>
           <I n="arrow-down" /> 새 내용 <span class="num">{fresh}</span>
         </button>
       )}

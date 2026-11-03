@@ -20,13 +20,13 @@ body {
 }
 .island {
   flex: none;
-  --bg-surface: #000;
-  --bg-raised: #17181d;
-  --bg-inset: #101115;
-  --bg-hover: rgb(255 255 255 / 0.07);
-  --bg-active: rgb(255 255 255 / 0.1);
+  --surface: #000;
+  --surface: #17181d;
+  --surface-2: #101115;
+  --hover: rgb(255 255 255 / 0.07);
+  --pressed: rgb(255 255 255 / 0.1);
   --line: rgb(255 255 255 / 0.1);
-  --line-strong: rgb(255 255 255 / 0.17);
+  --line-2: rgb(255 255 255 / 0.17);
   width: 100%;
   border-radius: 20px;
   overflow: hidden;
@@ -63,24 +63,24 @@ body {
   box-shadow: inset 0 0 0 2px var(--accent-text);
 }
 .is-dots i.b {
-  background: var(--warn-fill);
+  background: var(--warn-soft);
 }
 .is-dots i.r {
   background: var(--accent-text);
 }
 .is-dots i.v {
-  background: var(--ok-fill);
+  background: var(--ok-soft);
 }
 .is-tx {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   overflow: hidden;
   white-space: nowrap;
-  font-size: 13px;
-  font-weight: 500;
+  font-size: var(--t-md);
+  font-weight: var(--w-2);
   color: var(--text);
 }
 .is-tx .t {
@@ -96,14 +96,14 @@ body {
   height: 8px;
   transform: rotate(45deg);
   border-radius: 2px;
-  background: var(--warn-fill);
+  background: var(--warn-soft);
 }
 .is-use {
   flex: none;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--t-sm);
   font-variant-numeric: tabular-nums;
   color: var(--text-3);
 }
@@ -119,16 +119,16 @@ body {
 .is-card {
   padding: 12px 14px;
   border-radius: 18px;
-  background: var(--bg-raised);
-  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--warn-fill) 55%, transparent);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--warn-soft) 55%, transparent);
 }
 .is-ch {
   display: flex;
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
-  font-size: 13px;
-  font-weight: 600;
+  font-size: var(--t-md);
+  font-weight: var(--w-3);
 }
 .is-ch .lnk {
   min-width: 0;
@@ -143,8 +143,8 @@ body {
   align-items: center;
   gap: 6px;
   flex: none;
-  font-size: 12px;
-  font-weight: 500;
+  font-size: var(--t-sm);
+  font-weight: var(--w-2);
   color: var(--warn-text);
 }
 .is-card .pcard {
@@ -154,12 +154,12 @@ body {
 }
 .is-q {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--t-md);
   color: var(--text-2);
 }
 .more2 {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--text-3);
 }
 .is-list {
@@ -174,17 +174,17 @@ body {
   width: 100%;
   padding: 6px;
   border-radius: 10px;
-  font-size: 12.5px;
+  font-size: var(--t-sm);
   text-align: start;
 }
 .is-row:hover {
-  background: var(--bg-hover);
+  background: var(--hover);
 }
 .is-row .t {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-weight: 500;
+  font-weight: var(--w-2);
 }
 .is-row .s {
   overflow: hidden;
@@ -207,7 +207,7 @@ body {
   gap: 8px;
   padding: 8px 4px 0;
   border-top: 1px solid var(--line);
-  font-size: 12px;
+  font-size: var(--t-sm);
   color: var(--text-3);
 }
 .is-foot .sp {

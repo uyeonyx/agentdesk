@@ -138,7 +138,7 @@ function Bar({ mode: startMode, initial }) {
 
   return (
     <div class="scrim cmd-scrim" onMouseDown={(e) => e.target === e.currentTarget && (mode === 'theme' && endPreview(), close())}>
-      <div class="cmdbar glass-3" role="dialog" aria-label="명령" data-testid="command-bar">
+      <div class="cmdbar" role="dialog" aria-label="명령" data-testid="command-bar">
         <div class="cb-in">
           {mode !== 'all' && (
             <span class="cb-mode">
@@ -171,7 +171,7 @@ function Bar({ mode: startMode, initial }) {
         <div class="cb-list scroll" id="cb-list" role="listbox">
           {items.map((it, i) => (
             <button key={it.id} id={`cb-${i}`} class={`li cb-row ${i === active ? 'on' : ''} ${it.isNew ? 'new' : ''}`} role="option" aria-selected={i === active} onMouseMove={() => i !== active && setActive(i)} onClick={() => it.run()}>
-              {it.project ? <Glyph project={it.project} size={20} task={it.task} /> : it.swatch ? <Swatch t={it.swatch} /> : <I n={it.icon} />}
+              {it.project ? <Glyph project={it.project} size={20} /> : it.swatch ? <Swatch t={it.swatch} /> : <I n={it.icon} />}
               <span class="m">
                 {it.label}
                 {it.sub && <small>{it.sub}</small>}

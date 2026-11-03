@@ -1,26 +1,21 @@
-/* The window: a title bar of glass capsules, the rail and the content pane floating over the light. */
+/* The window: a chrome title bar, then full-height regions split by hairlines (rail, content,
+   side), the way an instrument panel is split into compartments. */
 
 .app {
   height: 100vh;
   display: grid;
   grid-template-rows: var(--bar-h) minmax(0, 1fr);
+  background: var(--bg);
 }
 .stage {
   display: flex;
-  gap: var(--gap);
   min-height: 0;
-  padding: 0 var(--gap) var(--gap);
 }
 .pane {
   position: relative;
   flex: 1;
   min-width: 0;
-  border-radius: var(--r-4);
-  background: var(--bg-surface);
-  box-shadow:
-    0 0 0 1px var(--line),
-    inset 0 1px 0 var(--glass-edge),
-    0 18px 50px -24px var(--glass-shadow);
+  background: var(--surface);
   overflow: hidden;
 }
 :root.resizing,
@@ -42,8 +37,10 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 16px;
-  padding: 0 12px 0 16px;
+  gap: var(--sp-4);
+  padding: 0 var(--sp-3) 0 var(--sp-4);
+  background: var(--chrome);
+  box-shadow: inset 0 -1px 0 var(--line);
   -webkit-app-region: drag;
 }
 .titlebar button,
@@ -60,26 +57,32 @@
 .tb-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--sp-3);
   min-width: 0;
 }
 .crumbs {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
-  font-weight: var(--w-3);
+  font-size: var(--t-md);
   white-space: nowrap;
+  color: var(--text-3);
+}
+.crumbs b {
+  color: var(--text);
+  font-weight: var(--w-2);
 }
 .crumbs .cr-p {
-  color: var(--text);
+  color: var(--text-2);
 }
 .crumbs .cr-sep {
   color: var(--text-3);
-  font-size: 13px;
+  font-size: var(--t-md);
 }
 .crumbs .cr-t {
-  color: var(--text-2);
+  color: var(--text);
+  font-weight: var(--w-2);
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 34vw;
@@ -87,83 +90,71 @@
 .cmdpill {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--sp-2);
   width: clamp(240px, 30vw, 440px);
-  height: 30px;
-  padding: 0 6px 0 12px;
-  border-radius: var(--r-full);
+  height: var(--h-md);
+  padding: 0 6px 0 var(--sp-3);
+  border-radius: var(--r-2);
+  font-size: var(--t-md);
   color: var(--text-3);
-  transition: transform var(--dur-3) var(--ease-spring);
+  background: var(--surface);
+  box-shadow: var(--e-0);
 }
 .cmdpill span {
   flex: 1;
   text-align: left;
 }
-.cmdpill kbd {
-  background: transparent;
-}
-.cmdpill:active {
-  transform: scale(0.985);
-}
 .tb-right {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 6px;
+  gap: var(--sp-3);
 }
-/* What waits on me, counted: amber and solid when something is stuck, the accent otherwise. */
+/* What waits on me, counted: warm when something is stuck, the accent otherwise. */
 .turnpill {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  height: 28px;
-  padding: 0 6px 0 11px;
-  border-radius: var(--r-2);
-  font-weight: var(--w-4);
-  font-size: var(--fs-2);
+  gap: var(--sp-2);
+  height: var(--h-sm);
+  padding: 0 10px;
+  border-radius: var(--r-1);
+  font-size: var(--t-md);
+  font-weight: var(--w-3);
   color: var(--accent-text);
   background: var(--accent-soft);
-  box-shadow: inset 0 0 0 1px var(--accent-line);
-  transition:
-    transform var(--dur-3) var(--ease-spring),
-    background var(--dur-2);
 }
-.turnpill:active {
-  transform: scale(0.96);
+.turnpill::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--info);
 }
 .turnpill b {
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 5px;
-  color: var(--accent-ink);
-  background: var(--accent);
+  font-weight: var(--w-3);
 }
 .turnpill.hot {
-  color: var(--warn-fill-ink);
-  background: var(--warn-fill);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.2), inset 0 1px 0 rgb(255 255 255 / 0.25);
+  color: var(--warn-text);
+  background: var(--warn-soft);
 }
-.turnpill.hot b {
-  color: var(--warn-fill);
-  background: var(--warn-fill-ink);
+.turnpill.hot::before {
+  background: var(--warn);
 }
 .turnpill.on {
-  box-shadow:
-    0 0 0 2px var(--bg-app),
-    0 0 0 3px currentColor;
+  box-shadow: 0 0 0 2px var(--accent-line);
 }
 .upd {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  height: 28px;
-  padding: 0 12px;
-  border-radius: var(--r-full);
-  font-size: var(--fs-2);
-  font-weight: var(--w-3);
+  height: var(--h-sm);
+  padding: 0 10px;
+  border-radius: var(--r-1);
+  font-size: var(--t-sm);
+  font-weight: var(--w-2);
+  color: var(--text-2);
+  background: var(--surface);
+  box-shadow: var(--e-0);
 }
 .upd.ok {
   color: var(--ok-text);
@@ -172,7 +163,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: var(--fs-2);
+  font-size: var(--t-sm);
   color: var(--text-2);
 }
 
@@ -203,7 +194,7 @@
 .lbl {
   display: block;
   margin: 16px 0 6px;
-  font-size: var(--fs-2);
+  font-size: var(--t-sm);
   font-weight: var(--w-3);
   color: var(--text-2);
 }
@@ -224,7 +215,7 @@ b.d {
   align-items: center;
   gap: 4px;
   color: var(--accent-text);
-  font-size: var(--fs-2);
+  font-size: var(--t-sm);
   font-weight: var(--w-3);
   cursor: pointer;
 }
@@ -235,18 +226,18 @@ b.d {
 .chip {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   height: 22px;
   padding: 0 8px;
-  border-radius: 6px;
-  font-size: var(--fs-2);
+  border-radius: var(--r-2);
+  font-size: var(--t-sm);
   color: var(--text-2);
   box-shadow: inset 0 0 0 1px var(--line);
   white-space: nowrap;
 }
 button.chip:hover {
   color: var(--text);
-  background: var(--bg-active);
+  background: var(--pressed);
 }
 .chip .ti {
   font-size: 13px;
@@ -254,11 +245,11 @@ button.chip:hover {
 .chip.warn {
   color: var(--warn-text);
   background: var(--warn-soft);
-  box-shadow: inset 0 0 0 1px var(--warn-line);
+  box-shadow: inset 0 0 0 1px var(--warn);
 }
 .chip.mono {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: var(--t-sm);
 }
 .chip button {
   margin-right: -4px;
@@ -304,8 +295,8 @@ button.chip:hover {
 }
 .skeleton i {
   height: 12px;
-  border-radius: 6px;
-  background: var(--bg-active);
+  border-radius: var(--r-2);
+  background: var(--pressed);
   animation: breathe 1.6s var(--ease-in-out) infinite alternate;
 }
 
@@ -316,11 +307,11 @@ button.chip:hover {
   gap: 6px;
   height: 22px;
   padding: 0 8px;
-  border-radius: 6px;
-  font-size: var(--fs-2);
+  border-radius: var(--r-2);
+  font-size: var(--t-sm);
   font-weight: var(--w-3);
   color: var(--text-2);
-  background: var(--bg-active);
+  background: var(--pressed);
   white-space: nowrap;
 }
 .state-pill .d {
@@ -340,8 +331,8 @@ button.chip:hover {
   animation: pulse 1.6s var(--ease-in-out) infinite;
 }
 .state-pill.blocked {
-  color: var(--warn-fill-ink);
-  background: var(--warn-fill);
+  color: var(--warn-text);
+  background: var(--warn-soft);
 }
 .state-pill.yours {
   color: var(--accent-text);
@@ -356,8 +347,8 @@ button.chip:hover {
 .meta-i {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: var(--fs-2);
+  gap: 6px;
+  font-size: var(--t-sm);
   color: var(--text-3);
   white-space: nowrap;
 }
@@ -366,7 +357,7 @@ button.chip:hover {
 }
 .meta-i.mono {
   font-family: var(--font-mono);
-  font-size: 11.5px;
+  font-size: var(--t-sm);
 }
 .meta-i.warn {
   color: var(--warn-text);
