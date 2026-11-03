@@ -1044,10 +1044,11 @@ export class Tasks {
       r.proc.write('/rewind');
       await delay(250);
       r.proc.write('\r');
-      // The first Enter can be taken by the command list; a second one runs it.
+      // The first Enter can be taken by the command list; a second one runs it, but only if the
+      // command is still sitting in the input box (a slow list would take it as "(current)").
       if ((await this.waitScreen(r, listed, 2500)) == null) {
-        r.proc.write('\r');
-        if ((await this.waitScreen(r, listed, 3000)) == null) {
+        if (/^\/rewind\s*$/.test(this.promptText(r) || '')) r.proc.write('\r');
+        if ((await this.waitScreen(r, listed, 5000)) == null) {
           await this.escape(r, menuUp);
           throw httpError(409, 'Claude Code의 되감기 화면을 열지 못했어요 · 원본 터미널에서 /rewind로 해 보세요');
         }

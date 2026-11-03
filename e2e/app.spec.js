@@ -281,7 +281,12 @@ test('rewind and fork: /rewind drops a turn and hands the words back; a fork sta
   await second.getByTestId('rewind').click();
   await page.getByTestId('rewind-go').click();
   // The CLI dropped the turn, the files went back, the words came back to the composer.
-  await expect(page.getByTestId('composer').locator('textarea')).toHaveValue(/두 번째 지시/, { timeout: 15_000 });
+  await expect(page.getByTestId('composer').locator('textarea')).toHaveValue(/두 번째 지시/, { timeout: 15_000 }).catch(async (e) => {
+    console.log('DBG toasts', await page.getByRole('status').allInnerTexts().catch(() => []));
+    console.log('DBG screen\n' + (await call('GET', `/api/tasks/${t.id}/screen?lines=30`)).lines.join('\n'));
+    console.log('DBG msgs', JSON.stringify((await task(t.id)).messages.map((m) => [m.source, m.text, m.undone])));
+    throw e;
+  });
   await expect(convo.getByText(/지시 전으로 되감았어요/)).toBeVisible();
   await expect(convo.locator('.umsg').filter({ hasText: '두 번째 지시' })).toHaveCount(0);
   await expect.poll(() => fs.existsSync(path.join(wt, 'notes/second.md'))).toBe(false);
