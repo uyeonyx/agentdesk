@@ -10,6 +10,7 @@ import { toast } from '../../store.js';
 import { Conversation } from '../conversation/Conversation.jsx';
 import { PromptCard } from '../prompt/PromptCard.jsx';
 import { Composer } from '../composer/Composer.jsx';
+import { ClashLine } from '../talk/Clash.jsx';
 import { Review } from '../review/Review.jsx';
 import { Files } from '../files/Files.jsx';
 import { Drawer } from '../terminal/Drawer.jsx';
@@ -33,6 +34,7 @@ export function TaskView({ task, project }) {
   const dock = (
     <div class="dock">
       <StatusLine task={task} />
+      {task.clash?.length > 0 && isLive(task) && <ClashLine t={task} big />}
       {blocked && task.prompt && <PromptCard task={task} project={project} focus />}
       {blocked && !task.prompt && <TerminalNeeded task={task} />}
       {task.watching ? <WatchBar task={task} project={project} /> : isLive(task) ? <Composer task={task} project={project} blocked={blocked} /> : <Finished task={task} />}

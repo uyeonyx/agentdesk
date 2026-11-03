@@ -302,6 +302,21 @@ function finish(text) {
 }
 
 function work(text) {
+  // Desk carrying words between two sessions: answer with a line for the other one, then "끝".
+  if (text.startsWith('[Agent Desk') && kind === 'claude') {
+    hook('UserPromptSubmit', { prompt: text });
+    prompts.push(text);
+    userLine(text);
+    W(`\r\n\x1b[36m⏺\x1b[0m ${text.split('\n')[0].slice(0, 80)}\r\n`);
+    setTimeout(() => {
+      const reply = /보낸 말|더 할 말이 없고/.test(text) ? '확인했어요. 그대로 두면 돼요.\n\n@상대: 끝' : '제 쪽은 README 끝에 한 줄을 붙였을 뿐이라 그쪽 변경과 같은 줄이 아니에요.\n\n@상대: 저는 README 끝에만 붙였어요. 그쪽도 같은 줄을 바꾸지 않으면 괜찮아요';
+      replyLine(reply);
+      W(`\r\x1b[2K\x1b[32m⏺\x1b[0m ${reply.split('\n')[0]}\r\n\r\n> `);
+      tline({ type: 'system', subtype: 'turn_duration', durationMs: 300, isMeta: false });
+      hook('Stop', { last_assistant_message: reply });
+    }, 300);
+    return;
+  }
   if (text.startsWith('[취소]')) {
     hook('UserPromptSubmit', { prompt: text });
     W(`\r\n\x1b[32m⏺\x1b[0m 알겠어요. 그 지시는 무시할게요.\r\n\r\n> `);

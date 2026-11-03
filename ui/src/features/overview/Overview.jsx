@@ -17,6 +17,7 @@ import { openMenu, openMenuAt } from '../../ui/Menu.jsx';
 import { taskItems } from '../task/taskActions.js';
 import { ModeChip, ModeTag, CtxMini } from '../session/Pickers.jsx';
 import { Strip } from './Strip.jsx';
+import { ClashLine } from '../talk/Clash.jsx';
 import { Glyph, I, useNow, roomVars, ago } from '../../ui/bits.jsx';
 import { sound } from '../../app/sounds.js';
 
@@ -200,6 +201,7 @@ const Panel = memo(function Panel({ t, p, z, cols, mosaic, pinned, focused, onFo
       <div class="pn-body">
         <Body t={t} p={p} z={z} focused={focused} />
       </div>
+      {t.clash?.length > 0 && z !== 's' && isLive(t) && <ClashLine t={t} />}
       <Foot t={t} p={p} z={z} mosaic={mosaic} pinned={pinned} onPin={onPin} />
     </article>
   );

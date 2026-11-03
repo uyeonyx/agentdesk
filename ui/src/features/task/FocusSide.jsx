@@ -5,6 +5,7 @@ import { api } from '../../api.js';
 import { setView } from '../../store.js';
 import { modeOf, effortOf, modelName, ctxPct, tokens } from '../../core/session.js';
 import { Strip } from '../overview/Strip.jsx';
+import { TalkThread } from '../talk/Clash.jsx';
 import { I, ago, useNow } from '../../ui/bits.jsx';
 
 export function FocusSide({ task }) {
@@ -28,6 +29,7 @@ export function FocusSide({ task }) {
   const pct = ctxPct(task.ctx);
   return (
     <aside class="fside" aria-label="세션 정보" data-testid="focus-side">
+      <TalkThread task={task} />
       {plan.length > 0 && (
         <section class="fs">
           <h3 class="lbl">

@@ -92,4 +92,4 @@ export function vscodeLink(abs, line) {
 /** Undo for the last send: ⌘Z on Mac; Ctrl+Alt+Z elsewhere (plain Ctrl+Z belongs to the shell). */
 export const undoKey = isMac ? '⌘Z' : 'Ctrl+Alt+Z';
 
-export const SOURCE_LABEL = { start: '처음 지시', terminal: '터미널', composer: '입력창', remote: '폰', outside: '다른 곳', import: '불러온 세션', answer: '답변', queue: 'Codex 대기열' };
+export const SOURCE_LABEL = { start: '처음 지시', terminal: '터미널', composer: '입력창', remote: '폰', outside: '다른 곳', import: '불러온 세션', answer: '답변', queue: 'Codex 대기열', talk: '협의' };

@@ -7,6 +7,7 @@ import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, real
 import * as G from './git.js';
 import { AGENTS, CLAUDE_MODES, EFFORTS, MODEL, lastAssistantText, summarize, trustedTranscript } from './agents.js';
 import { MetaTail } from './meta.js';
+import { Talks } from './talk.js';
 import { ConvoHub, legacyEntries } from './convo.js';
 import { httpError, addProject } from './projects.js';
 import { findSession, liveClaude, stopClaude, queueCodex, claudeTranscriptOf } from './sessions.js';
@@ -102,6 +103,8 @@ export class Tasks {
     this.codexTimer = setInterval(() => this.pollCodex(), 2000);
     this.watchTimer = setInterval(() => this.pollWatch(), 1200);
     this.metaTimer = setInterval(() => this.pollMeta(), 1500);
+    // Sessions changing the same files, and their talks.
+    this.talks = new Talks(this);
     // Main may have moved while Desk was closed (and older versions counted what came with it): recount once.
     this.recountTimer = setTimeout(() => this.recount(), 2000);
   }
@@ -263,6 +266,7 @@ export class Tasks {
       recap: t.recap || null,
       pick: t.pick || null,
       cuts: t.cuts || [],
+      clash: t.archived ? [] : this.talks?.viewOf(t) || [],
       forkOf: t.forkOf || null,
       strip: stripView(t),
       menu,
@@ -647,6 +651,7 @@ export class Tasks {
         const hooked = typeof p.last_assistant_message === 'string' && p.last_assistant_message.trim() ? p.last_assistant_message : '';
         const text = hooked || lastAssistantText(p.transcript_path);
         task.lastReply = typeof text === 'string' ? text.slice(-6000) : '';
+        setTimeout(() => this.talks.onReply(task).catch(() => {}), 50);
         return this.settle(task, '응답을 마쳤어요', text, pendingOf(p));
       }
     } else if (body.agent === 'codex') {
@@ -662,6 +667,7 @@ export class Tasks {
         this.tracker(task).pollCodex(r?.startedAt || task.createdAt);
         this.tracker(task).turnEnded();
         task.lastReply = typeof p['last-assistant-message'] === 'string' ? p['last-assistant-message'].slice(-6000) : '';
+        setTimeout(() => this.talks.onReply(task).catch(() => {}), 50);
         return this.settle(task, '응답을 마쳤어요', p['last-assistant-message']);
       }
     }
@@ -1715,6 +1721,7 @@ export class Tasks {
     task.archived = true;
     this.onGone?.(id);
     this.dropForkSrc(task, true);
+    this.talks.drop(id);
     if (task.imported) {
       this.watchers.delete(id);
       delete task.watch;
@@ -1778,8 +1785,9 @@ export class Tasks {
       const all = [];
       for (const x of task.repos) {
         if (!fs.existsSync(x.worktree)) continue;
-        for (const f of await G.changes(x.worktree, await this.since(x))) all.push({ ...f, path: x.prefix + f.path, repo: x.name });
+        for (const f of await G.changes(x.worktree, await this.since(x))) all.push({ ...f, path: x.prefix + f.path, repo: x.name, root: x.repo, rel: f.path });
       }
+      if (this.talks?.setPaths(task, all)) this.changed();
       const c = { files: all.length, adds: all.reduce((a, f) => a + f.adds, 0), dels: all.reduce((a, f) => a + f.dels, 0) };
       const prev = task.changes;
       task.changes = c;

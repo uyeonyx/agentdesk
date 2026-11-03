@@ -291,3 +291,23 @@ export async function mergeConflicts(repo, branch) {
     return null;
   }
 }
+
+/** One file's change since `base` as unified diff text (a new untracked file: its lines as added). */
+export async function fileDiff(dir, base, rel, maxLines = 120) {
+  let text = '';
+  try {
+    if (base) text = (await git(dir, ['diff', '--no-color', '--no-renames', base, '--', rel])).stdout;
+  } catch {}
+  if (!text.trim()) {
+    try {
+      const real = realPath(dir);
+      const abs = path.join(real, rel);
+      const st = fs.lstatSync(abs);
+      if (st.isFile() && st.size <= 400_000 && path.dirname(realPath(abs)).startsWith(real)) {
+        text = `--- /dev/null\n+++ b/${rel}\n` + fs.readFileSync(abs, 'utf8').split('\n').map((l) => '+' + l).join('\n');
+      }
+    } catch {}
+  }
+  const lines = text.split('\n');
+  return lines.length > maxLines ? lines.slice(0, maxLines).join('\n') + `\n… (${lines.length - maxLines}줄 더)` : text;
+}

@@ -254,6 +254,16 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
             return await tasks.compact(id);
           case 'rewind':
             return await tasks.rewind(id, body.msgId);
+          // Two sessions changing the same files: let them talk it out, stop that, or ask one to wait.
+          case 'talk':
+            await tasks.talks.start(id, String(body.with || ''));
+            return { ok: true };
+          case 'talk-stop':
+            tasks.talks.stop(id, String(body.with || ''));
+            return { ok: true };
+          case 'hold':
+            await tasks.talks.hold(id, String(body.with || ''));
+            return { ok: true };
         }
       }
     }

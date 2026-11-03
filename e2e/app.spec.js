@@ -356,6 +356,31 @@ test('agent settings: MCP servers added, checked and removed through claude mcp;
   await page.keyboard.press(`${MOD}+Comma`);
 });
 
+test('talk: two sessions changing the same file hear each other, Desk only carries the words', async () => {
+  const p = await project('repo-talk');
+  const a = await start(p.id, 'create shared.md 장바구니 정리');
+  const b = await start(p.id, 'create shared.md 결제 정리');
+  for (const t of [a, b]) await until(t.id, (x) => x?.state === 'review');
+  await until(a.id, (x) => x?.clash?.length > 0, 20_000);
+  expect((await task(a.id)).clash[0].files).toContain('shared.md');
+  await page.getByTestId('view-overview').click();
+  const tile = page.locator(`[data-testid="tile"][data-task-id="${a.id}"]`);
+  await expect(tile.getByTestId('clash')).toContainText(/README\.md|shared\.md/);
+  await page.screenshot({ path: shots('clash') });
+  await tile.getByTestId('talk-start').click();
+  // Each gets the other's diff, says something across, then both say 끝.
+  await until(a.id, (x) => x?.clash?.[0]?.talk?.state === 'done', 30_000);
+  const tk = (await task(a.id)).clash[0].talk;
+  expect(tk.result).toContain('부딪히지 않는다');
+  expect(tk.msgs.some((m) => m.text.includes('README 끝에만'))).toBe(true);
+  await tile.locator('.pn-h').click();
+  await expect(page.getByTestId('talk-thread')).toContainText('README 끝에만');
+  await expect(page.getByTestId('conversation').getByTestId('talk-msg').first()).toContainText('협의 시작');
+  await expect(page.getByTestId('clash')).toHaveAttribute('data-talk', 'done');
+  await page.screenshot({ path: shots('talk') });
+  for (const t of [a, b]) await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
 test('관제 new-session tile: project, start mode and model, then it runs in that mode', async () => {
   await page.getByTestId('view-overview').click();
   await navMode();

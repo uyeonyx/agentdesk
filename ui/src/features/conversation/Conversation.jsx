@@ -153,7 +153,35 @@ const Turn = memo(function Turn({ turn, task, messages, last, onFileRef, entries
   );
 });
 
+/** What Desk itself said to the agent in a talk between two sessions, as one short line. */
+export function talkLine(text) {
+  const t = String(text || '');
+  let m;
+  if ((m = t.match(/^\[Agent Desk · 다른 세션과 협의\][^「]*「([^」]+)」/))) return { icon: 'arrows-exchange', text: `협의 시작 · 「${m[1]}」의 변경을 받았어요` };
+  if ((m = t.match(/^\[Agent Desk · 「([^」]+)」 세션이 보낸 말\]\s*([^\n]+)/))) return { icon: 'message-forward', text: `「${m[1]}」: ${m[2]}` };
+  if ((m = t.match(/^\[Agent Desk · 「([^」]+)」 세션\]/))) return { icon: 'check', text: `「${m[1]}」: 끝 · 부딪히지 않는대요` };
+  if ((m = t.match(/^\[Agent Desk\] 같은 프로젝트의 다른 세션 「([^」]+)」/))) return { icon: 'player-pause', text: `「${m[1]}」가 끝날 때까지 같은 파일은 기다리라고 했어요` };
+  return null;
+}
+
+function TalkMsg({ e, line }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div class="peer-e" data-kind="talk" data-testid="talk-msg">
+      <button class="peer-h" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <I n={line.icon} />
+        <span>{line.text}</span>
+        <span class="by">Desk가 전함</span>
+        <I n="chevron-down" class="chev" />
+      </button>
+      {open && <div class="peer-b selectable">{e.text}</div>}
+    </div>
+  );
+}
+
 function UserMsg({ e, task, messages }) {
+  const line = talkLine(e.text);
+  if (line) return <TalkMsg e={e} line={line} />;
   const m = (e.msgId && messages.find((x) => x.id === e.msgId)) || messages.findLast?.((x) => x.text && e.text && x.text.slice(0, 200) === e.text.slice(0, 200));
   const source = m?.source && !['composer', 'start'].includes(m.source) ? SOURCE_LABEL[m.source] || '' : '';
   const copy = () => window.desk.copy(e.text);

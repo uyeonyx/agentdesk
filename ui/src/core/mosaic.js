@@ -14,6 +14,8 @@ const RANK = { l: 0, m: 1, s: 2 };
 export function sizeOf(t, pinned = false) {
   if (pinned || isBlocked(t)) return 'l';
   if (['needs_input', 'review', 'exited'].includes(t.state)) return 'm';
+  // Another session changes the same files and they haven't sorted it out yet.
+  if ((t.clash || []).some((c) => !c.talk || c.talk.state === 'talking')) return 'm';
   return 's';
 }
 
