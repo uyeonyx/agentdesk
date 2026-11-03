@@ -29,6 +29,43 @@ if (kind === 'claude' && argv[0] === 'stop') {
   process.exit(0);
 }
 
+// `claude mcp add|remove|list`: user-scope servers live in <config dir>/.claude.json, like the real one.
+if (kind === 'claude' && argv[0] === 'mcp') {
+  const cfgFile = path.join(process.env.CLAUDE_CONFIG_DIR || os.homedir(), '.claude.json');
+  const cfg = fs.existsSync(cfgFile) ? JSON.parse(fs.readFileSync(cfgFile, 'utf8')) : {};
+  cfg.mcpServers ||= {};
+  const rest = argv.slice(1);
+  const op = rest.shift();
+  const flag = (f) => {
+    const i = rest.indexOf(f);
+    if (i < 0) return undefined;
+    const v = rest[i + 1];
+    rest.splice(i, 2);
+    return v;
+  };
+  if (op === 'list') {
+    process.stdout.write('Checking MCP server health…\n\n');
+    for (const [n, c] of Object.entries(cfg.mcpServers)) process.stdout.write(`${n}: ${c.url ? `${c.url} (HTTP)` : [c.command, ...(c.args || [])].join(' ')} - ${/broken/.test(n) ? '✘ Failed to connect' : '✔ Connected'}\n`);
+    process.stdout.write('claude.ai Mock Drive: https://drive.example/mcp - ! Needs authentication\n');
+    process.exit(0);
+  }
+  const scope = flag('--scope') || 'local';
+  const transport = flag('--transport');
+  if (scope !== 'user') {
+    process.stderr.write('mock: only --scope user\n');
+    process.exit(1);
+  }
+  if (op === 'add') {
+    const dash = rest.indexOf('--');
+    const name = rest[0];
+    cfg.mcpServers[name] = transport ? { type: transport, url: rest[1] } : { type: 'stdio', command: rest[dash + 1], args: rest.slice(dash + 2), env: {} };
+  } else if (op === 'remove') delete cfg.mcpServers[rest[0]];
+  fs.mkdirSync(path.dirname(cfgFile), { recursive: true });
+  fs.writeFileSync(cfgFile, JSON.stringify(cfg, null, 2));
+  process.stdout.write(`${op === 'add' ? 'Added' : 'Removed'} MCP server ${rest[0]}\n`);
+  process.exit(0);
+}
+
 if (kind === 'codex' && argv[0] === 'queue') {
   const get = (k) => (argv.find((a) => a.startsWith(`--${k}=`)) || '').slice(k.length + 3);
   if (process.env.MOCK_QUEUE_LOG) fs.appendFileSync(process.env.MOCK_QUEUE_LOG, JSON.stringify({ thread: get('thread'), message: get('message') }) + '\n');

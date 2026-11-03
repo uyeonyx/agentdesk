@@ -15,6 +15,7 @@ import { Shells, isShellId, needShellTask } from './shells.js';
 import { startHookServer } from './hookserver.js';
 import { VERSION, tilde } from './util.js';
 import { Usage } from './usage.js';
+import { mcpServers, mcpCheck, mcpAdd, mcpRemove, permissions, editPermission } from './agentconfig.js';
 
 const BODY_LIMIT = 1_000_000;
 const IMAGE_TYPES = { '.png': 'image/png', '.svg': 'image/svg+xml', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.ico': 'image/x-icon' };
@@ -102,6 +103,19 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
     if (a === 'state' && method === 'GET') return publicState();
     if (a === 'discover' && method === 'GET') return { repos: discoverRepos(store.projects) };
     if (a === 'usage' && method === 'GET') return usage.view();
+    // Claude Code's own MCP servers and permission rules, for everything or for one project's folder.
+    if (a === 'agentconfig') {
+      const pid = url.searchParams.get('project') || body.projectId || '';
+      const proj = pid ? store.project(pid) : null;
+      if (pid && (!proj || proj.kind === 'group' || !proj.path)) throw httpError(404, '프로젝트를 찾을 수 없어요');
+      const folder = proj?.path || null;
+      if (id === 'mcp' && action === 'check' && method === 'POST') return await mcpCheck(folder);
+      if (id === 'mcp' && method === 'GET') return { servers: mcpServers(folder) };
+      if (id === 'mcp' && method === 'POST') return body.op === 'remove' ? await mcpRemove(body, folder) : await mcpAdd(body, folder);
+      if (id === 'perm' && method === 'GET') return permissions(folder);
+      if (id === 'perm' && method === 'POST') return editPermission(body, folder);
+      throw httpError(404, 'not found');
+    }
     // Someone opened the usage view: read again if it's more than a minute old.
     if (a === 'usage' && method === 'POST') return await usage.refresh({ minMs: body.force ? 0 : 60_000 });
     if (a === 'sessions' && method === 'GET') return { sessions: (await listSessions(store, { fresh: url.searchParams.get('fresh') === '1' })).map(({ file, ...x }) => x) };

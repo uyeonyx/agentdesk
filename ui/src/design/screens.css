@@ -1681,3 +1681,232 @@ input[type='range'] {
   padding: 12px 22px;
   border-top: 1px solid var(--line);
 }
+
+/* ---------------------------------------------------------------- settings: MCP, permissions, usage */
+.ac-h {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.ac-h > div {
+  flex: 1;
+  min-width: 0;
+}
+.ac-h .sp {
+  display: none;
+}
+.ac-h .btn {
+  flex: none;
+}
+.ac-scope {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: var(--fs-2);
+  color: var(--text-2);
+}
+.ac-scope select {
+  width: auto;
+  min-width: 220px;
+}
+.ac-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mcp {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.mcp .ico {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  color: var(--text-2);
+  background: var(--bg-active);
+}
+.mcp-m {
+  min-width: 0;
+}
+.mcp .nm {
+  font-size: 14px;
+  font-weight: var(--w-4);
+}
+.mcp .sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-3);
+}
+.mcp .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+.stt {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-2);
+}
+.stt i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+}
+.stt.ok i {
+  background: var(--ok);
+}
+.stt.ok {
+  color: var(--ok-text);
+}
+.stt.bad i {
+  background: var(--danger);
+}
+.stt.bad {
+  color: var(--danger-text);
+}
+.stt.wait i {
+  background: var(--warn);
+}
+.stt.wait {
+  color: var(--warn-text);
+}
+.ac-foot {
+  margin-top: 10px;
+  font-size: var(--fs-2);
+}
+.ac-form {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 14px;
+  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.ac-form > label {
+  font-size: var(--fs-2);
+  color: var(--text-2);
+}
+.ac-form .seg {
+  justify-self: start;
+}
+.ac-pre {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  overflow-x: auto;
+  font: 12px/18px var(--font-mono);
+  color: var(--text-2);
+  background: var(--bg-inset);
+}
+.ac-act {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.ac-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.ac-add select {
+  width: auto;
+}
+.ac-find {
+  max-width: 320px;
+  margin-bottom: 14px;
+}
+.perm-file {
+  margin-bottom: 22px;
+}
+.perm-file h4 {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  font-weight: var(--w-4);
+}
+.perm-file h4 .mono {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.perm-k {
+  margin-bottom: 10px;
+}
+.perm-kh {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: var(--fs-2);
+}
+.rule {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 32px;
+  padding: 0 4px 0 10px;
+  border-radius: 7px;
+}
+.rule:hover {
+  background: var(--bg-hover);
+}
+.rule code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 12.5px/18px var(--font-mono);
+}
+.rule .btn {
+  opacity: 0;
+}
+.rule:hover .btn,
+.rule .btn:focus-visible {
+  opacity: 1;
+}
+.usage-big {
+  max-width: 520px;
+  padding: 18px;
+  border-radius: 12px;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.rules {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0 12px;
+}
+.ac-add .btn {
+  height: 34px;
+  padding: 0 14px;
+}

@@ -320,6 +320,42 @@ test('usage: the title bar reads Claude Code\'s own /usage and shows each limit'
   await expect(pop).toBeHidden();
 });
 
+test('agent settings: MCP servers added, checked and removed through claude mcp; permission rules edited in settings.json', async () => {
+  await page.keyboard.press(`${MOD}+Comma`);
+  await page.getByRole('button', { name: 'MCP 서버' }).click();
+  await page.getByTestId('mcp-add').click();
+  const form = page.getByTestId('mcp-form');
+  await form.locator('input').first().fill('sentry');
+  await form.locator('input.mono').fill('npx -y @sentry/mcp-server@latest');
+  await expect(form.locator('pre')).toContainText('claude mcp add --scope user sentry -- npx -y @sentry/mcp-server@latest');
+  await form.getByRole('button', { name: '추가' }).click();
+  const list = page.getByTestId('mcp-list');
+  await expect(list.getByText('sentry', { exact: true })).toBeVisible();
+  await page.getByTestId('mcp-check').click();
+  await expect(list.getByText('연결됨')).toBeVisible({ timeout: 20_000 });
+  // claude.ai connectors only show up in the check, read-only.
+  await expect(list.getByText('claude.ai Mock Drive')).toBeVisible();
+  await expect(list.getByText('인증 필요')).toBeVisible();
+  await page.screenshot({ path: shots('settings-mcp') });
+  await list.getByTestId('mcp-row').filter({ hasText: 'sentry' }).getByRole('button', { name: '빼기' }).click();
+  await expect(list.getByText('sentry', { exact: true })).toHaveCount(0);
+  // Permission rules: written to Claude Code's own settings.json, other keys untouched.
+  const settingsFile = path.join(tmp, 'claude-home', 'settings.json');
+  fs.mkdirSync(path.dirname(settingsFile), { recursive: true });
+  fs.writeFileSync(settingsFile, JSON.stringify({ model: 'opus', permissions: { deny: ['Bash(git push --force:*)'] } }));
+  await page.getByRole('button', { name: '권한' }).click();
+  await expect(page.getByText('Bash(git push --force:*)')).toBeVisible();
+  await page.getByTestId('perm-rule').fill('Bash(pnpm test:*)');
+  await page.getByTestId('perm-add').click();
+  await expect(page.getByText('Bash(pnpm test:*)')).toBeVisible();
+  const saved = JSON.parse(fs.readFileSync(settingsFile, 'utf8'));
+  expect(saved.model).toBe('opus');
+  expect(saved.permissions.allow).toEqual(['Bash(pnpm test:*)']);
+  expect(saved.permissions.deny).toEqual(['Bash(git push --force:*)']);
+  await page.screenshot({ path: shots('settings-perm') });
+  await page.keyboard.press(`${MOD}+Comma`);
+});
+
 test('관제 new-session tile: project, start mode and model, then it runs in that mode', async () => {
   await page.getByTestId('view-overview').click();
   await navMode();

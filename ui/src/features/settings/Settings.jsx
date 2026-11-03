@@ -10,12 +10,16 @@ import { sound } from '../../app/sounds.js';
 import { KEYS, keyLabel } from '../../app/keys.js';
 import { Glyph, I, roomVars } from '../../ui/bits.jsx';
 import { uploadLogo, pickLogo, clearLogo } from '../../logos.js';
+import { McpTab, PermTab, UsageTab } from './AgentConfig.jsx';
 
 const TABS = [
   { key: 'theme', label: '테마', icon: 'palette' },
   { key: 'notify', label: '알림과 소리', icon: 'bell' },
   { key: 'keys', label: '단축키', icon: 'keyboard' },
   { key: 'agents', label: '에이전트', icon: 'terminal-2' },
+  { key: 'mcp', label: 'MCP 서버', icon: 'plug' },
+  { key: 'perm', label: '권한', icon: 'shield-check' },
+  { key: 'usage', label: '사용량', icon: 'gauge' },
   { key: 'projects', label: '프로젝트', icon: 'folders' },
   { key: 'about', label: '정보', icon: 'info-circle' },
 ];
@@ -39,6 +43,9 @@ export function Settings() {
         {tab === 'notify' && <NotifyTab />}
         {tab === 'keys' && <KeysTab />}
         {tab === 'agents' && <AgentsTab />}
+        {tab === 'mcp' && <McpTab />}
+        {tab === 'perm' && <PermTab />}
+        {tab === 'usage' && <UsageTab />}
         {tab === 'projects' && <ProjectsTab />}
         {tab === 'about' && <AboutTab />}
       </main>
