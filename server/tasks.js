@@ -684,6 +684,7 @@ export class Tasks {
       r.lastIn = Date.now();
       r.byHook = false;
     }
+    this.tracker(task).turnStarted();
     if (task.state !== 'working') this.setState(task, 'working', '');
   }
 
@@ -721,7 +722,10 @@ export class Tasks {
         }
         return;
       }
-      if (ev === 'UserPromptSubmit') return this.promptArrived(task, r, p.prompt);
+      if (ev === 'UserPromptSubmit') {
+        this.tracker(task).turnStarted();
+        return this.promptArrived(task, r, p.prompt);
+      }
       // Right when the prompt opens, with the command itself (the Notification comes ~6 s later).
       if (ev === 'PermissionRequest') return ASKS_PERSON.has(p.tool_name) ? this.blockOn(task, r, p, 'choice', choiceAsk(p)) : this.blockOn(task, r, p, 'permission', permissionAsk(p));
       if (ev === 'Notification') {

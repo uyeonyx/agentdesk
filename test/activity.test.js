@@ -46,3 +46,24 @@ test('an Agent call nobody claims is forgotten after a minute', () => {
   assert.equal(task.activity.subagents[0].desc, '');
   assert.deepEqual(task.activity.pending, []);
 });
+
+import { activityView } from '../server/activity.js';
+
+test('thinking between tools is timed from when the last tool ended, not from the turn or the task', async () => {
+  const task = { cwd: '/tmp/x', agent: 'claude' };
+  const tr = new ActivityTracker(task, () => {});
+  tr.turnStarted();
+  const began = activityView(task.activity).idleAt;
+  assert.ok(began > 0, 'a new turn starts the clock');
+  await new Promise((r) => setTimeout(r, 15));
+  tr.claude({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_use_id: 'b1', tool_input: { command: 'npm test' } });
+  const running = activityView(task.activity);
+  assert.match(running.current, /npm test/);
+  assert.ok(running.since >= began + 10, 'a running tool counts from its own start');
+  await new Promise((r) => setTimeout(r, 15));
+  tr.claude({ hook_event_name: 'PostToolUse', tool_name: 'Bash', tool_use_id: 'b1', tool_input: { command: 'npm test' }, tool_response: {} });
+  const thinking = activityView(task.activity);
+  assert.equal(thinking.current, '');
+  assert.equal(thinking.since, 0);
+  assert.ok(thinking.idleAt >= running.since + 10, 'thinking counts from when the tool ended');
+});

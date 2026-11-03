@@ -169,7 +169,9 @@ function StatusLine({ task }) {
   const now = useNow();
   if (!task.running || !isBusy(task)) return null;
   const waiting = task.state === 'waiting';
-  const since = task.activity?.since || task.updatedAt;
+  // A tool running: since it started. Thinking between tools: since the last one ended (or the turn
+  // began), never since the task last changed, which can be long before.
+  const since = task.activity?.since || task.activity?.idleAt || task.updatedAt;
   const what = waiting ? task.reason || '백그라운드 작업을 기다려요' : task.activity?.current || (task.state === 'starting' ? '시작하는 중' : '생각하는 중');
   return (
     <div class={`statusline ${waiting ? 'waiting' : ''}`} role="status" aria-live="polite">

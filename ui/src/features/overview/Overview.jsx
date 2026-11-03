@@ -391,7 +391,7 @@ function Now({ t, z }) {
   const now = useNow();
   const run = (t.activity?.feedTail || []).findLast((f) => f.st === 'run');
   const what = t.state === 'waiting' ? t.reason || '백그라운드 작업을 기다려요' : t.activity?.current || (t.state === 'starting' ? '시작하는 중' : '생각하는 중');
-  const since = t.activity?.since || t.updatedAt;
+  const since = t.activity?.since || t.activity?.idleAt || t.updatedAt;
   return (
     <div class="nowl">
       <i class={`kd k-${run ? kindOf(run.kind) : 'think'}`} />

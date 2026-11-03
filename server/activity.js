@@ -146,6 +146,8 @@ export class ActivityTracker {
           }
         }
         if (!owner && this.a.current === d.text) this.a.current = '';
+        // Between tools the agent is thinking: from when the last one ended, not from the turn's start.
+        if (!owner) this.a.idleAt = Date.now();
         this.plan(name, input, p.tool_response, owner);
       }
       return this.changed();
@@ -181,6 +183,13 @@ export class ActivityTracker {
         if (input.subject) it.text = clip(input.subject, 100);
       }
     }
+  }
+
+  /** A new turn: whatever runs (or thinks) from here is counted from now. */
+  turnStarted() {
+    this.a.current = '';
+    this.a.idleAt = Date.now();
+    this.changed();
   }
 
   /** The turn is over: nothing is "running" any more. */
@@ -354,6 +363,8 @@ export function activityView(a) {
     subagents: a.subagents.slice(-12).map((s) => ({ id: s.id, type: s.type || 'agent', desc: s.desc, status: s.status, last: s.last, tools: s.tools, startedAt: s.startedAt, endedAt: s.endedAt, plan: s.plan.slice(0, 12) })),
     current: a.current,
     since: a.current ? a.currentAt || 0 : 0,
+    // Thinking (no tool running): since the last tool ended or the turn began.
+    idleAt: a.idleAt || 0,
     feedTail: a.feed.slice(-5),
   };
 }
