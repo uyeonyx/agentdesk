@@ -40,9 +40,10 @@ export function firstClash(t) {
 /** An unresolved overlap: nobody has talked or waited yet. */
 export const openClash = (t) => (t.clash || []).some((c) => !c.talk || c.talk.state === 'talking');
 
-function Who({ id }) {
+/** Who said it: "이 세션" for the one on screen, the other by its title. */
+function Who({ id, me }) {
   const title = useStore((s) => taskOf(s, id)?.title);
-  return <b class="who">{short(title, 16)}</b>;
+  return <b class="who">{id === me ? '이 세션' : short(title, 28)}</b>;
 }
 
 /**
@@ -59,7 +60,7 @@ export function ClashLine({ t, big = false }) {
     setBusy(false);
   };
   const files = c.files.map(base);
-  const fileText = files.length > 1 ? `${files[0]} 외 ${files.length - 1 + c.more}개` : files[0];
+  const fileText = files.length > 2 || c.more ? `${files.slice(0, 2).join(', ')} 외 ${files.length - 2 + c.more}개` : files.join(', ');
   if (!c.talk)
     return (
       <div class={`clash ${big ? 'big' : ''}`} data-testid="clash">
@@ -85,7 +86,7 @@ export function ClashLine({ t, big = false }) {
         <span class="tx">
           {last ? (
             <>
-              <Who id={last.from} /> {last.text}
+              <Who id={last.from} me={t.id} /> {last.text}
             </>
           ) : (
             <>
@@ -125,7 +126,7 @@ export function TalkThread({ task }) {
         {tk.msgs.length ? (
           tk.msgs.map((m, i) => (
             <div key={i} class={`m ${m.from === task.id ? 'me' : ''}`}>
-              <Who id={m.from} />
+              <Who id={m.from} me={task.id} />
               <span>{m.text}</span>
             </div>
           ))
