@@ -5,9 +5,13 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createRequire } from 'node:module';
 import pty from '@lydell/node-pty';
 import { AGENTS } from './agents.js';
 import { inheritedEnv, commandFor, realPath } from './util.js';
+
+const require = createRequire(import.meta.url);
+const { Terminal } = require('@xterm/headless');
 
 const PTY_WIN = process.platform === 'win32' ? { useConptyDll: true } : {};
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -41,24 +45,49 @@ export function trustOwnFolder(dir) {
   return trusting.get(dir);
 }
 
+/**
+ * On Claude Code's trust screen ("❯ No, exit / Yes, I trust this folder", No highlighted): move to
+ * Yes, and press Enter only once Yes is the highlighted one, so "No, exit" is never picked.
+ * `lines()` reads the rendered screen; `write` types into the terminal. true when it said yes.
+ */
+export async function sayTrust(lines, write) {
+  const yes = (l) => l.some((x) => /❯\s*(\d\.\s*)?Yes, I trust this folder/i.test(x));
+  if (!(await lines()).some((x) => /Yes, I trust this folder/i.test(x))) return false;
+  for (let k = 0; k < 3 && !yes(await lines()); k++) {
+    write('\x1b[B');
+    for (let t = 0; t < 1000 && !yes(await lines()); t += 100) await delay(100);
+  }
+  if (!yes(await lines())) return false;
+  write('\r');
+  return true;
+}
+
 async function answer(dir) {
   const bin = AGENTS.claude.bin();
   if (!bin) return;
   const [file, ...pre] = commandFor(bin);
   // No user or project settings (so none of the person's hooks run) and no Remote Control.
   const args = ['--setting-sources', 'project', '--settings', JSON.stringify({ remoteControlAtStartup: false })];
-  const p = pty.spawn(file, [...pre, ...args], { name: 'xterm-256color', cols: 100, rows: 30, cwd: dir, env: inheritedEnv(), ...PTY_WIN });
-  let out = '';
-  p.onData((d) => (out += d));
+  const cols = 100;
+  const rows = 30;
+  const term = new Terminal({ cols, rows, allowProposedApi: true });
+  const p = pty.spawn(file, [...pre, ...args], { name: 'xterm-256color', cols, rows, cwd: dir, env: inheritedEnv(), ...PTY_WIN });
+  p.onData((d) => term.write(d));
+  // What's on screen: Claude Code draws spaces as cursor moves, so the raw stream can't be searched.
+  const lines = async () => {
+    await new Promise((r) => term.write('', r));
+    const b = term.buffer.active;
+    const out = [];
+    for (let y = 0; y < term.rows; y++) out.push(b.getLine(b.viewportY + y)?.translateToString(true) ?? '');
+    return out;
+  };
   try {
-    for (let t = 0; t < 15000 && !/trust this folder|for shortcuts|Try "|❯/i.test(out); t += 200) await delay(200);
-    if (/trust this folder/i.test(out)) {
-      await delay(1500);
-      p.write('\x1b[B');
+    for (let t = 0; t < 15000; t += 200) {
+      const l = await lines();
+      if (l.some((x) => /trust this folder|for shortcuts|Try "/i.test(x))) break;
       await delay(200);
-      p.write('\r');
-      await delay(2500);
     }
+    if (await sayTrust(lines, (k) => p.write(k))) for (let t = 0; t < 5000 && isTrusted(dir) === false; t += 200) await delay(200);
   } finally {
     try {
       p.write('\x03');
@@ -69,5 +98,6 @@ async function answer(dir) {
     try {
       p.kill();
     } catch {}
+    term.dispose();
   }
 }

@@ -17,7 +17,7 @@ import { buildPrompt, promptView, replyExcerpt } from './prompt.js';
 import { drive, answerLine, Fallback } from './answer.js';
 import { commandsIn } from './shells.js';
 import { ActivityTracker, activityView, emptyActivity, findRollout } from './activity.js';
-import { trustOwnFolder } from './trust.js';
+import { trustOwnFolder, sayTrust } from './trust.js';
 
 const require = createRequire(import.meta.url);
 const { Terminal } = require('@xterm/headless');
@@ -414,6 +414,13 @@ export class Tasks {
     return out;
   }
 
+  /** A general session still in its own folder under Desk's (not anchored to a project yet). */
+  ownGeneralFolder(task) {
+    if (task.projectId || !task.scratch || task.cwd !== task.scratch) return false;
+    const base = path.join(dataDir(), 'general');
+    return path.dirname(path.resolve(task.scratch)) === path.resolve(base);
+  }
+
   /**
    * A general session's own folder, inside Desk's folder for them. That parent is trusted once, so
    * Claude Code doesn't ask about each session's folder.
@@ -616,8 +623,13 @@ export class Tasks {
     if (this.rt.get(task.id) !== r) return;
     if (task.state !== 'working' && task.state !== 'starting') return;
     r.byHook = false;
-    // Trusting a folder, signing in: only the CLI's own terminal can answer it.
+    // Trusting a folder, signing in: only the CLI's own terminal can answer it. Except Desk's own
+    // folder for a general session: that one Desk trusts for you (it holds nothing of yours).
     const gate = gateFromLines(this.screenLines(r));
+    if (gate && !r.trusted && this.ownGeneralFolder(task) && (await sayTrust(async () => this.screenLines(r), (k) => r.proc.write(k)))) {
+      r.trusted = true;
+      return;
+    }
     if (gate) {
       this.prompts.delete(task.id);
       return this.setState(task, 'needs_input', `${gate} · 원본 터미널에서 답해 주세요`, { ask: 'terminal' });

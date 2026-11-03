@@ -172,9 +172,11 @@ function StatusLine({ task }) {
   const since = task.activity?.since || task.updatedAt;
   const what = waiting ? task.reason || '백그라운드 작업을 기다려요' : task.activity?.current || (task.state === 'starting' ? '시작하는 중' : '생각하는 중');
   return (
-    <div class={`statusline glass ${waiting ? 'waiting' : ''}`} role="status" aria-live="polite">
+    <div class={`statusline ${waiting ? 'waiting' : ''}`} role="status" aria-live="polite">
       <span class="breath" aria-hidden="true" />
-      <span class="what">{what}</span>
+      <span class="what" title={what}>
+        {what}
+      </span>
       {!waiting && <span class="num el">{duration(now - since)}</span>}
       <span class="sp" />
       <button class="btn sm ghost" onClick={() => interrupt(task.id)} data-tip="이번 턴만 멈춰요 · 세션은 그대로" data-kbd={keyLabel('interrupt')}>

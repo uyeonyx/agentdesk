@@ -680,6 +680,16 @@
   font-family: var(--font-mono);
   font-size: var(--t-sm);
 }
+.statusline .what {
+  flex: 0 1 auto;
+}
+/* The time and the stop button keep their size; only the command gets cut short. */
+.statusline .el,
+.statusline .breath,
+.statusline .btn {
+  flex: none;
+  white-space: nowrap;
+}
 .statusline .el {
   font-size: var(--t-sm);
   color: var(--text-3);

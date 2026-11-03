@@ -382,9 +382,14 @@
   font-weight: var(--w-1);
 }
 .nowl .el {
+  flex: none;
   margin-left: auto;
+  white-space: nowrap;
   color: var(--text-3);
   font-variant-numeric: tabular-nums;
+}
+.nowl .kd {
+  flex: none;
 }
 .stopr {
   display: flex;
