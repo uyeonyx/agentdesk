@@ -229,6 +229,19 @@ export async function pasteText(taskId, text) {
 
 // ------------------------------------------------------------ lifecycle
 
+/** A general session becomes a project's: same conversation, now in that project's own worktree. */
+export async function anchorTask(id, projectId) {
+  try {
+    await api('POST', `/api/tasks/${id}/anchor`, { projectId });
+    const p = projectOf(get(), projectId);
+    toast(`${p?.name || '프로젝트'}에 붙였어요 · 대화는 이어지고, 이제 그 저장소에서 일해요`, { projectId });
+    return true;
+  } catch (e) {
+    toast(e.message, { kind: 'err' });
+    return false;
+  }
+}
+
 export async function createTask(projectId, agent, prompt, opts = {}) {
   try {
     const t = await api('POST', '/api/tasks', { projectId, agent, prompt, ...opts });
@@ -236,7 +249,7 @@ export async function createTask(projectId, agent, prompt, opts = {}) {
     setView(t.id, 'chat');
     sound('sent');
     const p = projectOf(get(), projectId);
-    toast(`${p?.name || ''}에서 새 작업을 시작했어요`, { projectId, action: { label: '되돌리기', run: () => cancelCreate(t.id) } });
+    toast(p?.general ? '범용 세션을 시작했어요 · 구체화되면 프로젝트에 붙일 수 있어요' : `${p?.name || ''}에서 새 작업을 시작했어요`, { projectId, action: { label: '되돌리기', run: () => cancelCreate(t.id) } });
     return t;
   } catch (e) {
     toast(e.message, { kind: 'err' });

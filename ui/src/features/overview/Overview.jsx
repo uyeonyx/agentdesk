@@ -3,7 +3,7 @@
 // per group, split into cells by hairlines. What waits on me comes first and carries its card.
 import { memo } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { useStore, set, projectOf, toast } from '../../store.js';
+import { useStore, set, projectOf, toast, GENERAL } from '../../store.js';
 import { isLive, isBlocked, whyOf, markOf, grouped, lampOf, lampTimer, clockOf } from '../../core/status.js';
 import { MODES, CYCLE, MODELS, nextMode, modeOf } from '../../core/session.js';
 import { openTask, quickSend, archiveAsk, resume, openDrawer } from '../../actions.js';
@@ -511,7 +511,8 @@ function NewTile() {
   const ta = useRef();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
-  const p = s.projects.find((x) => x.id === d.projectId);
+  // No project picked (or none added yet): a general session, anchored to one later.
+  const p = (d.projectId && s.projects.find((x) => x.id === d.projectId)) || GENERAL;
   const claude = d.agent === 'claude';
   const patch = (x) => set((st) => ({ newDraft: { ...d, ...st.newDraft, ...x } }));
   useEffect(() => ta.current?.focus(), []);
@@ -519,10 +520,10 @@ function NewTile() {
     if (busy || text.trim().length < 2 || !p) return;
     setBusy(true);
     try {
-      const t = await api('POST', '/api/tasks', { projectId: p.id, agent: d.agent, prompt: text.trim(), ...(claude ? { mode: d.mode, model: d.model || undefined } : {}) });
+      const t = await api('POST', '/api/tasks', { projectId: p.general ? undefined : p.id, agent: d.agent, prompt: text.trim(), ...(claude ? { mode: d.mode, model: d.model || undefined } : {}) });
       sound('sent');
       set({ composing: false });
-      toast(`${p.name}에서 새 세션을 시작했어요${claude ? ` · ${modeOf(d.mode).label}` : ''}`, { projectId: p.id });
+      toast(`${p.general ? '범용 세션을 시작했어요' : `${p.name}에서 새 세션을 시작했어요`}${claude ? ` · ${modeOf(d.mode).label}` : ''}`, { projectId: p.id });
       return t;
     } catch (e) {
       toast(e.message, { kind: 'err' });
@@ -551,7 +552,7 @@ function NewTile() {
         <textarea
           ref={ta}
           value={text}
-          placeholder={claude && d.mode === 'plan' ? '맡길 일을 쓰세요 · 코드를 바꾸기 전에 계획부터 보여 줘요' : '에이전트에게 맡길 일을 쓰세요'}
+          placeholder={p.general ? '무엇이든 묻거나 맡기세요 · 어느 프로젝트 일인지는 나중에 정해도 돼요' : claude && d.mode === 'plan' ? '맡길 일을 쓰세요 · 코드를 바꾸기 전에 계획부터 보여 줘요' : '에이전트에게 맡길 일을 쓰세요'}
           onInput={(e) => setText(e.currentTarget.value)}
           onKeyDown={(e) => {
             if (e.isComposing || e.keyCode === 229) return;
@@ -571,13 +572,17 @@ function NewTile() {
           <div class="nr">
             <span class="nl">프로젝트</span>
             <span class="nps">
+              <button type="button" class={`npj ${p.general ? 'on' : ''}`} style={roomVars(GENERAL.color)} onClick={() => patch({ projectId: null })} data-tip="프로젝트 없이 · 나중에 붙일 수 있어요" aria-label="범용" aria-pressed={p.general} data-testid="new-general">
+                <Glyph project={GENERAL} size={22} />
+                {p.general && <span>범용</span>}
+              </button>
               {s.projects
                 .filter((x) => x.kind !== 'group' || x.members?.length)
                 .slice(0, 12)
                 .map((x) => (
-                  <button key={x.id} type="button" class={`npj ${x.id === d.projectId ? 'on' : ''}`} style={roomVars(x.color)} onClick={() => patch({ projectId: x.id })} data-tip={x.name} aria-label={x.name} aria-pressed={x.id === d.projectId}>
+                  <button key={x.id} type="button" class={`npj ${x.id === p.id ? 'on' : ''}`} style={roomVars(x.color)} onClick={() => patch({ projectId: x.id })} data-tip={x.name} aria-label={x.name} aria-pressed={x.id === p.id}>
                     <Glyph project={x} size={22} />
-                    {x.id === d.projectId && <span>{x.name}</span>}
+                    {x.id === p.id && <span>{x.name}</span>}
                   </button>
                 ))}
             </span>

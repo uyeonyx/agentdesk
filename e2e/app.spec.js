@@ -487,6 +487,30 @@ test('관제 new-session tile: project, start mode and model, then it runs in th
   await call('POST', `/api/tasks/${made.id}/discard`);
 });
 
+test('general: a session started with no project is anchored to one later and goes on there', async () => {
+  const p = await project('repo-anchor');
+  await page.getByTestId('view-overview').click();
+  await navMode();
+  await page.keyboard.press('n');
+  const tile = page.getByTestId('new-tile');
+  await tile.getByTestId('new-general').click();
+  await page.getByTestId('new-input').fill('just answer: 아직 어디 일인지 몰라요');
+  await page.getByTestId('new-input').press('Enter');
+  await expect(tile).toBeHidden();
+  const made = (await call('GET', '/api/state')).tasks.find((t) => t.title.includes('어디 일인지'));
+  expect(made.projectId).toBeNull();
+  await until(made.id, (x) => x?.state === 'needs_input');
+  await page.locator(`[data-testid="tile"][data-task-id="${made.id}"] .oc-h`).click();
+  await expect(page.locator('.th-meta')).toContainText('범용');
+  await page.getByTestId('anchor').click();
+  await page.getByRole('dialog', { name: '프로젝트에 붙이기' }).locator(`[data-project-id="${p.id}"]`).click();
+  await until(made.id, (x) => x?.projectId === p.id && !!x?.branch);
+  await expect(page.locator('.th-meta')).toContainText('repo-anchor');
+  await expect(page.getByTestId('anchor')).toBeHidden();
+  await page.screenshot({ path: shots('anchored') });
+  await call('POST', `/api/tasks/${made.id}/discard`);
+});
+
 test('focus: the composer bar changes the permission mode, mid-session, with Shift+Tab or the chip', async () => {
   const p = await project('repo-mode');
   const t = await start(p.id, 'just answer: 모드');

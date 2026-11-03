@@ -87,6 +87,7 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
   const tasks = new Tasks(store, auth, () => hooks.path, changed);
   // Plan usage from Claude Code's /usage, read now and then while Claude sessions run.
   const usage = new Usage(changed);
+  tasks.onStatusLine = (task, p) => task.agent === 'claude' && usage.fromStatus(p.rate_limits);
   if (process.env.AGENTDESK_USAGE !== 'off') usage.start(() => store.tasks.some((t) => t.agent === 'claude' && tasks.rt.has(t.id)));
   const shells = new Shells(store);
   tasks.onGone = (id) => shells.close(id);
@@ -215,6 +216,8 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
           case 'rename':
             tasks.rename(id, body.title);
             return { ok: true };
+          case 'anchor':
+            return tasks.view(await tasks.anchor(id, body.projectId));
           case 'paste':
             tasks.paste(id, body.text);
             return { ok: true };

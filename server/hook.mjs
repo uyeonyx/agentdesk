@@ -4,6 +4,7 @@
 // .mjs on purpose: inside the packaged app this file sits next to no package.json that says "module".
 import fs from 'node:fs';
 import http from 'node:http';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 function readStdin(ms) {
@@ -28,13 +29,17 @@ export async function runHook(argv) {
   const task = process.env.AGENTDESK_TASK;
   if (!sock || !token || !task) return;
   const mode = argv[0] === 'codex' ? 'codex' : 'claude';
+  const status = argv[0] === 'claude-status';
   let payload = {};
+  let raw = '';
   try {
     if (mode === 'codex') payload = JSON.parse(argv[argv.length - 1]);
     // Inside the app binary process.stdin isn't wired up on Windows (a GUI binary); the inherited
     // handle still reads fine as fd 0. Claude closes stdin after writing the event.
-    else payload = JSON.parse((process.versions.electron ? fs.readFileSync(0, 'utf8') : await readStdin(1500)) || '{}');
+    else payload = JSON.parse((raw = process.versions.electron ? fs.readFileSync(0, 'utf8') : await readStdin(1500)) || '{}');
   } catch {}
+  // The status line: Desk takes the limits it carries, then the person's own status line draws.
+  if (status) payload.hook_event_name = 'DeskStatusLine';
   // The server holds UserPromptSubmit for up to 2.5 s; Claude's hook timeout is 5 s.
   await new Promise((resolve) => {
     const req = http.request(
@@ -51,6 +56,11 @@ export async function runHook(argv) {
     });
     req.end(JSON.stringify({ task, agent: mode, payload }));
   });
+  const own = process.env.AGENTDESK_STATUSLINE;
+  if (status && own) {
+    const r = spawnSync(own, { shell: true, input: raw, encoding: 'utf8', timeout: 4000, windowsHide: true });
+    if (r.stdout) fs.writeSync(1, r.stdout);
+  }
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {

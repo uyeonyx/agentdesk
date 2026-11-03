@@ -133,7 +133,9 @@ function shallowEq(a, b) {
 
 // ------------------------------------------------------------ derived helpers
 
-export const projectOf = (s, id) => s.projects.find((p) => p.id === id);
+/** Sessions not tied to a project yet (projectId null) show as this until they're anchored to one. */
+export const GENERAL = Object.freeze({ id: null, name: '범용', icon: 'message-circle', color: '#7d8fa3', kind: 'general', general: true, desc: '프로젝트 없이 시작한 세션' });
+export const projectOf = (s, id) => (id == null ? GENERAL : s.projects.find((p) => p.id === id));
 /** A task with whatever the window has done to it and the core hasn't confirmed yet. */
 export const taskOf = (s, id) => {
   const t = s.tasks.find((x) => x.id === id);

@@ -311,7 +311,7 @@ export function UsageTab() {
   return (
     <section class="st-sec">
       <div class="ac-h">
-        <p class="st-desc">Claude Code의 /usage 화면에 나오는 값을 그대로 읽어요. 세션이 돌고 있으면 10분마다 다시 읽어요.</p>
+        <p class="st-desc">5시간·주간 사용량은 돌고 있는 세션의 상태 줄로 실시간으로 받아요. 모델별 한도와 추가 크레딧은 Claude Code의 /usage 결과를 30분마다 읽어요. 모델을 부르지 않아 사용량이 늘지 않아요.</p>
         <span class="sp" />
         <button
           class="btn sm"

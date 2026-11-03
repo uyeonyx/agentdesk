@@ -2,7 +2,7 @@
 // command can start a new task right there (@ picks the project or the agent, Tab cycles projects).
 // ⌘P lists the open task's files; "테마" previews themes as you move through them.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { useStore, set, get, projectOf, taskOf, openModal } from '../../store.js';
+import { useStore, set, get, projectOf, taskOf, openModal, GENERAL } from '../../store.js';
 import { api } from '../../api.js';
 import { fuzzyFilter, isMac } from '../../util.js';
 import { isLive, labelOf } from '../../core/status.js';
@@ -33,8 +33,14 @@ function Bar({ mode: startMode, initial }) {
   });
   const [files, setFiles] = useState([]);
   const sel = taskOf(s, s.selected);
-  // New tasks go to the filtered project, else the open task's, else the last one used.
-  const [pid, setPid] = useState(() => s.filter || sel?.projectId || s.prefs.lastProject || s.projects[0]?.id);
+  // New tasks go to the filtered project, else the open task's, else the last one used; null is a
+  // general session (no project yet), which is also where they go before any project is added.
+  const [pid, setPid] = useState(() => {
+    if (s.filter) return s.filter;
+    if (sel) return sel.projectId ?? null;
+    const last = s.prefs.lastProject;
+    return last === '' ? null : last && s.projects.some((p) => p.id === last) ? last : s.projects[0]?.id ?? null;
+  });
   const [agent, setAgent] = useState(() => s.prefs.agent || 'claude');
   const project = projectOf(s, pid);
   const input = useRef();
@@ -64,12 +70,12 @@ function Bar({ mode: startMode, initial }) {
       const ags = Object.entries(s.agents || {})
         .filter(([k, a]) => a.available !== false && (k.startsWith(w) || (a.label || '').toLowerCase().startsWith(w)))
         .map(([k, a]) => ({ id: 'agent:' + k, icon: 'terminal-2', label: a.label || k, sub: '에이전트', run: () => (setAgent(k), setQ(q.replace(/@\S*$/, ''))) }));
-      const ps = fuzzyFilter(w, s.projects, (p) => p.name, 8).map((p) => ({ id: 'p:' + p.id, project: p, label: p.name, sub: '프로젝트', run: () => (setPid(p.id), setQ(q.replace(/@\S*$/, ''))) }));
+      const ps = fuzzyFilter(w, [GENERAL, ...s.projects], (p) => (p.general ? '범용 general' : p.name), 8).map((p) => ({ id: 'p:' + (p.id ?? 'general'), project: p, label: p.name, sub: p.general ? '프로젝트 없이' : '프로젝트', run: () => (setPid(p.id), setQ(q.replace(/@\S*$/, ''))) }));
       return [...ps, ...ags];
     }
     const out = [];
     const text = q.trim();
-    const newRow = { id: 'new', icon: 'plus', label: text ? text : '무엇을 시킬까요?', sub: project ? `${project.name}에서 새 작업` : '프로젝트를 먼저 추가해 주세요', isNew: true, run: () => start() };
+    const newRow = { id: 'new', icon: 'plus', label: text ? text : '무엇을 시킬까요?', sub: project?.general ? '범용 · 프로젝트는 나중에 붙여요 · Tab 프로젝트 바꾸기' : `${project?.name}에서 새 작업 · Tab 프로젝트 바꾸기`, isNew: true, run: () => start() };
     if (mode === 'new') return [newRow];
     const tasks = fuzzyFilter(text, s.tasks.filter((t) => !t.archived), (t) => `${t.title} ${projectOf(s, t.projectId)?.name || ''}`, text ? 12 : 8).map((t) => ({
       id: 't:' + t.id,
@@ -92,8 +98,8 @@ function Bar({ mode: startMode, initial }) {
   const start = () => {
     const text = q.trim();
     if (!text || !project) return;
-    api('PATCH', '/api/prefs', { lastProject: project.id, agent }).catch(() => {});
-    createTask(project.id, agent, text);
+    api('PATCH', '/api/prefs', { lastProject: project.id ?? '', agent }).catch(() => {});
+    createTask(project.id ?? undefined, agent, text);
   };
   const [active, setActive, onNav] = useListNav(items.length, (i) => items[i]?.run());
 
@@ -113,10 +119,12 @@ function Bar({ mode: startMode, initial }) {
       if (mode === 'theme') endPreview();
       return close();
     }
-    if (e.key === 'Tab' && !at && (mode === 'new' || items[active]?.isNew) && s.projects.length) {
+    if (e.key === 'Tab' && !at && (mode === 'new' || items[active]?.isNew)) {
       e.preventDefault();
-      const i = s.projects.findIndex((p) => p.id === pid);
-      setPid(s.projects[(i + (e.shiftKey ? -1 : 1) + s.projects.length) % s.projects.length].id);
+      // Through every project, and the general session (no project) at the start of the round.
+      const ids = [null, ...s.projects.map((p) => p.id)];
+      const i = Math.max(0, ids.indexOf(pid ?? null));
+      setPid(ids[(i + (e.shiftKey ? -1 : 1) + ids.length) % ids.length]);
       return;
     }
     if (e.key === 'Backspace' && !q && mode !== 'all') {

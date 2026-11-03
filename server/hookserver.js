@@ -86,6 +86,8 @@ export async function startHookServer({ auth, tasks, path: want, quiet = false }
     let body = await readBody(req);
     const qTask = url.searchParams.get('task');
     if (qTask) body = { task: qTask, agent: url.searchParams.get('agent') === 'codex' ? 'codex' : 'claude', payload: body };
+    // The status line posts its own input; it isn't a hook event of Claude's, so it gets a name here.
+    if (url.searchParams.get('kind') === 'status' && body?.payload && typeof body.payload === 'object') body.payload.hook_event_name = 'DeskStatusLine';
     // Each task has its own token, so one agent can't report for another.
     if (!auth.hookValid(req, body.task)) return send(res, 403, { error: 'forbidden' });
     const done = tasks.hook(body).catch(() => {});

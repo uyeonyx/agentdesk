@@ -97,9 +97,14 @@ function Header({ task, project, view }) {
               저장소 {task.repos.length}개
             </span>
           )}
-          {!task.isolated && (
+          {!task.isolated && !project?.general && (
             <span class="meta-i" data-tip="worktree 없이 원래 폴더에서 일해요">
               원래 폴더
+            </span>
+          )}
+          {project?.general && (
+            <span class="meta-i" data-tip="Desk의 범용 폴더에서 일해요 · 구체화되면 프로젝트에 붙일 수 있어요">
+              프로젝트 없음
             </span>
           )}
           <span class="meta-i">{task.agent === 'codex' ? 'Codex' : 'Claude Code'}</span>
@@ -126,6 +131,11 @@ function Header({ task, project, view }) {
         ))}
       </div>
       <div class="th-act">
+        {project?.general && task.agent === 'claude' && isLive(task) && !task.archived && (
+          <button class="btn sm" onClick={() => openModal('anchor', { taskId: task.id })} data-testid="anchor">
+            <I n="anchor" /> 프로젝트에 붙이기
+          </button>
+        )}
         {task.prUrl && (
           <a class="btn sm ghost" href={task.prUrl} target="_blank" rel="noopener noreferrer">
             <I n="external-link" /> PR

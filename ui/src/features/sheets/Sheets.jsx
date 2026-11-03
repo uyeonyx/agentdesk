@@ -2,11 +2,11 @@
 // project. Everything else happens in place.
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { api } from '../../api.js';
-import { useStore, get, set, closeModal, toast, projectOf, taskOf } from '../../store.js';
+import { useStore, get, set, closeModal, openModal, toast, projectOf, taskOf } from '../../store.js';
 import { fuzzyFilter, mod } from '../../util.js';
 import { isBusy } from '../../core/status.js';
 import { enterAction } from '../../core/sendPolicy.js';
-import { merge, pr, discard, archive, archiveMany, rename, importSession, restore, openTask } from '../../actions.js';
+import { merge, pr, discard, archive, archiveMany, rename, importSession, restore, openTask, anchorTask } from '../../actions.js';
 import { Sheet } from '../../ui/Sheet.jsx';
 import { Glyph, I, ago, useListNav } from '../../ui/bits.jsx';
 
@@ -30,6 +30,8 @@ export function SheetHost() {
       return <AddProject />;
     case 'removeProject':
       return <RemoveProject projectId={m.projectId} />;
+    case 'anchor':
+      return <Anchor taskId={m.taskId} />;
     default:
       return null;
   }
@@ -190,6 +192,64 @@ function Rename({ taskId }) {
         </button>
         <button class="btn primary" onClick={save} disabled={!v.trim()}>
           바꾸기 <kbd>↵</kbd>
+        </button>
+      </div>
+    </Sheet>
+  );
+}
+
+/** A general session gets its project: pick one, and the conversation goes on in its worktree. */
+function Anchor({ taskId }) {
+  const s = useStore((s) => ({ t: taskOf(s, taskId), projects: s.projects }));
+  const [q, setQ] = useState('');
+  const [busy, setBusy] = useState(false);
+  const list = fuzzyFilter(q, s.projects.filter((p) => p.kind !== 'group' || p.members?.length), (p) => `${p.name} ${p.display || ''}`, 60);
+  const go = async (p) => {
+    if (busy || !p) return;
+    setBusy(true);
+    const ok = await anchorTask(taskId, p.id);
+    setBusy(false);
+    if (ok) closeModal();
+  };
+  const [active, setActive, onNav] = useListNav(list.length, (i) => go(list[i]));
+  useEffect(() => setActive(0), [q]);
+  if (!s.t) return null;
+  return (
+    <Sheet label="프로젝트에 붙이기">
+      <div class="sheet-h">
+        <div class="sh-t">
+          <h2>프로젝트에 붙이기</h2>
+          <p>대화는 그대로 이어지고, 고른 프로젝트의 새 작업 공간(worktree)에서 일해요. 범용 폴더에 만든 파일은 그 자리에 남아요.</p>
+        </div>
+      </div>
+      <div class="sheet-b">
+        <input class="field" autofocus placeholder="프로젝트 찾기" value={q} onInput={(e) => setQ(e.currentTarget.value)} onKeyDown={(e) => !e.isComposing && e.keyCode !== 229 && onNav(e)} />
+        <div class="list anchor-list" role="listbox" aria-label="프로젝트">
+          {list.map((p, i) => (
+            <button key={p.id} class={`li ${i === active ? 'active' : ''}`} role="option" aria-selected={i === active} onMouseEnter={() => setActive(i)} onClick={() => go(p)} disabled={busy} data-testid="anchor-project" data-project-id={p.id}>
+              <Glyph project={p} size={24} />
+              <span class="m">
+                {p.name}
+                <small>{p.desc || p.display}</small>
+              </span>
+              <span />
+            </button>
+          ))}
+          {!list.length && <p class="muted">{s.projects.length ? '맞는 프로젝트가 없어요' : '아직 프로젝트가 없어요'}</p>}
+        </div>
+      </div>
+      <div class="sheet-f">
+        <button class="btn ghost" onClick={() => openModal('addProject')}>
+          <I n="folder-plus" /> 프로젝트 추가
+        </button>
+        <span class="sp" />
+        {busy && (
+          <span class="muted">
+            <span class="spin" /> 작업 공간을 만드는 중
+          </span>
+        )}
+        <button class="btn ghost" onClick={closeModal}>
+          취소
         </button>
       </div>
     </Sheet>

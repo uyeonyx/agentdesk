@@ -29,6 +29,30 @@ function claudeHook() {
   return { type: 'command', command: exe, args: [...rest, 'claude'] };
 }
 
+/**
+ * The status line of a Desk session: hand its input (which carries the plan's live limits) to Desk,
+ * then run the person's own status line, if they have one, so the terminal shows what it always did.
+ */
+function claudeStatusLine() {
+  const curl = curlBin();
+  if (curl)
+    return `in=$(cat); printf '%s' "$in" | ${curlTo(curl, 'claude').replace('&agent=claude"', '&agent=claude&kind=status"').replace('-m 4', '-m 1')}; if [ -n "$AGENTDESK_STATUSLINE" ]; then printf '%s' "$in" | sh -c "$AGENTDESK_STATUSLINE"; fi`;
+  return [...hookClient, 'claude-status'].map(q).join(' ');
+}
+
+/** The person's own status line for a folder: local, then project, then user settings. */
+export function ownStatusLine(cwd) {
+  const home = process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude');
+  const files = [cwd && path.join(cwd, '.claude', 'settings.local.json'), cwd && path.join(cwd, '.claude', 'settings.json'), path.join(home, 'settings.json')].filter(Boolean);
+  for (const f of files) {
+    try {
+      const sl = JSON.parse(fs.readFileSync(f, 'utf8'))?.statusLine;
+      if (sl && sl.type === 'command' && typeof sl.command === 'string' && sl.command.trim()) return { command: sl.command, padding: Number.isFinite(sl.padding) ? sl.padding : undefined };
+    } catch {}
+  }
+  return null;
+}
+
 /** Codex runs notify as a program and appends its JSON as the last argument. */
 function codexNotify() {
   const curl = curlBin();
@@ -43,9 +67,9 @@ export const AGENTS = {
     idleMs: 12000,
     remote: true,
     /**
-     * @param {{prompt?:string, resume?:boolean, sessionId?:string, fork?:boolean, newSessionId?:string, remote?:string|false, name?:string, mode?:string, model?:string, effort?:string}} o
+     * @param {{prompt?:string, resume?:boolean, sessionId?:string, fork?:boolean, newSessionId?:string, remote?:string|false, name?:string, mode?:string, model?:string, effort?:string, statusPadding?:number}} o
      */
-    args({ prompt, resume, sessionId, fork, newSessionId, remote, name, mode, model, effort }) {
+    args({ prompt, resume, sessionId, fork, newSessionId, remote, name, mode, model, effort, statusPadding }) {
       const hook = claudeHook();
       const sync = [{ hooks: [{ ...hook, timeout: 5 }] }];
       // Tool and subagent events only feed the progress view, so they never block the agent.
@@ -64,6 +88,8 @@ export const AGENTS = {
           SubagentStart: bgNoMatcher,
           SubagentStop: bgNoMatcher,
         },
+        // The plan's limits arrive with every status line refresh (see usage.js).
+        statusLine: { type: 'command', command: claudeStatusLine(), ...(Number.isFinite(statusPadding) ? { padding: statusPadding } : {}) },
       });
       const args = ['--settings', settings];
       // `=` form: these take optional values and would otherwise swallow the prompt.

@@ -404,6 +404,15 @@ select.field {
   color: var(--text-3);
   font-size: var(--t-sm);
 }
+.sh-t {
+  min-width: 0;
+}
+.sh-t p {
+  margin: var(--sp-1) 0 0;
+  font-size: var(--t-md);
+  line-height: var(--lh-md);
+  color: var(--text-3);
+}
 .sheet-b {
   padding: var(--sp-2) var(--sp-5) var(--sp-5);
   overflow: auto;

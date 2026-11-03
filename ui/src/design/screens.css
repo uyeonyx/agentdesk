@@ -1511,6 +1511,19 @@ input[type='range'] {
 }
 
 /* ---------------------------------------------------------------- dialogs */
+.anchor-list {
+  max-height: 340px;
+  margin-top: var(--sp-3);
+  overflow: auto;
+}
+.anchor-list .li small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--t-sm);
+  color: var(--text-3);
+}
 .addp .list {
   max-height: 300px;
   overflow: auto;

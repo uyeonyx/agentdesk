@@ -1,5 +1,6 @@
-// How much of the plan is used, as Claude Code's own /usage screen says it. The core reads it now
-// and then while sessions run; opening this asks for a fresh read when it's more than a minute old.
+// How much of the plan is used, as Claude Code itself reports it: live from running sessions' status
+// lines (5-hour and weekly), the whole report (per-model weeks, credits) from /usage now and then.
+// Opening this asks for a fresh report when the last one is more than a minute old.
 import { createPortal } from 'preact/compat';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { api } from '../../api.js';
@@ -42,11 +43,11 @@ export function UsageRow({ r }) {
 export function UsageRows({ u }) {
   const now = useNow(30000);
   const c = u?.claude;
-  if (!c) return <p class="ur-empty">아직 읽지 않았어요 · Claude Code의 /usage 화면에서 읽어요</p>;
+  if (!c) return <p class="ur-empty">아직 받지 않았어요 · 세션이 돌면 바로 들어와요</p>;
   return (
     <div class="ug">
       <h4>
-        Claude Code <span>{c.at ? `${ago(c.at, now)} 전에 읽음` : ''}</span>
+        Claude Code <span>{c.liveAt && now - c.liveAt < 10 * 60_000 ? '실시간' : c.at ? `${ago(c.at, now)} 전에 읽음` : ''}</span>
       </h4>
       {(c.rows || []).map((r) => (
         <UsageRow key={r.key} r={r} />
@@ -109,7 +110,7 @@ function UsagePop({ anchor, u, busy, onClose }) {
     <div ref={ref} class="usage-pop" tabIndex={-1} role="dialog" aria-label="사용량" style={{ left: (pos?.left ?? -9999) + 'px', top: (pos?.top ?? -9999) + 'px' }} data-testid="usage-pop">
       <UsageRows u={u} />
       <div class="up-f">
-        <span>Claude Code의 /usage 화면 값을 그대로 읽어요 · 앱이 따로 API를 부르지 않아요</span>
+        <span>돌고 있는 세션이 실시간으로 알려 주고, 나머지는 Claude Code의 /usage에서 읽어요</span>
         <button type="button" class="btn sm ghost" disabled={busy} onClick={() => refreshUsage(true)}>
           {busy ? <span class="spin" /> : <I n="refresh" />} 새로 읽기
         </button>

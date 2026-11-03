@@ -23,6 +23,7 @@ export function taskItems(t, { group } = {}) {
     live && here && t.agent === 'claude' && (t.remote ? { icon: 'device-mobile-off', label: '폰 연결 끄기', run: () => setRemote(t.id, false) } : { icon: 'device-mobile', label: '폰(Claude 앱)에서 이어하기', run: () => setRemote(t.id, true) }),
     t.remoteUrl && { icon: 'external-link', label: 'claude.ai에서 이 세션 열기', href: t.remoteUrl },
     '-',
+    live && here && t.projectId == null && t.agent === 'claude' && { icon: 'anchor', label: '프로젝트에 붙이기…', run: () => openModal('anchor', { taskId: t.id }) },
     { icon: 'pencil', label: '이름 바꾸기', run: () => openModal('rename', { taskId: t.id }) },
     live && here && { icon: 'terminal-2', label: '원본 터미널', hint: keyLabel('drawer'), run: () => (openTask(t.id), toggleDrawer('agent')) },
     '-',
@@ -31,7 +32,7 @@ export function taskItems(t, { group } = {}) {
     t.prUrl && { icon: 'git-pull-request', label: 'PR 열기', href: t.prUrl },
     t.branch && { icon: 'git-branch', label: '브랜치 이름 복사', run: () => copy(t.branch) },
     t.worktreeAbs && { icon: 'copy', label: '폴더 경로 복사', run: () => copy(t.worktreeAbs) },
-    p && { icon: 'settings', label: `${p.name} 설정`, run: () => set({ screen: 'settings', settingsTab: 'projects', settingsProject: p.id }) },
+    p && !p.general && { icon: 'settings', label: `${p.name} 설정`, run: () => set({ screen: 'settings', settingsTab: 'projects', settingsProject: p.id }) },
     '-',
     t.archived
       ? live && { icon: 'archive-off', label: '꺼내기', run: () => restore(t.id) }

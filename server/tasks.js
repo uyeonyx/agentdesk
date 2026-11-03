@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import pty from '@lydell/node-pty';
 import { randomId, run, errText, resolveInside, tilde, dataDir, commandFor, realPath, inheritedEnv } from './util.js';
 import * as G from './git.js';
-import { AGENTS, CLAUDE_MODES, EFFORTS, MODEL, lastAssistantText, summarize, trustedTranscript } from './agents.js';
+import { AGENTS, CLAUDE_MODES, EFFORTS, MODEL, lastAssistantText, summarize, trustedTranscript, ownStatusLine } from './agents.js';
 import { MetaTail } from './meta.js';
 import { Talks } from './talk.js';
 import { ConvoHub, legacyEntries } from './convo.js';
@@ -17,6 +17,7 @@ import { buildPrompt, promptView, replyExcerpt } from './prompt.js';
 import { drive, answerLine, Fallback } from './answer.js';
 import { commandsIn } from './shells.js';
 import { ActivityTracker, activityView, emptyActivity, findRollout } from './activity.js';
+import { trustOwnFolder } from './trust.js';
 
 const require = createRequire(import.meta.url);
 const { Terminal } = require('@xterm/headless');
@@ -299,32 +300,23 @@ export class Tasks {
    */
   async create({ projectId, agent, prompt, extraProjectIds = [], remote, import: imp, mode, model, effort }) {
     if (imp) return this.adopt({ ...imp, projectId, remote });
-    const project = this.store.project(projectId);
-    if (!project) throw httpError(404, '프로젝트를 찾을 수 없어요');
+    // No project: a general session, in a folder of its own until it's anchored to one (anchor()).
+    const general = !projectId;
+    const project = general ? null : this.store.project(projectId);
+    if (!general && !project) throw httpError(404, '프로젝트를 찾을 수 없어요');
     const ad = AGENTS[agent];
     if (!ad) throw httpError(400, 'unknown agent');
     if (!ad.bin()) throw httpError(400, `${ad.label} CLI를 찾을 수 없어요. 설치 후 다시 시도하세요.`);
     prompt = safeTyped(prompt || '').trim();
     if (prompt.length < 2) throw httpError(400, '할 일을 입력하세요');
 
-    // Which repos does this task span?
-    const members = project.kind === 'group' ? (project.members || []).map((id) => this.store.project(id)).filter(Boolean) : [project];
-    for (const id of Array.isArray(extraProjectIds) ? extraProjectIds.slice(0, 12) : []) {
-      const p = this.store.project(String(id));
-      if (!p || p.kind === 'group') throw httpError(400, '추가할 저장소를 찾을 수 없어요');
-      if (!members.some((m) => m.id === p.id)) members.push(p);
-    }
-    const gitMembers = [];
-    for (const m of members) {
-      if (m.isGit && (await G.head(m.path))) gitMembers.push(m);
-      else if (members.length > 1) throw httpError(400, `${m.name}은(는) 커밋이 있는 git 저장소여야 여러 저장소 작업에 넣을 수 있어요`);
-    }
+    const members = general ? [] : this.membersOf(project, extraProjectIds);
 
     const id = randomId('t');
     const slug = id.slice(1);
     const task = {
       id,
-      projectId,
+      projectId: general ? null : projectId,
       agent,
       title: titleOf(prompt),
       prompt,
@@ -334,7 +326,7 @@ export class Tasks {
       updatedAt: Date.now(),
       messages: [],
       repos: [],
-      cwd: project.path,
+      cwd: general ? '' : project.path,
       activity: emptyActivity(),
       // Known up front, so resuming reopens exactly this conversation (not just the latest one here).
       sessionId: agent === 'claude' ? randomUUID() : undefined,
@@ -347,6 +339,42 @@ export class Tasks {
       if (EFFORTS.includes(effort)) task.pick = { ...task.pick, effort };
     }
 
+    if (general) {
+      task.scratch = await this.generalFolder(slug, agent);
+      task.cwd = task.scratch;
+    } else Object.assign(task, await this.workspace(members, slug));
+
+    const snap = await this.snapshotAll(task, 'start');
+    task.messages.push({ id: randomId('m'), text: prompt, at: Date.now(), snap, source: 'start' });
+    this.store.tasks.push(task);
+    this.store.save();
+    this.spawn(task, { prompt });
+    this.changed();
+    return task;
+  }
+
+  /** The repos a task in this project spans (a group's members, plus any picked for this task). */
+  membersOf(project, extraProjectIds = []) {
+    const members = project.kind === 'group' ? (project.members || []).map((id) => this.store.project(id)).filter(Boolean) : [project];
+    for (const id of Array.isArray(extraProjectIds) ? extraProjectIds.slice(0, 12) : []) {
+      const p = this.store.project(String(id));
+      if (!p || p.kind === 'group') throw httpError(400, '추가할 저장소를 찾을 수 없어요');
+      if (!members.some((m) => m.id === p.id)) members.push(p);
+    }
+    return members;
+  }
+
+  /**
+   * Where a task in these repos works: its own worktree in one git repo, one folder with a worktree
+   * per repo for several, or the folder itself when it isn't a git repo. → { repos, cwd, folder? }
+   */
+  async workspace(members, slug) {
+    const gitMembers = [];
+    for (const m of members) {
+      if (m.isGit && (await G.head(m.path))) gitMembers.push(m);
+      else if (members.length > 1) throw httpError(400, `${m.name}은(는) 커밋이 있는 git 저장소여야 여러 저장소 작업에 넣을 수 있어요`);
+    }
+    const out = { repos: [], cwd: members[0]?.path };
     const made = [];
     try {
       if (gitMembers.length === 1 && members.length === 1) {
@@ -356,8 +384,8 @@ export class Tasks {
         const base = await G.head(m.path);
         await G.addWorktree(m.path, wt, `desk/${slug}`, base);
         made.push({ repo: m.path, wt, branch: `desk/${slug}` });
-        task.repos.push({ name: m.name, prefix: '', repo: m.path, worktree: wt, branch: `desk/${slug}`, baseRef: base, projectId: m.id });
-        task.cwd = wt;
+        out.repos.push({ name: m.name, prefix: '', repo: m.path, worktree: wt, branch: `desk/${slug}`, baseRef: base, projectId: m.id });
+        out.cwd = wt;
       } else if (gitMembers.length > 1) {
         // One folder per task, one worktree per repo inside it. The agent runs in the folder.
         const dir = path.join(dataDir(), 'tasks', slug);
@@ -371,24 +399,73 @@ export class Tasks {
           const base = await G.head(m.path);
           await G.addWorktree(m.path, wt, `desk/${slug}`, base);
           made.push({ repo: m.path, wt, branch: `desk/${slug}` });
-          task.repos.push({ name, prefix: name + '/', repo: m.path, worktree: wt, branch: `desk/${slug}`, baseRef: base, projectId: m.id });
+          out.repos.push({ name, prefix: name + '/', repo: m.path, worktree: wt, branch: `desk/${slug}`, baseRef: base, projectId: m.id });
         }
-        const guide = workspaceGuide(task.repos);
+        const guide = workspaceGuide(out.repos);
         fs.writeFileSync(path.join(dir, 'CLAUDE.md'), guide);
         fs.writeFileSync(path.join(dir, 'AGENTS.md'), guide);
-        task.cwd = dir;
-        task.folder = dir;
+        out.cwd = dir;
+        out.folder = dir;
       }
     } catch (e) {
       for (const x of made) await G.removeWorktree(x.repo, x.wt, x.branch).catch(() => {});
       throw httpError(500, `worktree를 만들지 못했어요: ${errText(e)}`);
     }
+    return out;
+  }
 
-    const snap = await this.snapshotAll(task, 'start');
-    task.messages.push({ id: randomId('m'), text: prompt, at: Date.now(), snap, source: 'start' });
-    this.store.tasks.push(task);
+  /**
+   * A general session's own folder, inside Desk's folder for them. That parent is trusted once, so
+   * Claude Code doesn't ask about each session's folder.
+   */
+  async generalFolder(slug, agent) {
+    const base = path.join(dataDir(), 'general');
+    fs.mkdirSync(base, { recursive: true, mode: 0o700 });
+    if (agent === 'claude') await trustOwnFolder(base).catch(() => {});
+    const dir = path.join(base, slug);
+    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+    return dir;
+  }
+
+  /**
+   * A general session becomes a project's: the conversation goes on, from a copy of it the way a
+   * fork starts, in that project's own worktree. What it wrote in its general folder stays there,
+   * and the folder goes when the task does.
+   */
+  async anchor(id, projectId) {
+    const task = this.need(id);
+    if (task.projectId) throw httpError(400, '이미 프로젝트에 붙은 세션이에요');
+    if (task.imported || task.watch) throw httpError(400, '불러온 세션은 프로젝트에 붙일 수 없어요');
+    if (task.agent !== 'claude') throw httpError(400, 'Codex 세션은 아직 프로젝트에 붙일 수 없어요');
+    const project = this.store.project(String(projectId || ''));
+    if (!project) throw httpError(404, '프로젝트를 찾을 수 없어요');
+    const src = this.transcriptOf(task);
+    if (!src) throw httpError(409, '대화가 시작된 뒤에 붙일 수 있어요');
+    if (['starting', 'working'].includes(task.state) && this.rt.get(id)) throw httpError(409, '지금 일하는 중이에요 · 이번 턴이 끝난 뒤에 붙여 주세요');
+    if (!LIVE.has(task.state)) throw httpError(409, '이미 정리된 작업이에요');
+    const ws = await this.workspace(this.membersOf(project), task.id.slice(1));
+    const r = this.rt.get(id);
+    if (r) {
+      const exited = new Promise((resolve) => r.proc.onExit(() => resolve()));
+      // Gone before it exits, so its exit doesn't mark the task as stopped.
+      this.rt.delete(id);
+      r.proc.kill();
+      await Promise.race([exited, delay(3000)]);
+    }
+    // The conversation so far, copied: the session resumes from it as a new one in the new folder.
+    const tmpId = randomUUID();
+    const tmpFile = path.join(path.dirname(src), `${tmpId}.jsonl`);
+    fs.writeFileSync(tmpFile, withoutCuts(fs.readFileSync(src, 'utf8').split('\n'), task.cuts).join('\n'), { mode: 0o600 });
+    this.dropForkSrc(task, true);
+    // Until it writes its own transcript in the new folder, it starts (and shows) from the copy.
+    task.forkSrc = { file: tmpFile, id: tmpId };
+    delete task.transcriptPath;
+    task.sessionId = randomUUID();
+    Object.assign(task, { projectId: project.id, repos: ws.repos, cwd: ws.cwd, anchoredAt: Date.now() });
+    if (ws.folder) task.folder = ws.folder;
+    task.remote = task.remote && this.wantsRemote(task.agent, project, true);
     this.store.save();
-    this.spawn(task, { prompt });
+    this.spawn(task, { resume: true });
     this.changed();
     return task;
   }
@@ -426,6 +503,9 @@ export class Tasks {
       AGENTDESK_HOOK_TOKEN: this.auth.hookTokenFor(task.id),
       AGENTDESK_TASK: task.id,
     });
+    // Desk takes the status line (it carries the plan's limits) and runs the person's own after it.
+    const own = task.agent === 'claude' ? ownStatusLine(task.cwd) : null;
+    if (own) env.AGENTDESK_STATUSLINE = own.command;
     const cols = task.cols || COLS;
     const rows = Math.max(task.rows || 0, ROWS);
     this.tracker(task).restart();
@@ -441,6 +521,7 @@ export class Tasks {
       mode: task.mode || undefined,
       model: task.pick?.model,
       effort: task.pick?.effort,
+      statusPadding: own?.padding,
     });
     if (task.remote) task.remoteUrl = '';
     const [file, ...pre] = commandFor(bin);
@@ -600,6 +681,8 @@ export class Tasks {
     if (!task || task.archived) return;
     const r = this.rt.get(task.id);
     const p = body.payload && typeof body.payload === 'object' ? body.payload : {};
+    // A status line refresh: only the plan's limits matter here, and it comes often.
+    if (p.hook_event_name === 'DeskStatusLine') return this.onStatusLine?.(task, p);
     // Whatever happened, the conversation on screen may have grown.
     this.convos.poke(task.id);
     if (body.agent === 'claude') {
@@ -1713,7 +1796,7 @@ export class Tasks {
       this.stop(id);
       await delay(150);
       for (const x of task.repos) await G.removeWorktree(x.repo, x.worktree, x.branch, { force: true, deleteBranch: true, unmergedOk: false });
-      if (task.folder) fs.rmSync(task.folder, { recursive: true, force: true });
+      for (const d of [task.folder, task.scratch]) if (d) fs.rmSync(d, { recursive: true, force: true });
       this.onGone?.(id);
       task.mergedInto = into.map((d) => (task.repos.length > 1 ? `${d.name}:${d.branch}` : d.branch)).join(', ');
       this.setState(task, 'merged', `${task.mergedInto}에 머지했어요`);
@@ -1771,7 +1854,7 @@ export class Tasks {
       return this.setState(task, 'discarded', '목록에서 뺐어요 · 파일은 그대로예요');
     }
     for (const x of task.repos) await G.removeWorktree(x.repo, x.worktree, x.branch, { force: true, deleteBranch: true, unmergedOk: true });
-    if (task.folder) fs.rmSync(task.folder, { recursive: true, force: true });
+    for (const d of [task.folder, task.scratch]) if (d) fs.rmSync(d, { recursive: true, force: true });
     this.setState(task, 'discarded', '버렸어요');
   }
 

@@ -8,7 +8,7 @@
 //   pnpm shots -- --only overview,settings
 //
 // Screens: home, overview, focus-perm, focus-work, focus-review, focus-reply, focus-plan, focus-codex,
-// cmdk, changes, drawer, recaps, newtile, settings, add, panel.
+// general (and its anchor dialog), cmdk, changes, drawer, recaps, newtile, settings, add, panel.
 import { _electron as electron } from '@playwright/test';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -109,6 +109,7 @@ await start('reply', 'docs', 'just answer: markdown 온보딩 문서에서 빠�
 await start('plan', 'docs', 'planmode 핸드북 목차를 팀별로 다시 짜 줘');
 await start('wait', 'infra', 'background 스테이징 빌드 돌려 놓고 결과 알려 줘');
 await start('codex', 'infra', 'create notes/vpc.md VPC 서브넷 정리', { agent: 'codex' });
+T.general = await call('POST', '/api/tasks', { agent: 'claude', prompt: 'just answer: 사내 위키 구조를 어떻게 잡을지 같이 생각해 보자' });
 await page.waitForTimeout(4500);
 
 const overview = () => page.getByTestId('view-overview').click();
@@ -124,6 +125,15 @@ for (const k of ['perm', 'work', 'review', 'reply', 'plan', 'codex'])
     await open(k);
     await shot(`focus-${k}`);
   }
+if (want('general')) {
+  await overview();
+  await page.locator(`[data-testid="tile"][data-task-id="${T.general.id}"] .oc-h`).click();
+  await page.waitForTimeout(700);
+  await shot('general');
+  await page.getByTestId('anchor').click();
+  await shot('anchor-dialog');
+  await esc();
+}
 if (want('cmdk')) {
   await open('work');
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+k' : 'Control+k');
@@ -181,6 +191,8 @@ if (want('panel')) {
     console.log('shot panel');
   }
 }
-await app.close();
+// Closing waits for the core to stop every mock session; don't let a slow one hold the script.
+await Promise.race([app.close(), new Promise((r) => setTimeout(r, 15000))]);
 fs.rmSync(tmp, { recursive: true, force: true });
 console.log(`shots in ${path.relative(process.cwd(), out) || '.'}`);
+process.exit(0);

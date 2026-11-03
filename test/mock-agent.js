@@ -11,6 +11,27 @@ import { randomUUID } from 'node:crypto';
 const kind = process.env.MOCK_KIND || 'claude';
 const argv = process.argv.slice(2);
 
+// `claude -p /usage --output-format stream-json`: the plan's limits as data (MOCK_USAGE: 5h,week,fable),
+// the way Claude Code 2.1 reports them; MOCK_USAGE_REPORT=off acts like an older CLI without it.
+if (kind === 'claude' && argv.includes('-p') && argv.includes('/usage')) {
+  const [h5, wk, fb] = (process.env.MOCK_USAGE || '62,41,18').split(',').map(Number);
+  const at = (h) => new Date(Date.now() + h * 3600_000).toISOString();
+  const report = {
+    session: { total_cost_usd: 0 },
+    rate_limits: {
+      limits: [
+        { kind: 'session', group: 'session', percent: h5, resets_at: at(3), scope: null },
+        { kind: 'weekly_all', group: 'weekly', percent: wk, resets_at: at(60), scope: null },
+        { kind: 'weekly_scoped', group: 'weekly', percent: fb, resets_at: at(60), scope: { model: { display_name: 'Fable' } } },
+      ],
+      extra_usage: { is_enabled: true, monthly_limit: 3200, used_credits: 0, utilization: null, currency: 'USD' },
+    },
+  };
+  const out = [{ type: 'system', subtype: 'init' }, { type: 'assistant', message: { content: [{ type: 'text', text: 'usage' }] }, ...(process.env.MOCK_USAGE_REPORT === 'off' ? {} : { usage_report: report }) }, { type: 'result', subtype: 'success', local_command: 'usage' }];
+  process.stdout.write(out.map((o) => JSON.stringify(o)).join('\n') + '\n');
+  process.exit(0);
+}
+
 // `claude agents --json` / `claude stop <id>`: the live-session list lives in a JSON file.
 const liveFile = process.env.MOCK_LIVE_FILE;
 if (kind === 'claude' && argv[0] === 'agents') {
@@ -73,6 +94,7 @@ if (kind === 'codex' && argv[0] === 'queue') {
 }
 
 let hooks = {};
+let statusLine;
 let notify;
 let prompt;
 let resume = false;
@@ -105,6 +127,7 @@ for (let i = 0; i < argv.length; i++) {
   else if (a === '--settings') {
     const s = JSON.parse(argv[++i]);
     for (const [ev, list] of Object.entries(s.hooks || {})) hooks[ev] = list?.[0]?.hooks?.[0];
+    if (s.statusLine?.command) statusLine = s.statusLine.command;
   } else if (a === '-c') {
     const v = argv[++i];
     if (v.startsWith('notify=')) notify = JSON.parse(v.slice(7));
@@ -182,6 +205,17 @@ function richResult(name, input, res) {
   return res;
 }
 const REJECTED = "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.";
+
+// Like Claude Code: the status line command gets the session's state, the plan's limits included,
+// after a reply (MOCK_LIVE: 5h,week percents; nothing when unset).
+function status() {
+  if (kind !== 'claude' || !statusLine || !process.env.MOCK_LIVE) return;
+  const [h5, wk] = process.env.MOCK_LIVE.split(',').map(Number);
+  const now = Math.floor(Date.now() / 1000);
+  const p = spawn('sh', ['-c', statusLine], { stdio: ['pipe', 'ignore', 'ignore'] });
+  p.on('error', () => {});
+  p.stdin.end(JSON.stringify({ session_id: sid, cwd: process.cwd(), model: { id: model }, rate_limits: { five_hour: { used_percentage: h5, resets_at: now + 7200 }, seven_day: { used_percentage: wk, resets_at: now + 86400 * 2 } } }));
+}
 
 function hook(event, extra = {}) {
   if (kind !== 'claude') return;
@@ -298,6 +332,7 @@ function finish(text) {
   tline({ type: 'system', subtype: 'turn_duration', durationMs: 900, isMeta: false });
   if (/recap|요약/i.test(text)) tline({ type: 'system', subtype: 'away_summary', content: `${reply.slice(0, 60)} 다음은 테스트를 더 넣는 거예요. (disable recaps in /config)` });
   hook('Stop', { last_assistant_message: reply });
+  status();
   notifyCodex({ type: 'agent-turn-complete', 'last-assistant-message': reply });
 }
 

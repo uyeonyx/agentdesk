@@ -17,8 +17,13 @@ export function Home() {
     return (
       <div class="home">
         <div class="home-c narrow">
-          <h1>프로젝트부터 추가해 주세요</h1>
-          <p class="muted">git 저장소를 고르면 작업마다 별도 worktree에서 에이전트가 일해요. 서로 부딪히지 않아요.</p>
+          <button class="home-ask" onClick={() => openCommand('new')}>
+            <I n="plus" />
+            <span>프로젝트 없이 바로 시작</span>
+            <kbd>{keyLabel('new') || 'N'}</kbd>
+          </button>
+          <h1>프로젝트를 추가하면</h1>
+          <p class="muted">git 저장소를 고르면 작업마다 별도 worktree에서 에이전트가 일해요. 서로 부딪히지 않아요. 프로젝트 없이 시작한 세션도 나중에 프로젝트에 붙일 수 있어요.</p>
           <div class="home-add">
             <AddProjectBody />
           </div>
