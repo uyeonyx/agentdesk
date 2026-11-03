@@ -265,18 +265,15 @@ export function httpError(status, message) {
 
 const SKIP = new Set(['node_modules', 'Library', 'Applications', 'Pictures', 'Movies', 'Music', 'Documents', 'Desktop', 'Downloads', '.Trash', 'vendor', 'target', 'dist', 'build', '.cache', 'Pods']);
 
-/** Find git repos under common code folders (skips macOS-protected folders to avoid permission prompts). */
-export function discoverRepos(existing) {
-  const home = os.homedir();
-  const roots = ['Projects', 'projects', 'dev', 'Dev', 'Developer', 'code', 'Code', 'src', 'work', 'Work', 'workspace', 'repos', 'git', 'github', 'GitHub', 'sites']
-    .map((d) => path.join(home, d))
-    .filter((d) => fs.existsSync(d));
-  roots.push(home);
+/**
+ * Walk folders for git repos, newest first. A repo isn't walked into; hidden and build folders are
+ * skipped, and so are macOS-protected ones unless the person picked a folder under them.
+ */
+function findRepos(roots, { skip = SKIP, deadlineMs = 1500, max = 150, known = new Set() } = {}) {
   const found = new Map();
-  const deadline = Date.now() + 1500;
-  const known = new Set(existing.map((p) => p.path));
+  const deadline = Date.now() + deadlineMs;
   const walk = (dir, depth) => {
-    if (Date.now() > deadline || found.size >= 150) return;
+    if (Date.now() > deadline || found.size >= max) return;
     let entries;
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
@@ -284,23 +281,60 @@ export function discoverRepos(existing) {
       return;
     }
     if (entries.some((e) => e.name === '.git')) {
-      if (!known.has(dir)) {
+      if (!found.has(dir)) {
         let mtime = 0;
         try {
           mtime = fs.statSync(path.join(dir, '.git')).mtimeMs;
         } catch {}
-        found.set(dir, { path: dir, display: tilde(dir), name: path.basename(dir), mtime });
+        found.set(dir, { path: dir, display: tilde(dir), name: path.basename(dir), mtime, added: known.has(dir) });
       }
       return;
     }
     if (depth <= 0) return;
     for (const e of entries) {
-      if (!e.isDirectory() || e.name.startsWith('.') || SKIP.has(e.name)) continue;
+      if (!e.isDirectory() || e.name.startsWith('.') || skip.has(e.name)) continue;
       walk(path.join(dir, e.name), depth - 1);
     }
   };
-  for (const r of roots) walk(r, r === home ? 1 : 3);
-  return [...found.values()].sort((a, b) => b.mtime - a.mtime).slice(0, 60);
+  for (const [r, depth] of roots) walk(r, depth);
+  return [...found.values()].sort((a, b) => b.mtime - a.mtime);
+}
+
+/** Find git repos under common code folders (skips macOS-protected folders to avoid permission prompts). */
+export function discoverRepos(existing) {
+  const home = os.homedir();
+  const roots = ['Projects', 'projects', 'dev', 'Dev', 'Developer', 'code', 'Code', 'src', 'work', 'Work', 'workspace', 'repos', 'git', 'github', 'GitHub', 'sites']
+    .map((d) => path.join(home, d))
+    .filter((d) => fs.existsSync(d))
+    .map((d) => [d, 3]);
+  roots.push([home, 1]);
+  const known = new Set(existing.map((p) => p.path));
+  return findRepos(roots, { known })
+    .filter((r) => !r.added)
+    .slice(0, 120);
+}
+
+/**
+ * A folder the person picked or dropped: is it a repo itself (or inside one), and which repos are in
+ * it. Walked deeper than discovery, since they chose it.
+ */
+export async function inspectFolder(input, existing) {
+  const p = String(input || '').trim().replace(/^~(?=$|[\\/])/, os.homedir());
+  if (!p || !path.isAbsolute(p)) throw httpError(400, '절대 경로여야 해요');
+  let real;
+  try {
+    real = realPath(p);
+    if (!fs.statSync(real).isDirectory()) throw new Error();
+  } catch {
+    throw httpError(400, `폴더를 찾을 수 없어요: ${tilde(p)}`);
+  }
+  const known = new Set(existing.filter((x) => x.kind !== 'group').map((x) => x.path));
+  const git = await isRepo(real);
+  const root = git ? realPath(await repoRoot(real)) : real;
+  const self = { path: root, display: tilde(root), name: path.basename(root), git, added: known.has(root) };
+  if (git) return { self, repos: [] };
+  const skip = new Set([...SKIP].filter((n) => !['Documents', 'Desktop', 'Downloads'].includes(n)));
+  return { self, repos: findRepos([[real, 4]], { skip, deadlineMs: 2500, max: 200, known }) };
 }
 
 /** Folder autocomplete for the add-project field. */

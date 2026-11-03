@@ -515,6 +515,24 @@ async function runApp() {
   ipcMain.on('desk:reveal', (e, p) => {
     if (isTrustedFrame(e.senderFrame) && typeof p === 'string' && path.isAbsolute(p) && fs.existsSync(p)) shell.showItemInFolder(p);
   });
+  // The system's own folder picker, for adding projects. Only the chosen paths come back; it opens
+  // where the last pick was.
+  let lastPickDir = null;
+  ipcMain.handle('desk:pick-folders', async (e) => {
+    if (!isTrustedFrame(e.senderFrame)) return [];
+    const owner = BrowserWindow.fromWebContents(e.sender);
+    const opts = {
+      title: '프로젝트 폴더 고르기',
+      buttonLabel: '고르기',
+      message: 'git 저장소나, 저장소가 들어 있는 폴더를 고르세요',
+      defaultPath: lastPickDir && fs.existsSync(lastPickDir) ? lastPickDir : app.getPath('home'),
+      properties: ['openDirectory', 'multiSelections', 'createDirectory'],
+    };
+    const r = owner ? await dialog.showOpenDialog(owner, opts) : await dialog.showOpenDialog(opts);
+    if (r.canceled || !r.filePaths?.length) return [];
+    lastPickDir = path.dirname(r.filePaths[0]);
+    return r.filePaths.slice(0, 50);
+  });
 
   // ------------------------------------------------------------ updates (see updater.js)
 

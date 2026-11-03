@@ -395,12 +395,21 @@ function AddProject() {
   );
 }
 
+const matches = (r, q) => !q || r.name.toLowerCase().includes(q) || r.display.toLowerCase().includes(q);
+
+/**
+ * Adding a folder: pick it in the system's folder picker or drop it from Finder / Explorer, take one
+ * that was found near home, or type its path. A folder that isn't a repo but holds some lists them.
+ */
 export function AddProjectBody({ onAdded }) {
   const [path, setPath] = useState('');
   const [dirs, setDirs] = useState([]);
   const [di, setDi] = useState(-1);
   const [found, setFound] = useState(null);
+  const [inside, setInside] = useState(null); // { self, repos } of a picked folder that holds repos
+  const [q, setQ] = useState('');
   const [busy, setBusy] = useState(false);
+  const [drag, setDrag] = useState(false);
   useEffect(() => {
     api('GET', '/api/discover')
       .then((r) => setFound(r.repos))
@@ -412,21 +421,88 @@ export function AddProjectBody({ onAdded }) {
     return () => clearTimeout(t);
   }, [path]);
 
-  async function add(p) {
+  const done = (list) => {
+    setPath('');
+    const gone = new Set(list.map((p) => p.path));
+    setFound((f) => f?.filter((x) => !gone.has(x.path)));
+    setInside((x) => (x ? { ...x, repos: x.repos.map((r) => (gone.has(r.path) ? { ...r, added: true } : r)) } : x));
+    if (get().modal?.kind === 'addProject') closeModal();
+    const one = list[0];
+    if (list.length === 1) toast(`${one.name} 추가했어요${one.desc ? ` · ${one.desc}` : ''}`, { projectId: one.id, ms: 6000, action: { label: '꾸미기', run: () => set({ screen: 'settings', settingsTab: 'projects', settingsProject: one.id }) } });
+    else toast(`프로젝트 ${list.length}개 추가했어요 · ${list.map((p) => p.name).join(', ')}`, { ms: 6000 });
+    for (const p of list) onAdded?.(p);
+  };
+
+  /** Add folders by path, one after another; the ones that fail say why and the rest still go in. */
+  async function add(paths) {
     if (busy) return;
     setBusy(true);
-    try {
-      const proj = await api('POST', '/api/projects', { path: p });
-      setPath('');
-      setFound((f) => f?.filter((x) => x.path !== proj.path));
-      if (get().modal?.kind === 'addProject') closeModal();
-      onAdded?.(proj);
-      toast(`${proj.name} 추가했어요${proj.desc ? ` · ${proj.desc}` : ''}`, { projectId: proj.id, ms: 6000, action: { label: '꾸미기', run: () => set({ screen: 'settings', settingsTab: 'projects', settingsProject: proj.id }) } });
-    } catch (e) {
-      toast(e.message, { kind: 'err' });
+    const ok = [];
+    for (const p of [].concat(paths)) {
+      try {
+        ok.push(await api('POST', '/api/projects', { path: p }));
+      } catch (e) {
+        toast(e.message, { kind: 'err' });
+      }
     }
     setBusy(false);
+    if (ok.length) done(ok);
   }
+
+  /**
+   * Folders that were picked or dropped: a repo (or a folder in one) goes straight in, and so does a
+   * plain folder with no repos in it; one that holds repos lists them to choose from.
+   */
+  async function take(paths) {
+    if (!paths.length || busy) return;
+    setBusy(true);
+    const direct = [];
+    let holder = null;
+    for (const p of paths) {
+      try {
+        const r = await api('GET', `/api/inspect?path=${encodeURIComponent(p)}`);
+        if (r.self.git || !r.repos.length) {
+          if (r.self.added) toast(`${r.self.name}은(는) 이미 추가된 프로젝트예요`);
+          else direct.push(r.self.path);
+        } else holder = holder ? { self: holder.self, repos: [...holder.repos, ...r.repos], many: true } : r;
+      } catch (e) {
+        toast(e.message, { kind: 'err' });
+      }
+    }
+    setBusy(false);
+    if (holder) {
+      setInside(holder);
+      setQ('');
+    }
+    if (direct.length) await add(direct);
+  }
+
+  const pick = async () => take(await window.desk.pickFolders?.().catch(() => []) || []);
+  const dropped = (e) => {
+    const files = [...(e.dataTransfer?.files || [])];
+    if (!files.length) return;
+    e.preventDefault();
+    setDrag(false);
+    take(files.map((f) => window.desk.pathOf?.(f)).filter(Boolean));
+  };
+  const over = (e) => {
+    if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setDrag(true);
+  };
+  // ⌘O / Ctrl+O opens the picker while this is on screen.
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'o') {
+        e.preventDefault();
+        pick();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
+
   const onKey = (e) => {
     if (e.isComposing || e.keyCode === 229) return;
     if (e.key === 'ArrowDown' && dirs.length) {
@@ -444,47 +520,93 @@ export function AddProjectBody({ onAdded }) {
       if (di >= 0 && dirs[di]) {
         setPath(dirs[di].display);
         setDi(-1);
-      } else if (path.trim()) add(path.trim().replace(/\/$/, ''));
+      } else if (path.trim()) take([path.trim().replace(/[\\/]$/, '') || path.trim()]);
     }
   };
+
+  const ql = q.trim().toLowerCase();
+  const list = inside ? inside.repos : found || [];
+  const shown = list.filter((r) => matches(r, ql));
   return (
-    <div class="addp">
-      <label class="lbl">폴더 경로</label>
-      <div class="row-gap rel">
-        <input class="field mono" autofocus placeholder="~/projects/todo-app" value={path} onInput={(e) => (setPath(e.currentTarget.value), setDi(-1))} onKeyDown={onKey} spellcheck={false} autocomplete="off" />
-        <button class="btn" disabled={!path.trim() || busy} onClick={() => add(path.trim().replace(/\/$/, ''))}>
-          추가
+    <div class={`addp ${drag ? 'drag' : ''}`} onDragOver={over} onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget) && setDrag(false)} onDrop={dropped} data-testid="add-project">
+      <div class="ap-drop" data-testid="add-drop">
+        <I n={drag ? 'download' : 'folder-open'} />
+        <div class="tx">
+          <b>{drag ? '여기에 놓으면 추가해요' : '폴더를 여기로 끌어 놓거나 골라 주세요'}</b>
+          <small>git 저장소는 바로 추가하고, 저장소가 여러 개 든 폴더면 그 안에서 고를 수 있어요</small>
+        </div>
+        <button class="btn primary" onClick={pick} disabled={busy} data-testid="pick-folder">
+          <I n="folder-search" /> 폴더 고르기… <kbd>{mod}O</kbd>
         </button>
-        {dirs.length > 0 && (
-          <div class="dd glass-3">
-            {dirs.map((d, i) => (
-              <button key={d.path} class={`li ${i === di ? 'on' : ''}`} onMouseDown={(e) => (e.preventDefault(), setPath(d.display))}>
-                <I n={d.git ? 'git-branch' : 'folder'} />
-                <span class="m mono">{d.display}</span>
-                <span class="r">{d.git ? 'git' : ''}</span>
-              </button>
-            ))}
-          </div>
+      </div>
+
+      <div class="ap-head">
+        {inside ? (
+          <>
+            <button class="btn sm ghost" onClick={() => (setInside(null), setQ(''))} data-tip="근처에서 찾은 저장소로">
+              <I n="arrow-left" />
+            </button>
+            <label class="lbl" title={inside.many ? undefined : inside.self.display}>
+              {inside.many ? '고른 폴더' : `「${inside.self.name}」`} 안의 git 저장소 <span class="num">{inside.repos.length}</span>
+            </label>
+          </>
+        ) : (
+          <label class="lbl">
+            홈 폴더 근처에서 찾은 git 저장소 {found?.length ? <span class="num">{found.length}</span> : null}
+          </label>
+        )}
+        <span class="sp" />
+        {list.length > 6 && (
+          <span class="ap-q">
+            <I n="search" />
+            <input class="field sm" placeholder="이름·경로로 찾기" value={q} onInput={(e) => setQ(e.currentTarget.value)} spellcheck={false} data-testid="add-filter" />
+          </span>
         )}
       </div>
-      <small class="muted">
-        <kbd>Tab</kbd> 자동완성 · <kbd>↵</kbd> 추가
-      </small>
-      <label class="lbl">찾은 git 저장소</label>
-      {found === null && <div class="muted">찾는 중…</div>}
-      {found && !found.length && <div class="muted">홈 폴더 근처에서 찾지 못했어요. 위에 경로를 직접 입력해 주세요.</div>}
-      <div class="list">
-        {(found || []).slice(0, 14).map((r) => (
-          <button key={r.path} class="li" onClick={() => add(r.path)} disabled={busy}>
+      {!inside && found === null && <div class="muted">찾는 중…</div>}
+      {!inside && found && !found.length && <div class="muted">홈 폴더 근처에서 찾지 못했어요. 위에서 폴더를 골라 주세요.</div>}
+      {list.length > 0 && !shown.length && <div class="muted">「{q}」와 맞는 저장소가 없어요</div>}
+      <div class="list" data-testid="add-list">
+        {shown.map((r) => (
+          <button key={r.path} class="li" onClick={() => add(r.path)} disabled={busy || r.added}>
             <I n="git-branch" />
             <span class="m">
               {r.name}
-              <small>{r.display}</small>
+              <small title={r.display}>{inside && !inside.many && r.path.startsWith(inside.self.path) ? r.path.slice(inside.self.path.length + 1) : r.display}</small>
             </span>
-            <I n="plus" />
+            {r.added ? <span class="r">추가됨</span> : <I n="plus" />}
           </button>
         ))}
       </div>
+      {inside && !inside.many && !inside.self.added && (
+        <button class="btn sm ghost ap-self" onClick={() => add(inside.self.path)} disabled={busy}>
+          <I n="folder" /> 저장소가 아니어도 <span class="mono">{inside.self.name}</span> 폴더 그대로 추가
+        </button>
+      )}
+
+      <details class="ap-path" open={!!path}>
+        <summary>경로로 입력</summary>
+        <div class="row-gap rel">
+          <input class="field mono" placeholder="~/projects/todo-app" value={path} onInput={(e) => (setPath(e.currentTarget.value), setDi(-1))} onKeyDown={onKey} spellcheck={false} autocomplete="off" />
+          <button class="btn" disabled={!path.trim() || busy} onClick={() => take([path.trim().replace(/[\\/]$/, '') || path.trim()])}>
+            추가
+          </button>
+          {dirs.length > 0 && (
+            <div class="dd glass-3">
+              {dirs.map((d, i) => (
+                <button key={d.path} class={`li ${i === di ? 'on' : ''}`} onMouseDown={(e) => (e.preventDefault(), setPath(d.display))}>
+                  <I n={d.git ? 'git-branch' : 'folder'} />
+                  <span class="m mono">{d.display}</span>
+                  <span class="r">{d.git ? 'git' : ''}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <small class="muted">
+          <kbd>Tab</kbd> 자동완성 · <kbd>↵</kbd> 추가
+        </small>
+      </details>
     </div>
   );
 }

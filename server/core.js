@@ -6,7 +6,7 @@ import path from 'node:path';
 import { Auth } from './security.js';
 import { Store } from './store.js';
 import { Tasks } from './tasks.js';
-import { addProject, updateProject, removeProject, discoverRepos, listDirs, httpError, PALETTE, ICONS, autofill, backfill, setCustomLogo, clearCustomLogo, customLogoPath } from './projects.js';
+import { addProject, updateProject, removeProject, discoverRepos, inspectFolder, listDirs, httpError, PALETTE, ICONS, autofill, backfill, setCustomLogo, clearCustomLogo, customLogoPath } from './projects.js';
 import { safeLogo } from './describe.js';
 import { availability, configureHooks } from './agents.js';
 import { listThemes, saveTheme, removeTheme } from './themes.js';
@@ -102,6 +102,8 @@ export async function startCore({ quiet = false, sock, hookClient } = {}) {
 
     if (a === 'state' && method === 'GET') return publicState();
     if (a === 'discover' && method === 'GET') return { repos: discoverRepos(store.projects) };
+    // A folder the person picked or dropped: the repo it is, or the repos inside it.
+    if (a === 'inspect' && method === 'GET') return await inspectFolder(url.searchParams.get('path'), store.projects);
     if (a === 'usage' && method === 'GET') return usage.view();
     // Claude Code's own MCP servers and permission rules, for everything or for one project's folder.
     if (a === 'agentconfig') {

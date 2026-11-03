@@ -1428,6 +1428,113 @@ input[type='range'] {
   max-height: 300px;
   overflow: auto;
 }
+/* The drop target and the picker: the first thing on the sheet. */
+.ap-drop {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 16px 16px 16px 18px;
+  border-radius: var(--r-3);
+  border: 1.5px dashed var(--line-strong);
+  background: var(--bg-inset);
+  transition:
+    border-color var(--dur-2),
+    background var(--dur-2);
+}
+.ap-drop > .ti {
+  font-size: 28px;
+  color: var(--text-3);
+}
+.ap-drop .tx {
+  flex: 1;
+  min-width: 0;
+}
+.ap-drop .tx b {
+  display: block;
+  font-weight: var(--w-3);
+}
+.ap-drop .tx small {
+  display: block;
+  margin-top: 3px;
+  color: var(--text-3);
+  font-size: var(--fs-2);
+  line-height: var(--lh-2);
+}
+.ap-drop .btn {
+  flex: none;
+}
+.addp.drag .ap-drop {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.addp.drag .ap-drop > .ti {
+  color: var(--accent-text);
+}
+.ap-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 16px 0 6px;
+  min-height: 28px;
+}
+.ap-head .lbl {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ap-head .lbl .num {
+  margin-left: 4px;
+  color: var(--text-3);
+}
+.ap-q {
+  position: relative;
+  flex: 0 1 200px;
+}
+.ap-q .ti {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-3);
+  pointer-events: none;
+}
+.ap-q .field {
+  height: 28px;
+  padding-left: 28px;
+  font-size: var(--fs-2);
+}
+.addp .li .r {
+  color: var(--text-3);
+  font-size: var(--fs-2);
+}
+.ap-self {
+  margin-top: 6px;
+}
+.ap-path {
+  margin-top: 14px;
+}
+.ap-path summary {
+  width: max-content;
+  cursor: pointer;
+  font-size: var(--fs-2);
+  font-weight: var(--w-3);
+  color: var(--text-2);
+}
+.ap-path summary:hover {
+  color: var(--text);
+}
+.ap-path[open] summary {
+  margin-bottom: 8px;
+}
+.ap-path > small {
+  display: block;
+  margin-top: 6px;
+}
+.addp .li {
+  flex: none;
+}
 .addp .li small {
   display: block;
   margin: 0;

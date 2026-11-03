@@ -413,6 +413,59 @@ test('island: with another app in front it shows what waits, unfolds for a permi
   await call('POST', `/api/tasks/${t.id}/discard`);
 });
 
+test('adding a project: a picked repo goes straight in; a picked folder of repos lists them to choose from', async () => {
+  const top = path.join(tmp, 'clients');
+  makeRepo(path.join(top, 'shop', 'web'));
+  makeRepo(path.join(top, 'shop', 'api'));
+  const solo = makeRepo(path.join(tmp, 'picked-solo'));
+  await project('repo-add');
+  const sheet = page.getByRole('dialog', { name: '프로젝트 추가' });
+  const open = async () => {
+    await page.getByTestId('project-switch').click();
+    await page.getByRole('dialog', { name: '프로젝트 고르기' }).getByRole('button', { name: '프로젝트 추가' }).click();
+    await expect(sheet).toBeVisible();
+  };
+  // The system picker answers with these folders. A release build keeps its main process closed to
+  // Playwright, so there the path field stands in for it (the same route once a folder is chosen).
+  const pick = async (dir) => {
+    if (app) {
+      await app.evaluate(({ dialog }, p) => {
+        dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [p] });
+      }, dir);
+      await sheet.getByTestId('pick-folder').click();
+    } else {
+      await sheet.getByText('경로로 입력').click();
+      await sheet.getByPlaceholder('~/projects/todo-app').fill(dir);
+      await sheet.getByPlaceholder('~/projects/todo-app').press('Enter');
+    }
+  };
+  const paths = async () => (await call('GET', '/api/state')).projects.map((p) => p.path);
+
+  await open();
+  await expect(sheet.getByTestId('add-drop')).toContainText('끌어 놓거나');
+  await pick(solo);
+  await expect(sheet).toBeHidden();
+  await expect.poll(paths).toContain(fs.realpathSync(solo));
+
+  await open();
+  await pick(top);
+  const list = sheet.getByTestId('add-list');
+  await expect(sheet).toContainText('안의 git 저장소');
+  await expect(list.getByRole('button')).toHaveCount(2);
+  await list.getByRole('button', { name: /web/ }).click();
+  await expect(sheet).toBeHidden();
+  await expect.poll(paths).toContain(fs.realpathSync(path.join(top, 'shop', 'web')));
+
+  // Picked again, the one already in is marked and can't be added twice.
+  await open();
+  await pick(top);
+  await expect(list.getByRole('button', { name: /web/ })).toBeDisabled();
+  await expect(list.getByRole('button', { name: /web/ })).toContainText('추가됨');
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  for (const p of (await call('GET', '/api/state')).projects.filter((p) => /picked-solo|clients|repo-add/.test(p.path))) await call('DELETE', `/api/projects/${p.id}`);
+});
+
 test('관제 new-session tile: project, start mode and model, then it runs in that mode', async () => {
   await page.getByTestId('view-overview').click();
   await navMode();

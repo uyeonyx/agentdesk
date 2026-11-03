@@ -92,6 +92,10 @@ contextBridge.exposeInMainWorld('desk', {
   reveal(p) {
     ipcRenderer.send('desk:reveal', String(p));
   },
+  /** The system folder picker: the chosen folders' paths, or [] when cancelled. */
+  pickFolders() {
+    return ipcRenderer.invoke('desk:pick-folders');
+  },
   /** The path of a file dropped on the page (the composer turns it into a reference). */
   pathOf(file) {
     try {
