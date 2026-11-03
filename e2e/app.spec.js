@@ -445,7 +445,7 @@ test('adding a project: a picked repo goes straight in; a picked folder of repos
   await expect(sheet.getByTestId('add-drop')).toContainText('끌어 놓거나');
   await pick(solo);
   await expect(sheet).toBeHidden();
-  await expect.poll(paths).toContain(fs.realpathSync(solo));
+  await expect.poll(paths).toContain(fs.realpathSync.native(solo));
 
   await open();
   await pick(top);
@@ -454,7 +454,7 @@ test('adding a project: a picked repo goes straight in; a picked folder of repos
   await expect(list.getByRole('button')).toHaveCount(2);
   await list.getByRole('button', { name: /web/ }).click();
   await expect(sheet).toBeHidden();
-  await expect.poll(paths).toContain(fs.realpathSync(path.join(top, 'shop', 'web')));
+  await expect.poll(paths).toContain(fs.realpathSync.native(path.join(top, 'shop', 'web')));
 
   // Picked again, the one already in is marked and can't be added twice.
   await open();

@@ -18,11 +18,11 @@ test('a repo, or a folder inside one, is the repo itself', async () => {
   const r = await inspect(repo);
   assert.equal(r.status, 200);
   assert.equal(r.json.self.git, true);
-  assert.equal(r.json.self.path, fs.realpathSync(repo));
+  assert.equal(r.json.self.path, fs.realpathSync.native(repo));
   assert.deepEqual(r.json.repos, []);
   const sub = await inspect(path.join(repo, 'src'));
   assert.equal(sub.json.self.git, true);
-  assert.equal(sub.json.self.path, fs.realpathSync(repo));
+  assert.equal(sub.json.self.path, fs.realpathSync.native(repo));
 });
 
 test('a folder of repos lists them, deep ones and ones under Documents included, the added ones marked', async () => {
