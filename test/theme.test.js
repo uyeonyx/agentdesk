@@ -132,36 +132,42 @@ test('built-ins: ids are unique, defaults exist, every definition normalizes cle
 });
 
 for (const t of BUILTIN_THEMES) {
-  test(`derive: ${t.id} is complete, readable, and leaves the app's own palette alone`, () => {
+  test(`derive: ${t.id} is complete, readable, and colors the whole app`, () => {
     const d = deriveTokens(t);
     assertComplete(d, t.id);
-    // Surfaces, lines and text are the hand-set palette for this kind of screen, whatever the theme.
     const own = themeApi.BASE[t.kind];
-    for (const k of ['bg', 'surface', 'line', 'text', 'text-2', 'text-3', 'accent-fill', 'warn', 'ok']) assert.equal(d.vars[`--${k}`], own[k], `${t.id}: --${k}`);
+    if (t.id.startsWith('desk-')) {
+      // Desk Light and Desk Dark are the hand-set screens, value for value.
+      for (const [k, v] of Object.entries(own)) assert.equal(d.vars[`--${k}`], v, `${t.id}: --${k}`);
+    } else if (!t.ui?.['bg-surface']) {
+      // Any other theme paints the panels in its own background.
+      assert.equal(d.vars['--surface'], toHex(t.base.bg), `${t.id}: surface`);
+    }
   });
 }
 
-test('accents: every accent keeps the contract on both screens; blue and unknown ids are the standard', () => {
-  for (const kind of ['light', 'dark']) {
-    const t = BUILTIN_THEMES.find((x) => x.kind === kind);
+test('accents: every accent keeps the contract on both screens and on other themes; "theme" keeps the theme\'s own', () => {
+  for (const t of [...['light', 'dark'].map((k) => BUILTIN_THEMES.find((x) => x.id === `desk-glass-${k}`)), BUILTIN_THEMES.find((x) => x.id === 'dracula'), BUILTIN_THEMES.find((x) => x.id === 'solarized-light')]) {
+    const kind = t.kind;
     for (const a of themeApi.ACCENTS) {
       const d = deriveTokens(t, { accent: a.id });
-      assertComplete(d, `${kind}+${a.id}`);
-      assert.equal(d.vars['--accent-fill'], kind === 'light' ? a.light : a.dark, `${kind}+${a.id}: accent`);
+      assertComplete(d, `${t.id}+${a.id}`);
+      assert.equal(d.vars['--accent-fill'], kind === 'light' ? a.light : a.dark, `${t.id}+${a.id}: accent`);
     }
     const std = deriveTokens(t).vars;
     assert.deepEqual(deriveTokens(t, { accent: 'nope' }).vars, std);
-    assert.deepEqual(deriveTokens(t, { accent: 'blue' }).vars, std);
+    assert.deepEqual(deriveTokens(t, { accent: 'theme' }).vars, std);
+    if (t.id.startsWith('desk-')) assert.deepEqual(deriveTokens(t, { accent: 'blue' }).vars, std);
   }
 });
 
-test('derive: a theme cannot repaint the app, only its code', () => {
-  const base = BUILTIN_THEMES[0];
-  const d = deriveTokens({ ...base, ui: { 'syn-keyword': '#ff00aa', 'text-3': '#17181d', accent: '#33cc99', 'bg-raised': '#222233' } });
+test('derive: a theme colors the app through the palette roles, and can\'t make it unreadable', () => {
+  const nord = BUILTIN_THEMES.find((x) => x.id === 'nord');
+  const d = deriveTokens({ ...nord, ui: { 'syn-keyword': '#ff00aa', 'text-3': '#3b4252', accent: '#33cc99' } });
   assert.equal(d.vars['--syn-keyword'], '#ff00aa');
-  assert.equal(d.vars['--accent-fill'], themeApi.BASE[base.kind]['accent-fill']);
-  assert.equal(d.vars['--text-3'], themeApi.BASE[base.kind]['text-3']);
-  assert.equal(d.vars['--surface'], themeApi.BASE[base.kind].surface);
+  // Its accent is used (hue kept), its unreadable gray is lifted until it reads.
+  assert.ok(Math.abs(toOklch(d.vars['--accent-fill']).h - toOklch('#33cc99').h) < 8, 'accent hue');
+  assert.ok(contrast(d.vars['--text-3'], d.vars['--surface']) >= 4.5, 'text-3 readable');
   assert.equal(d.vars['--bg-raised'], undefined);
 });
 

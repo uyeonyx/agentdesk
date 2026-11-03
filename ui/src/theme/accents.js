@@ -1,6 +1,6 @@
-// Accent colors a person can pick for the app (primary buttons, selection, meters). Each has a
-// light-screen and a dark-screen shade; the rest of the set (text, soft fill, ink) is worked out so
-// it reads on the app's own surfaces. Blue is the standard and needs no override.
+// Accent colors a person can lay over any theme (primary buttons, selection, meters), or "theme" for
+// the theme's own. Each has a light-screen and a dark-screen shade; the rest of the set (text, soft
+// fill, ink) is worked out so it reads on that theme's surfaces.
 import { parseColor, toHex, mix, contrast, ensureContrast } from './color.js';
 import { BASE } from './base.js';
 
@@ -13,11 +13,13 @@ export const ACCENTS = [
   { id: 'graphite', name: '흑연', light: '#3b4350', dark: '#c7cdd6' },
 ];
 
-/** The accent tokens for a picked accent, or null for the standard blue (and unknown ids). */
-export function accentSet(id, kind) {
+/** The accent tokens for a picked accent over a palette, or null to keep the palette's own. */
+export function accentSet(id, kind, palette = null) {
+  const own = BASE[kind === 'light' ? 'light' : 'dark'];
+  const p = palette || own;
   const a = ACCENTS.find((x) => x.id === id);
-  if (!a || a.id === 'blue') return null;
-  const p = BASE[kind === 'light' ? 'light' : 'dark'];
+  // Blue on Desk's own screens is already the hand-set accent.
+  if (!a || (a.id === 'blue' && p === own)) return null;
   const fill = parseColor(kind === 'light' ? a.light : a.dark);
   const surface = parseColor(p.surface);
   const white = parseColor('#ffffff');

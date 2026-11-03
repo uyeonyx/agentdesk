@@ -1,6 +1,10 @@
-// The app's own two palettes, set by hand (0.7 standard: instrument panel, color strength 85).
-// Every surface, line, text and signal color on screen comes from here. A theme only supplies the
-// terminal, code and diff colors (see derive.js), so no theme can make the app itself muddy.
+// The app's own two palettes, set by hand (0.7 standard: instrument panel, color strength 85). These
+// are Desk Light and Desk Dark, and the shape every other theme is laid onto (palette.js): the same
+// roles, steps and contrast floors, filled with that theme's colors.
+
+import { parseColor, contrast, WHITE } from './color.js';
+
+const INK = parseColor('#05070a');
 
 const LIGHT = {
   bg: '#f4f6fb',
@@ -108,16 +112,13 @@ const DARK = {
 
 export const BASE = { light: LIGHT, dark: DARK };
 
-/** The CSS variables for one palette, with the picked accent's colors laid over it. */
-export function uiVars(kind, accent) {
-  const p = { ...BASE[kind === 'light' ? 'light' : 'dark'], ...(accent || {}) };
+/** The CSS variables for one palette (a theme's, or the hand-set one), with the picked accent over it. */
+export function uiVars(kind, accent, palette = BASE[kind === 'light' ? 'light' : 'dark']) {
+  const p = { ...palette, ...(accent || {}) };
   const v = {};
   for (const [k, c] of Object.entries(p)) v[`--${k}`] = c;
-  // Ink on a solid status color: dark on both screens (these fills are light enough to need it).
-  const dark = kind !== 'light';
-  v['--warn-ink'] = dark ? '#1a1206' : '#1a1e26';
-  v['--ok-ink'] = dark ? '#0b1a12' : '#1a1e26';
-  v['--danger-ink'] = dark ? '#1a0b09' : '#05070a';
+  // Ink on a solid status color: near-black, or white when the color is too deep for it.
+  for (const s of ['warn', 'ok', 'danger']) v[`--${s}-ink`] = contrast(INK, parseColor(p[s])) >= contrast(WHITE, parseColor(p[s])) ? '#05070a' : '#ffffff';
   return v;
 }
 

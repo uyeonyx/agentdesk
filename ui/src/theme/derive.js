@@ -1,11 +1,11 @@
-// Theme definition -> the colors of code: the terminal (xterm), the editor (Monaco) and syntax tokens.
-// The app's own surfaces, lines, text and signals don't come from a theme: they're the hand-set
-// palette in base.js for the kind of screen (light or dark), with the picked accent.
+// Theme definition -> the full token set: the app's palette (palette.js lays the theme onto the roles
+// of base.js), the terminal (xterm), the editor (Monaco) and syntax tokens.
 import {
   parseColor, toCss, toHex, withAlpha, mix, over, contrast, ensureContrast, toOklch, shiftL, WHITE,
 } from './color.js';
 import { normalizeTheme, SYNTAX_KEYS, ANSI_NAMES } from './schema.js';
 import { uiVars } from './base.js';
+import { themePalette } from './palette.js';
 import { accentSet } from './accents.js';
 
 const AA = 4.5;
@@ -163,9 +163,9 @@ export function deriveTokens(input, { accent: accentId = null } = {}) {
     },
   };
 
-  // The app's own surfaces, lines, text and signals: the hand-set palette for this kind of screen.
-  // What came from the theme above stays only where code is shown (terminal, editor, syntax, diff).
-  const own = uiVars(t.kind, accentSet(accentId, t.kind));
+  // The app's surfaces, lines, text and signals: the theme laid onto the palette's roles.
+  const pal = themePalette(t);
+  const own = uiVars(t.kind, accentSet(accentId, t.kind, pal), pal);
   Object.assign(vars, own);
   return { kind: t.kind, vars, xterm, monaco, chrome: { bg: own['--chrome'], fg: own['--text'] } };
 }

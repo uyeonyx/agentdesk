@@ -573,27 +573,29 @@ test('⌘J opens the raw terminal of the agent', async () => {
   await call('POST', `/api/tasks/${t.id}/discard`);
 });
 
-test('themes: the screen is light or dark, and a code theme colors the terminal only', async () => {
+test('themes: a theme colors the whole app, one for the light screen and one for the dark', async () => {
   // Settings open on the tab used last; the theme tab, whatever came before.
   if (!(await page.locator('.settings').isVisible())) await page.keyboard.press(`${MOD}+Comma`);
   await page.locator('.st-nav').getByRole('button', { name: '테마' }).click();
   const vars = () => page.evaluate(() => {
     const cs = getComputedStyle(document.documentElement);
-    return { bg: cs.getPropertyValue('--bg').trim(), surface: cs.getPropertyValue('--surface').trim(), term: cs.getPropertyValue('--term-bg').trim() };
+    return { surface: cs.getPropertyValue('--surface').trim(), term: cs.getPropertyValue('--term-bg').trim() };
   });
   await page.getByTestId('screen-dark').click();
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.themeKind)).toBe('dark');
   const before = await vars();
   await page.locator('[data-testid="theme-card"][data-theme-id="cyberpunk"]').click();
-  await expect.poll(async () => (await vars()).term).not.toBe(before.term);
-  // The app's own surfaces stay the hand-set dark screen, whatever the code theme.
-  expect((await vars()).surface).toBe(before.surface);
-  await page.screenshot({ path: shots('theme-dark') });
+  // The panels and the terminal both take the theme's colors.
+  await expect.poll(async () => (await vars()).surface).not.toBe(before.surface);
+  expect((await vars()).term).not.toBe(before.term);
+  await page.screenshot({ path: shots('theme-cyberpunk') });
   await page.getByTestId('screen-light').click();
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.themeKind)).toBe('light');
+  await page.locator('[data-testid="theme-card"][data-theme-id="catppuccin-latte"]').click();
+  await expect.poll(async () => (await vars()).surface).toBe('#eff1f5');
   const chrome = path.join(tmp, 'home', 'electron', 'chrome.json');
   await expect.poll(() => fs.existsSync(chrome) && JSON.parse(fs.readFileSync(chrome, 'utf8')).light?.bg).toMatch(/^#[0-9a-f]{6}$/);
-  await page.screenshot({ path: shots('theme-light') });
+  await page.screenshot({ path: shots('theme-latte') });
 });
 
 test('a Ghostty theme pasted into settings becomes a theme of its own', async () => {

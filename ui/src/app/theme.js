@@ -1,11 +1,11 @@
-// The person's theme, live. The screen is light, dark, or follows the system; each screen kind has
-// its own code·terminal theme (pref.light / pref.dark). Applied as CSS variables and handed to xterm,
-// Monaco and the window chrome. The choice lives in the main process, so every window follows it.
+// The person's theme, live. The screen is light, dark, or follows the system; each kind has its own
+// theme (pref.light / pref.dark), which colors the whole app. Applied as CSS variables and handed to
+// xterm, Monaco and the window chrome. The choice lives in the main process, so every window follows it.
 import { deriveTokens, applyTheme, findTheme, BUILTIN_THEMES, DEFAULT_DARK_ID, DEFAULT_LIGHT_ID } from '../theme/index.js';
 import { api } from '../api.js';
 import { set } from '../store.js';
 
-export const DEFAULT_PREF = { mode: 'system', light: DEFAULT_LIGHT_ID, dark: DEFAULT_DARK_ID, fixed: DEFAULT_DARK_ID, accent: 'blue' };
+export const DEFAULT_PREF = { mode: 'system', light: DEFAULT_LIGHT_ID, dark: DEFAULT_DARK_ID, fixed: DEFAULT_DARK_ID, accent: 'theme' };
 
 let pref = { ...DEFAULT_PREF };
 let userThemes = [];
@@ -102,7 +102,7 @@ export function savePref(patch) {
   apply({ animate: true });
 }
 
-/** Pick a code·terminal theme: it becomes the theme of the screen of its own kind (light or dark). */
+/** Pick a theme: it becomes the theme of the screen of its own kind (light or dark). */
 export function chooseTheme(id) {
   previewId = null;
   const t = findTheme(id, userThemes);

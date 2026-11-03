@@ -69,8 +69,10 @@ test('design: every variable a stylesheet reads is defined somewhere', () => {
     ...TOKEN_NAMES,
     ...[...tokens.matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]),
     ...all.filter((d) => d.prop.startsWith('--')).map((d) => d.prop),
-    // Set from code: a project's color and its ink (ui/bits.jsx roomVars), a stagger index.
+    // Set from code: a project's color and its ink (ui/bits.jsx roomVars), a stagger index, and a
+    // theme card's own palette (Settings.jsx miniVars).
     '--room', '--room-ink', '--i',
+    ...['bg', 'chrome', 'surface', 'line', 'text', 'text3', 'accent', 'soft', 'warn', 'ok'].map((k) => `--tc-${k}`),
   ]);
   check('undefined variable', (d) => [...d.value.matchAll(/var\((--[a-z0-9-]+)/g)].some((m) => !defined.has(m[1])));
 });

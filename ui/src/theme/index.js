@@ -8,6 +8,7 @@ export { BUILTIN_THEMES, DEFAULT_DARK_ID, DEFAULT_LIGHT_ID } from './builtin/ind
 export { detectAndImport, MAX_THEME_BYTES } from './import/index.js';
 export { ACCENTS, accentSet } from './accents.js';
 export { BASE, UI_TOKENS } from './base.js';
+export { themePalette } from './palette.js';
 
 // Built-ins first, then the user's imported themes.
 export const findTheme = (id, userThemes = []) => BUILTIN_THEMES.find((t) => t.id === id) ?? userThemes.find((t) => t?.id === id);

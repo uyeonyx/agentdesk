@@ -3,6 +3,7 @@
 //
 //   pnpm shots                         every screen, light, 1440×900, into shots/light
 //   pnpm shots -- --dark               the dark screen, into shots/dark
+//   pnpm shots -- --theme dracula      any theme (its own kind of screen)
 //   pnpm shots -- --size 1100x720      a smaller window
 //   pnpm shots -- --only overview,settings
 //
@@ -21,10 +22,11 @@ const flag = (name) => {
   const i = args.indexOf(`--${name}`);
   return i < 0 ? null : args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : true;
 };
+const theme = flag('theme') ? String(flag('theme')) : null;
 const dark = !!flag('dark');
 const [W, H] = String(flag('size') || '1440x900').split('x').map(Number);
 const only = flag('only') ? String(flag('only')).split(',') : null;
-const out = path.resolve(String(flag('out') || path.join(root, 'shots', `${dark ? 'dark' : 'light'}-${W}`)));
+const out = path.resolve(String(flag('out') || path.join(root, 'shots', `${theme || (dark ? 'dark' : 'light')}-${W}`)));
 const want = (n) => !only || only.includes(n) || (n.startsWith('focus-') && only.includes('focus'));
 fs.mkdirSync(out, { recursive: true });
 
@@ -74,10 +76,11 @@ const page = await app.firstWindow();
 await app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0]?.setSize(w, h), [W, H]);
 const call = (m, p, b) => page.evaluate(async ([m, p, b]) => JSON.parse((await window.desk.api(m, p, b === undefined ? undefined : JSON.stringify(b))).body || '{}'), [m, p, b]);
 await page.waitForFunction(() => document.documentElement.dataset.themeKind);
-if (dark) {
-  await page.evaluate(() => window.desk.setThemePrefs({ mode: 'dark', fixedKind: 'dark' }));
+if (dark || theme) {
+  const kind = theme ? (/light|latte|day|dawn|lotus/.test(theme) ? 'light' : 'dark') : 'dark';
+  await page.evaluate(([kind, id]) => window.desk.setThemePrefs({ mode: kind, fixedKind: kind, ...(id ? { [kind]: id } : {}) }), [kind, theme]);
   await page.reload();
-  await page.waitForFunction(() => document.documentElement.dataset.themeKind === 'dark');
+  await page.waitForFunction((k) => document.documentElement.dataset.themeKind === k, kind);
 }
 const shot = async (name) => {
   await page.waitForTimeout(450);

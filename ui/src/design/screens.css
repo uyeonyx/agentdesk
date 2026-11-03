@@ -966,7 +966,24 @@
   box-shadow: inset 0 0 0 2px var(--line-2);
 }
 
-/* Code·terminal themes: a few lines in the theme's own colors, its name on white below. */
+.acc.theme {
+  width: auto;
+  height: var(--h-sm);
+  padding: 0 10px;
+  border-radius: var(--r-1);
+  font-size: var(--t-sm);
+  font-weight: var(--w-2);
+  color: var(--text-2);
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+.acc.theme.on {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-line);
+}
+
+/* Themes: each card is a small app in that theme's own palette (rail, a plate of two cells with
+   their lamps), its name below. */
 .gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(184px, 1fr));
@@ -988,6 +1005,78 @@
 .tcard.on {
   outline: 2px solid var(--accent-line);
   outline-offset: -2px;
+}
+.tc-mini {
+  display: flex;
+  aspect-ratio: 16 / 9;
+  background: var(--tc-bg);
+}
+.tc-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  width: 28%;
+  padding: var(--sp-2) 6px;
+  background: var(--tc-chrome);
+  box-shadow: inset -1px 0 0 var(--tc-line);
+}
+.tc-rail i {
+  height: 6px;
+  border-radius: 2px;
+  background: var(--tc-line);
+}
+.tc-rail i.on {
+  background: var(--tc-soft);
+}
+.tc-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+}
+.tc-plate {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  border-radius: var(--r-1);
+  overflow: hidden;
+  background: var(--tc-line);
+}
+.tc-plate > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: 6px;
+  background: var(--tc-surface);
+}
+.tc-plate b {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+.tc-plate b.w {
+  background: var(--tc-warn);
+}
+.tc-plate b.o {
+  background: var(--tc-ok);
+}
+.tc-plate i {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--tc-text);
+  opacity: 0.75;
+}
+.tc-plate i.s {
+  width: 60%;
+  background: var(--tc-text3);
+}
+.tc-plate em {
+  width: 60%;
+  height: 8px;
+  margin-top: 2px;
+  border-radius: 2px;
+  background: var(--tc-accent);
 }
 .tc-code {
   display: flex;
@@ -1016,6 +1105,7 @@
   padding: 0 var(--sp-3);
   font-size: var(--t-md);
   font-weight: var(--w-2);
+  box-shadow: inset 0 1px 0 var(--line);
 }
 .tc-name small {
   font-size: var(--t-sm);

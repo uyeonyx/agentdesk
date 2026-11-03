@@ -1,20 +1,21 @@
 # Themes
 
-The app itself has two hand-set screens, light and dark (`ui/src/theme/base.js`): every surface,
-line, text level and signal color comes from there, whatever theme is picked. Settings > 테마 picks
-the screen (시스템 따라, 밝게, 어둡게), an accent, and one code·terminal theme for each screen.
+A theme colors the whole app. Settings > 테마 keeps one theme for the light screen and one for the
+dark, picks which screen to show (시스템 따라, 밝게, 어둡게) and an accent ("테마" keeps the theme's own).
 
-A theme colors code only: the raw terminal (xterm), the editor and diff view (Monaco) and syntax
-tokens. It supplies a background, a foreground, the 16 terminal colors and (optionally) syntax
-colors; `ui/src/theme/derive.js` turns that into the terminal palette, the Monaco theme and the
-`--syn-*` / `--term-*` variables, and lifts the editor's text until it reads on the theme's own
-background. Agent Desk ships the themes below and can import more from other apps (VS Code,
-Ghostty, kitty, iTerm2, Windows Terminal).
+Desk Light and Desk Dark are the app's hand-set screens (`ui/src/theme/base.js`). Every other theme
+is laid onto the same roles (`ui/src/theme/palette.js`): the theme's background becomes the panels,
+the window sits a step darker, lines and hover fills are steps between background and foreground,
+its yellow, green and red become the waiting, done and failed signals at one strength, and its accent
+fills the main button (its blue stands in for "working" when the accent is the waiting color's hue).
+Text is lifted until it reads on every place it can sit: primary at 7:1, secondary at 5.6:1, the
+small tertiary text at 4.5:1. `ui/src/theme/derive.js` adds the terminal palette, the Monaco theme and
+the syntax colors.
 
-The accent (`ui/src/theme/accents.js`) is blue, teal, green, orange, rose or graphite, each with a
-light-screen and a dark-screen shade; the soft fill, text color and ink on a filled button are
-worked out so they read on the app's own surfaces. `test/theme.test.js` holds both screens and every
-accent to WCAG AA: text, secondary and tertiary text at 4.5:1 on every surface they sit on.
+Themes can be imported from VS Code, Ghostty, kitty, iTerm2 and Windows Terminal. The accent
+(`ui/src/theme/accents.js`) can be blue, teal, green, orange, rose or graphite on any theme, each with
+a light-screen and a dark-screen shade. `test/theme.test.js` holds every built-in theme and every
+accent to these floors.
 
 ## Built-in themes
 

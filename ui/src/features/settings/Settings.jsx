@@ -1,11 +1,11 @@
-// Settings, as a screen: the screen (light, dark, system), accent and code·terminal themes, sounds
-// and notifications, shortcuts, agents, projects.
+// Settings, as a screen: themes (one for the light screen, one for the dark, previewed on the whole
+// app), the accent, sounds and notifications, shortcuts, agents, projects.
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { api, updateAction } from '../../api.js';
 import { useStore, get, set, setSettings, toast, openModal, projectOf } from '../../store.js';
 import { isMac, mod } from '../../util.js';
-import { detectAndImport, ACCENTS } from '../../theme/index.js';
-import { themeList, chooseTheme, savePref, saveUserTheme, removeUserTheme, screenKind } from '../../app/theme.js';
+import { detectAndImport, findTheme, normalizeTheme, themePalette, ACCENTS } from '../../theme/index.js';
+import { themeList, chooseTheme, previewTheme, endPreview, savePref, saveUserTheme, removeUserTheme, screenKind } from '../../app/theme.js';
 import { sound } from '../../app/sounds.js';
 import { KEYS, keyLabel } from '../../app/keys.js';
 import { Glyph, I, roomVars } from '../../ui/bits.jsx';
@@ -100,10 +100,21 @@ function ThemeTab() {
   const mode = pref.mode === 'fixed' ? now : pref.mode || 'system';
   const list = useMemo(() => themeList(), [s.userThemes]);
   const kinds = now === 'light' ? ['light', 'dark'] : ['dark', 'light'];
-  const accent = ACCENTS.some((a) => a.id === pref.accent) ? pref.accent : 'blue';
+  const accent = ACCENTS.some((a) => a.id === pref.accent) ? pref.accent : 'theme';
+  // Resting on a card shows the whole app in that theme; leaving the gallery puts it back.
+  const hover = useRef();
+  const enter = (id) => {
+    clearTimeout(hover.current);
+    hover.current = setTimeout(() => previewTheme(id), 220);
+  };
+  const leave = () => {
+    clearTimeout(hover.current);
+    hover.current = setTimeout(endPreview, 120);
+  };
+  useEffect(() => () => (clearTimeout(hover.current), endPreview()), []);
   return (
     <>
-      <Section title="화면과 강조색" desc="앱 화면은 밝은 것과 어두운 것 두 벌이에요. 테마는 터미널·코드·바뀐 내용의 색에만 써요.">
+      <Section title="화면과 강조색" desc="테마는 앱 전체의 색이에요. 밝은 화면과 어두운 화면에 하나씩 골라 두고, 어느 쪽을 쓸지 정해요.">
         <div class="st-row">
           <span class="st-l">
             <b>화면</b>
@@ -124,9 +135,12 @@ function ThemeTab() {
         <div class="st-row">
           <span class="st-l">
             <b>강조색</b>
-            <small>주 버튼, 고른 항목, 작업 중 표시에 써요</small>
+            <small>주 버튼, 고른 항목, 작업 중 표시의 색이에요. 테마의 색을 쓰거나 하나로 정해요</small>
           </span>
           <div class="accents" role="radiogroup" aria-label="강조색">
+            <button class={`acc theme ${accent === 'theme' ? 'on' : ''}`} role="radio" aria-checked={accent === 'theme'} onClick={() => savePref({ accent: 'theme' })} data-tip="테마의 색">
+              테마
+            </button>
             {ACCENTS.map((a) => (
               <button key={a.id} class={`acc ${accent === a.id ? 'on' : ''}`} role="radio" aria-checked={accent === a.id} onClick={() => savePref({ accent: a.id })} aria-label={a.name} data-tip={a.name}>
                 <span class="dot" style={{ background: now === 'light' ? a.light : a.dark }} />
@@ -136,12 +150,12 @@ function ThemeTab() {
         </div>
       </Section>
       {kinds.map((k) => (
-        <Section key={k} title={`코드·터미널 테마 · ${k === 'light' ? '밝은 화면' : '어두운 화면'}`} desc={k === now ? '지금 화면에 쓰는 테마예요.' : `${k === 'light' ? '밝은' : '어두운'} 화면으로 바꾸면 쓰는 테마예요.`}>
-          <div class="gallery" data-kind={k}>
+        <Section key={k} title={k === 'light' ? '밝은 화면 테마' : '어두운 화면 테마'} desc={k === now ? '지금 쓰는 쪽이에요. 카드에 마우스를 올리면 앱 전체로 미리 보여요.' : `${k === 'light' ? '밝은' : '어두운'} 화면일 때 쓰는 테마예요.`}>
+          <div class="gallery" data-kind={k} onMouseLeave={leave}>
             {list
               .filter((t) => t.kind === k)
               .map((t) => (
-                <ThemeCard key={t.id} t={t} on={pref[k] === t.id} onPick={() => chooseTheme(t.id)} />
+                <ThemeCard key={t.id} t={t} on={pref[k] === t.id} onEnter={() => enter(t.id)} onPick={() => chooseTheme(t.id)} />
               ))}
           </div>
         </Section>
@@ -151,20 +165,30 @@ function ThemeTab() {
   );
 }
 
-/** A code·terminal theme as it will look: a few lines of a session in its own colors. */
-function ThemeCard({ t, on, onPick }) {
-  const c = t.preview;
+/** A theme as the app will look in it: the rail, a plate with two cells, a lamp and a button. */
+function ThemeCard({ t, on, onEnter, onPick }) {
+  const style = useMemo(() => miniVars(t.id), [t.id]);
   return (
-    <button class={`tcard ${on ? 'on' : ''}`} onClick={onPick} aria-pressed={on} data-testid="theme-card" data-theme-id={t.id}>
-      <span class="tc-code" style={{ background: c.bg, color: c.fg }} aria-hidden="true">
-        <span>
-          <i style={{ color: c.accent }}>$</i> pnpm test
+    <button class={`tcard ${on ? 'on' : ''}`} style={style} onMouseEnter={onEnter} onFocus={onEnter} onClick={onPick} aria-pressed={on} data-testid="theme-card" data-theme-id={t.id}>
+      <span class="tc-mini" aria-hidden="true">
+        <span class="tc-rail">
+          <i class="on" />
+          <i />
+          <i />
         </span>
-        <span>
-          <i style={{ color: c.ok }}>✓</i> 12 passed
-        </span>
-        <span>
-          <i style={{ color: c.danger }}>✗</i> <i style={{ color: c.warn }}>coupon</i>.test.ts
+        <span class="tc-main">
+          <span class="tc-plate">
+            <span>
+              <b class="w" />
+              <i />
+              <em />
+            </span>
+            <span>
+              <b class="o" />
+              <i />
+              <i class="s" />
+            </span>
+          </span>
         </span>
       </span>
       <span class="tc-name">
@@ -174,6 +198,20 @@ function ThemeCard({ t, on, onPick }) {
       </span>
     </button>
   );
+}
+
+// A card paints its mini app with that theme's own palette, scoped to the card.
+const miniCache = new Map();
+function miniVars(id) {
+  if (miniCache.has(id)) return miniCache.get(id);
+  let v = {};
+  try {
+    const th = findTheme(id, get().userThemes);
+    const p = th ? themePalette(normalizeTheme(th)) : null;
+    if (p) v = { '--tc-bg': p.bg, '--tc-chrome': p.chrome, '--tc-surface': p.surface, '--tc-line': p.line, '--tc-text': p.text, '--tc-text3': p['text-3'], '--tc-accent': p['accent-fill'], '--tc-soft': p['accent-soft'], '--tc-warn': p.warn, '--tc-ok': p.ok };
+  } catch {}
+  miniCache.set(id, v);
+  return v;
 }
 
 function ImportTheme() {
@@ -211,7 +249,7 @@ function ImportTheme() {
   const userThemes = useStore((s) => s.userThemes);
   const FORMAT = { vscode: 'VS Code', ghostty: 'Ghostty', iterm: 'iTerm2', wterm: 'Windows Terminal', kitty: 'kitty' };
   return (
-    <Section title="테마 가져오기" desc="VS Code 테마(.json), Ghostty·kitty 색 구성, iTerm2(.itermcolors), Windows Terminal 색 구성을 가져올 수 있어요. 가져온 테마는 터미널·코드·바뀐 내용에 써요.">
+    <Section title="테마 가져오기" desc="VS Code 테마(.json), Ghostty·kitty 색 구성, iTerm2(.itermcolors), Windows Terminal 색 구성을 가져올 수 있어요. 가져온 테마도 앱 전체에 맞게 채워요.">
       {found ? (
         <div class="imp-found">
           <span class="tc-code small" style={{ background: found.theme.base.bg, color: found.theme.base.fg }} aria-hidden="true">
