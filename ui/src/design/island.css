@@ -213,3 +213,27 @@ body {
 .is-foot .sp {
   flex: 1;
 }
+
+.is-err {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: 10px;
+  padding: var(--sp-2) 10px;
+  border-radius: var(--r-2);
+  font-size: var(--t-sm);
+  line-height: var(--lh-sm);
+  color: var(--danger-text);
+  background: var(--danger-soft);
+}
+.is-err .ti {
+  flex: none;
+  font-size: 14px;
+}
+.is-err span {
+  flex: 1;
+  min-width: 0;
+}
+.is-err .btn {
+  flex: none;
+}

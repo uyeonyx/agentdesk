@@ -47,7 +47,40 @@ export async function drive(io, prompt, body) {
       await new Promise((r) => setTimeout(r, POLL));
     }
   };
-  const gone = (before) => (m) => !m || m.question !== before.question || m.options.map((o) => o.label).join('|') !== before.options.map((o) => o.label).join('|');
+  // The menu moved on: it's gone, or it asks something else. Text typed into a text box option
+  // changes that option's label but answers nothing, so the box's label doesn't count.
+  const sig = (x, box) => `${x.question}|${x.options.map((o) => (o.key === box ? o.key : `${o.key}:${o.label}`)).join('|')}`;
+  const gone = (before) => (m) => !m || sig(m, before.input) !== sig(before, before.input);
+
+  /**
+   * Pick an option. A digit picks it, like in the CLI, except when the highlight sits in a text box
+   * option (Claude Code's "Tell Claude what to change", "Type something."): there a digit is typed
+   * into the box and nothing is answered. Then the arrows move the highlight, each step checked on
+   * screen, and Enter picks it. Resolves once the keys are out; `true` when Enter was pressed.
+   */
+  async function select(m, key, box = m.input) {
+    const to = m.options.findIndex((o) => o.key === key);
+    if (to < 0) throw new Fallback('고를 선택지가 화면에서 사라졌어요 · 터미널에서 직접 답해 주세요', 'select');
+    const at = m.options.findIndex((o) => o.selected);
+    if (!box || at < 0 || m.options[at].key !== box) {
+      press(key);
+      return false;
+    }
+    if (at === to) return false;
+    let cur = m;
+    for (let n = 0; n < 12; n++) {
+      const i = cur.options.findIndex((o) => o.selected);
+      if (i === to) {
+        press('\r');
+        return true;
+      }
+      press(i < to ? '\x1b[B' : '\x1b[A');
+      const next = (await waitMenu((x) => x && x.options.findIndex((o) => o.selected) !== i, 1200))?.m;
+      if (!next) throw new Fallback('선택이 화면에서 움직이지 않았어요 · 터미널에서 직접 답해 주세요', 'select');
+      cur = next;
+    }
+    throw new Fallback('선택지까지 가지 못했어요 · 터미널에서 직접 답해 주세요', 'select');
+  }
   const waitInput = async (ms) => {
     const until = Date.now() + ms;
     for (;;) {
@@ -65,7 +98,7 @@ export async function drive(io, prompt, body) {
   if (body.action === 'key') {
     const k = String(body.key || body.option || '');
     if (!first.options.some((o) => o.key === k)) throw new Fallback('선택지가 화면에서 사라졌어요', 'key');
-    press(k);
+    await select(first, k);
     return { steps };
   }
 
@@ -73,7 +106,7 @@ export async function drive(io, prompt, body) {
     const k = String(body.option || '');
     const o = first.options.find((x) => x.key === k);
     if (!o) throw new Fallback('계획 승인 선택지가 화면과 달라요 · 터미널에서 직접 답해 주세요', 'plan');
-    press(k);
+    await select(first, k);
     if (!(await waitMenu(gone(first), 3000))) throw new Fallback('눌렀지만 화면이 바뀌지 않았어요 · 터미널을 확인해 주세요', 'plan');
     if (body.action === 'keep' && body.text) return { steps, ...(await reason(body.text)) };
     return { steps };
@@ -90,7 +123,7 @@ export async function drive(io, prompt, body) {
   }[body.action];
   const opt = pick ? first.options.find(pick) : first.options.find((o) => o.key === String(body.option || ''));
   if (!opt) throw new Fallback('이 선택지가 화면에 없어요 · 터미널에서 직접 답해 주세요', 'permission');
-  press(opt.key);
+  await select(first, opt.key);
   if (!(await waitMenu(gone(first), 3000))) throw new Fallback('눌렀지만 화면이 바뀌지 않았어요 · 터미널을 확인해 주세요', 'permission');
   if (body.action === 'no' && body.text) return { steps, ...(await reason(body.text)) };
   return { steps };
@@ -109,9 +142,18 @@ export async function drive(io, prompt, body) {
       const a = answers[qi] || {};
       const m = (await waitMenu((x) => x && same(x.question, q.question), 2500))?.m;
       if (!m) throw new Fallback(`${qi + 1}번째 질문이 화면에 없어요 · 터미널에서 직접 답해 주세요`, `q${qi + 1}`);
+      // The "Type something." box: by its label, or (once something is typed in it) by its place,
+      // right after the question's own options.
+      const box = m.input || m.free || (m.options.some((o) => o.key === String((q.options || []).length + 1)) ? String((q.options || []).length + 1) : null);
       if (typeof a.text === 'string' && a.text.trim()) {
-        if (!m.free) throw new Fallback('직접 입력할 칸이 없어요 · 터미널에서 직접 답해 주세요', `q${qi + 1}`);
-        press(m.free);
+        if (!box) throw new Fallback('직접 입력할 칸이 없어요 · 터미널에서 직접 답해 주세요', `q${qi + 1}`);
+        const inBox = m.options.find((o) => o.selected)?.key === box;
+        if (!inBox) press(box);
+        else {
+          // Already in the box, maybe with something typed earlier: clear it first.
+          const typed = m.options.find((o) => o.key === box)?.label || '';
+          if (!/^type something/i.test(typed)) press('\x7f'.repeat(typed.length + 4));
+        }
         await new Promise((r) => setTimeout(r, 150));
         // Typed into the form, not sent as a message: one line, no control bytes.
         press(a.text.replace(/[\x00-\x1f\x7f]+/g, ' ').trim().slice(0, 2000));
@@ -131,18 +173,17 @@ export async function drive(io, prompt, body) {
         const label = norm((a.pick || [])[0]);
         const o = m.options.find((x) => norm(x.label) === label || same(x.label, (a.pick || [])[0]));
         if (!o) throw new Fallback('고른 답이 화면의 선택지와 달라요 · 터미널에서 직접 답해 주세요', `q${qi + 1}`);
-        press(o.key);
+        const entered = await select({ ...m, input: box }, o.key, box);
         // Some versions move on at the digit, others want Enter on the highlighted option.
-        const moved = await waitMenu(gone(m), 600);
-        if (!moved) press('\r');
+        if (!entered && !(await waitMenu(gone({ ...m, input: box }), 600))) press('\r');
       }
-      if (!(await waitMenu(gone(m), 2500))) throw new Fallback('답했지만 다음으로 넘어가지 않았어요 · 터미널을 확인해 주세요', `q${qi + 1}`);
+      if (!(await waitMenu(gone({ ...m, input: box }), 2500))) throw new Fallback('답했지만 다음으로 넘어가지 않았어요 · 터미널을 확인해 주세요', `q${qi + 1}`);
     }
     // Several questions end on a review step; a single one may submit right away.
     const review = (await waitMenu((x) => !x || x.review, 1500))?.m;
     if (review?.review) {
       const submit = review.options.find((o) => /^submit/i.test(o.label));
-      press(submit.key);
+      await select(review, submit.key);
       if (!(await waitMenu(gone(review), 2500))) throw new Fallback('제출했지만 화면이 바뀌지 않았어요 · 터미널을 확인해 주세요', 'submit');
     }
     return {};

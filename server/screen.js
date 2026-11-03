@@ -8,11 +8,16 @@ const strip = (l) => l.replace(/^\s*[│┃|╭╰─]+/, '').replace(/[│┃|�
 // Multi-select options carry a checkbox in front of the label.
 const BOX = /^(?:\[([ xX✓✔●■])\]|([☐☑☒◯◉○●□■]))\s+/;
 const CHECKED = /[xX✓✔●■☑☒◉]/;
+// Options that are a text box: a digit typed while the highlight sits in one goes into the box.
+const TEXT_BOX = /^(tell claude what to change|type something\.?)$/i;
+const BOX_HINT = /shift\+tab to approve with this feedback/i;
 
 /**
  * A numbered choice menu: permission prompts, plan approval, and AskUserQuestion forms where each
  * option has description lines under it and the last ones sit below a separator.
- * Returns { question, options:[{key,label,desc,selected,checked?}], tabs?, review, free? } or null.
+ * Returns { question, options:[{key,label,desc,selected,checked?}], tabs?, review, free?, input? } or
+ * null. `input` is the key of the option that is a text box (found by its label, or by the hint
+ * Claude Code draws under it, which stays once something is typed in it).
  */
 export function menuFromLines(lines) {
   let end = lines.length;
@@ -38,7 +43,9 @@ export function menuFromLines(lines) {
   for (y = last; y >= Math.max(0, end - 60) && want >= 1; y--) {
     const m = lines[y].match(OPT);
     if (m && Number(m[2]) === want) {
-      opts.unshift(option(m, desc.reverse().join(' ')));
+      const o = option(m, desc.reverse().join(' '));
+      if (TEXT_BOX.test(o.label) || hintUnder(lines, y)) o.box = true;
+      opts.unshift(o);
       firstIdx = y;
       want--;
       gap = 0;
@@ -65,7 +72,19 @@ export function menuFromLines(lines) {
   if (tabs) menu.tabs = tabs;
   const free = opts.find((o) => /^type something/i.test(o.label));
   if (free) menu.free = free.key;
+  const box = opts.find((o) => o.box);
+  if (box) menu.input = box.key;
+  for (const o of opts) delete o.box;
   return menu;
+}
+
+/** The hint drawn right under a text box option (before the next option). */
+function hintUnder(lines, y) {
+  for (let k = y + 1; k < Math.min(lines.length, y + 3); k++) {
+    if (OPT.test(lines[k])) return false;
+    if (BOX_HINT.test(lines[k])) return true;
+  }
+  return false;
 }
 
 function option(m, desc) {

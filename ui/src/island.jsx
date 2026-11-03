@@ -19,7 +19,7 @@ const short = (s, n) => (s && s.length > n ? s.slice(0, n) + '…' : s || '');
 
 
 function Island() {
-  const s = useStore((s) => ({ tasks: s.tasks, projects: s.projects, usage: s.usage, loaded: s.loaded, settings: s.settings }));
+  const s = useStore((s) => ({ tasks: s.tasks, projects: s.projects, usage: s.usage, loaded: s.loaded, settings: s.settings, toasts: s.toasts }));
   const now = useNow(1000);
   const [open, setOpen] = useState(false);
   const root = useRef();
@@ -53,6 +53,7 @@ function Island() {
     return () => ro.disconnect();
   }, [want, open]);
 
+  const err = (s.toasts || []).filter((t) => t.kind === 'err').at(-1);
   const working = sessions.filter((t) => ['working', 'starting', 'waiting'].includes(t.state));
   const busy = working.sort((a, b) => (b.activity?.since || 0) - (a.activity?.since || 0))[0];
   const { top, wk, h5 } = headline(s.usage);
@@ -107,6 +108,16 @@ function Island() {
                 </span>
               </div>
               {first.prompt ? <PromptCard task={first} project={projectOf(s, first.projectId)} compact /> : <p class="is-q">{firstLine(first.reason, 160) || '터미널에서 답해야 해요'}</p>}
+              {/* The island draws no toasts: an answer that didn't go through says so here. */}
+              {err && (
+                <div class="is-err" role="alert">
+                  <I n="alert-triangle" />
+                  <span>{err.text}</span>
+                  <button class="btn sm" onClick={() => window.desk.open(first.id)}>
+                    Desk에서 열기
+                  </button>
+                </div>
+              )}
               {blocked.length > 1 && <p class="more2">다음 {blocked.length - 1}개가 기다려요</p>}
             </div>
           )}
