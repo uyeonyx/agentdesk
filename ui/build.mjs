@@ -10,6 +10,7 @@ fs.rmSync(out, { recursive: true, force: true });
 fs.mkdirSync(path.join(out, 'assets'), { recursive: true });
 fs.copyFileSync(path.join(here, 'index.html'), path.join(out, 'index.html'));
 fs.copyFileSync(path.join(here, 'panel.html'), path.join(out, 'panel.html'));
+fs.copyFileSync(path.join(here, 'island.html'), path.join(out, 'island.html'));
 
 const common = {
   bundle: true,
@@ -23,7 +24,7 @@ const common = {
 
 const app = {
   ...common,
-  entryPoints: { app: path.join(here, 'src', 'main.jsx'), panel: path.join(here, 'src', 'panel.jsx') },
+  entryPoints: { app: path.join(here, 'src', 'main.jsx'), panel: path.join(here, 'src', 'panel.jsx'), island: path.join(here, 'src', 'island.jsx') },
   outdir: path.join(out, 'assets'),
   format: 'esm',
   splitting: true,

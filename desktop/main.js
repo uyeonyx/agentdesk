@@ -44,8 +44,9 @@ async function runApp() {
   let panel = null;
   let tray = null;
   let quitting = false;
-  /** Every window that talks to the core: the main one and the quick panel. */
-  const windows = () => [win, panel].filter((w) => w && !w.isDestroyed());
+  let island = null;
+  /** Every window that talks to the core: the main one, the quick panel and the island. */
+  const windows = () => [win, panel, island].filter((w) => w && !w.isDestroyed());
 
   if (process.platform === 'win32') app.setAppUserModelId('dev.uyeon.agentdesk');
   app.on('second-instance', () => showWindow());
@@ -267,6 +268,8 @@ async function runApp() {
       win.show();
       // The quick panel is made ahead, hidden, so it appears the instant it's called.
       setTimeout(createPanel, 1500);
+      // So is the island: it decides from the core's state whether it has anything to show.
+      setTimeout(createIsland, 2500);
     });
     // Full screen hides the traffic lights: the top bar can use that space again.
     win.on('enter-full-screen', () => wc.send('desk:fullscreen', true));
@@ -362,6 +365,66 @@ async function runApp() {
     else if (action === 'hide') panel?.hide();
     else if (action === 'resize' && panel && Number.isFinite(arg)) placePanel(arg);
   });
+  // ------------------------------------------------------------ the agent island
+  // A small bar at the top of the screen while another app is in front: who's working, what
+  // waits on me. A permission request unfolds it with the card, answerable right there.
+
+  let isle = { want: false, open: false, w: 400, h: 40 };
+  function createIsland() {
+    if (island && !island.isDestroyed()) return island;
+    island = new BrowserWindow({
+      width: isle.w,
+      height: isle.h,
+      show: false,
+      frame: false,
+      transparent: true,
+      backgroundColor: '#00000000',
+      hasShadow: false,
+      resizable: false,
+      movable: false,
+      fullscreenable: false,
+      minimizable: false,
+      maximizable: false,
+      skipTaskbar: true,
+      alwaysOnTop: true,
+      title: 'Agent Desk',
+      // macOS: a non-activating panel, so a click on it doesn't pull the person out of their app.
+      ...(mac ? { type: 'panel' } : {}),
+      webPreferences,
+    });
+    island.setAlwaysOnTop(true, 'floating');
+    if (mac) island.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
+    harden(island);
+    island.on('blur', () => island?.webContents.send('desk:island-blur'));
+    island.on('closed', () => (island = null));
+    island.loadURL(`${ORIGIN}/island.html`);
+    return island;
+  }
+  function placeIsland() {
+    if (!island || island.isDestroyed()) return;
+    const wa = screen.getPrimaryDisplay().workArea;
+    const w = Math.max(240, Math.min(isle.w || 400, wa.width - 24));
+    const h = Math.max(36, Math.min(isle.h || 40, wa.height - 40));
+    island.setBounds({ x: Math.round(wa.x + (wa.width - w) / 2), y: wa.y + 6, width: w, height: h });
+  }
+  /** Shown while it has something and Desk itself isn't in front (or the quick panel is up). */
+  function syncIsland() {
+    if (!island || island.isDestroyed() || quitting) return;
+    const deskInFront = (win && !win.isDestroyed() && win.isVisible() && win.isFocused()) || (panel && !panel.isDestroyed() && panel.isVisible());
+    if (isle.want && !deskInFront) {
+      placeIsland();
+      if (!island.isVisible()) island.showInactive();
+    } else if (island.isVisible()) island.hide();
+  }
+  ipcMain.on('desk:island', (e, st) => {
+    if (!isTrustedFrame(e.senderFrame) || !st || typeof st !== 'object') return;
+    isle = { want: !!st.want, open: !!st.open, w: Number(st.w) || 400, h: Number(st.h) || 40 };
+    syncIsland();
+  });
+  app.on('browser-window-focus', () => setTimeout(syncIsland, 30));
+  app.on('browser-window-blur', () => setTimeout(syncIsland, 30));
+  app.on('did-resign-active', () => setTimeout(syncIsland, 30));
+
   // "Open this in the app": from the panel (or a notification) to the main window, on that task.
   ipcMain.on('desk:open', (e, target) => {
     if (!isTrustedFrame(e.senderFrame) || typeof target?.taskId !== 'string' || target.taskId.length > 64) return;

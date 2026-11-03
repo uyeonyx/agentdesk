@@ -323,6 +323,10 @@ function NotifyTab() {
           onChange={(v) => setSettings({ notify: v })}
         />
       </Section>
+      <Section title="에이전트 아일랜드" desc="다른 앱을 쓰는 동안 화면 위쪽 가운데에 작은 막대로 떠서, 누가 일하는지와 나를 기다리는 일을 보여 줘요. Desk 창을 보고 있을 때는 숨어요.">
+        <Switch on={st.island !== false} onChange={(v) => setSettings({ island: v })} label="아일랜드 띄우기" />
+        <Switch on={st.islandAuto !== false} onChange={(v) => setSettings({ islandAuto: v })} label="허락 요청이 오면 펼쳐서 바로 답하기" />
+      </Section>
       <Section title="효과음" desc="에이전트가 나를 기다릴 때, 일이 끝났을 때, 보내고 답할 때 작은 소리를 내요.">
         <Switch on={st.sounds} onChange={(v) => setSettings({ sounds: v })} label="효과음" />
         <label class="st-row">

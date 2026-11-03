@@ -381,6 +381,33 @@ test('talk: two sessions changing the same file hear each other, Desk only carri
   for (const t of [a, b]) await call('POST', `/api/tasks/${t.id}/discard`);
 });
 
+test('island: with another app in front it shows what waits, unfolds for a permission, and answers it', async () => {
+  // Hiding the main window takes the main process, which a release build doesn't open to Playwright.
+  test.skip(!app, 'needs the dev checkout');
+  const p = await project('repo-island');
+  const islandShown = () => app.evaluate(({ BrowserWindow }) => !!BrowserWindow.getAllWindows().find((w) => w.webContents.getURL().endsWith('/island.html'))?.isVisible());
+  // Desk in front: no island.
+  await expect.poll(islandShown).toBe(false);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w.webContents.getURL() === 'app://desk/')?.hide());
+  const t = await start(p.id, 'ask before deleting build 아일랜드');
+  await expect.poll(islandShown, { timeout: 15_000 }).toBe(true);
+  const isl = app.windows().find((w) => w.url().endsWith('/island.html'));
+  await expect(isl.getByTestId('island-card')).toContainText('이 명령을 실행할까요?', { timeout: 15_000 });
+  await isl.getByTestId('island-card').getByRole('button', { name: /^1\s*허락$/ }).click();
+  await until(t.id, (x) => x?.state !== 'needs_input');
+  await expect(isl.getByTestId('island-card')).toHaveCount(0);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((w) => w.webContents.getURL() === 'app://desk/');
+    w?.show();
+    w?.focus();
+    // Keys go to the page again (the tests after this one type shortcuts).
+    w?.webContents.focus();
+  });
+  await expect.poll(islandShown).toBe(false);
+  await page.bringToFront();
+  await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
 test('관제 new-session tile: project, start mode and model, then it runs in that mode', async () => {
   await page.getByTestId('view-overview').click();
   await navMode();
@@ -484,7 +511,9 @@ test('⌘J opens the raw terminal of the agent', async () => {
 });
 
 test('themes: a fixed theme from the gallery reaches the page and the window', async () => {
-  await page.keyboard.press(`${MOD}+Comma`);
+  // Settings open on the tab used last; the theme tab, whatever came before.
+  if (!(await page.locator('.settings').isVisible())) await page.keyboard.press(`${MOD}+Comma`);
+  await page.locator('.st-nav').getByRole('button', { name: '테마' }).click();
   await page.getByRole('button', { name: '항상 이 테마' }).click();
   await page.locator('[data-testid="theme-card"][data-theme-id="cyberpunk"]').click();
   await expect.poll(() => page.evaluate(() => document.documentElement.dataset.themeKind)).toBe('dark');

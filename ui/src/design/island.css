@@ -1,0 +1,215 @@
+/* The agent island: a black bar under the menu bar, like the notch it sits beside. The window is
+   transparent and exactly the island's size; the island draws its own shape and shadow. */
+@import 'pretendard/dist/web/variable/pretendardvariable.css';
+@import '@tabler/icons-webfont/dist/tabler-icons.min.css';
+@import './tokens.css';
+@import './base.css';
+@import './ui.css';
+@import './md.css';
+@import './task.css';
+
+html,
+body {
+  background: transparent !important;
+  overflow: hidden;
+}
+#app {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.island {
+  flex: none;
+  --bg-surface: #000;
+  --bg-raised: #17181d;
+  --bg-inset: #101115;
+  --bg-hover: rgb(255 255 255 / 0.07);
+  --bg-active: rgb(255 255 255 / 0.1);
+  --line: rgb(255 255 255 / 0.1);
+  --line-strong: rgb(255 255 255 / 0.17);
+  width: 100%;
+  border-radius: 20px;
+  overflow: hidden;
+  color: var(--text);
+  background: #000;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.08);
+  user-select: none;
+}
+.island.open {
+  border-radius: 26px;
+}
+.is-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  padding: 0 14px;
+  text-align: start;
+}
+.is-dots {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.is-dots i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5d606a;
+}
+.is-dots i.w {
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--accent-text);
+}
+.is-dots i.b {
+  background: var(--warn-fill);
+}
+.is-dots i.r {
+  background: var(--accent-text);
+}
+.is-dots i.v {
+  background: var(--ok-fill);
+}
+.is-tx {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.is-tx .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.is-tx.b {
+  color: var(--warn-text);
+}
+.dia {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  transform: rotate(45deg);
+  border-radius: 2px;
+  background: var(--warn-fill);
+}
+.is-use {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-3);
+}
+.is-use.hi {
+  color: var(--warn-text);
+}
+.is-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px 12px 12px;
+}
+.is-card {
+  padding: 12px 14px;
+  border-radius: 18px;
+  background: var(--bg-raised);
+  box-shadow: inset 0 0 0 1.5px color-mix(in oklab, var(--warn-fill) 55%, transparent);
+}
+.is-ch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.is-ch .lnk {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+}
+.is-ch .since {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--warn-text);
+}
+.is-card .pcard {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.is-q {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+.more2 {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-3);
+}
+.is-list {
+  display: flex;
+  flex-direction: column;
+}
+.is-row {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  text-align: start;
+}
+.is-row:hover {
+  background: var(--bg-hover);
+}
+.is-row .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+.is-row .s {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-3);
+}
+.is-row .s.b {
+  color: var(--warn-text);
+}
+.is-row .s.r {
+  color: var(--accent-text);
+}
+.is-row .s.v {
+  color: var(--ok-text);
+}
+.is-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px 0;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--text-3);
+}
+.is-foot .sp {
+  flex: 1;
+}

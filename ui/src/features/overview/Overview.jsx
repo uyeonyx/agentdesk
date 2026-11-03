@@ -4,7 +4,7 @@
 import { memo } from 'preact/compat';
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import { useStore, set, get, projectOf, toast } from '../../store.js';
-import { isLive, isBlocked, isBusy, whyOf, markOf, grouped } from '../../core/status.js';
+import { isLive, isBlocked, isBusy, whyOf, markOf, grouped, stateSince, waited } from '../../core/status.js';
 import { arrange, colsFor, rowHeight, SPAN } from '../../core/mosaic.js';
 import { duration } from '../../core/turns.js';
 import { MODES, CYCLE, MODELS, nextMode, modeOf } from '../../core/session.js';
@@ -229,22 +229,11 @@ export function StateChip({ t }) {
   return <span class="st x">{t.state === 'merged' ? '머지함' : '끝남'}</span>;
 }
 
-/** When the task got into its current state: the last change in its strip. */
-const stateSince = (t) => {
-  const s = t.strip?.s?.at(-1);
-  return s ? t.strip.from + s[0] * 1000 : t.updatedAt;
-};
 const turnStart = (t) => t.messages?.at(-1)?.at || t.activity?.since || t.updatedAt;
 const pad = (n) => String(n).padStart(2, '0');
 function clock(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
   return s >= 3600 ? `${Math.floor(s / 3600)}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}` : `${Math.floor(s / 60)}:${pad(s % 60)}`;
-}
-function waited(ms) {
-  const m = Math.floor(ms / 60000);
-  if (m < 1) return '방금';
-  if (m < 60) return `${m}분째`;
-  return `${Math.floor(m / 60)}시간 ${m % 60}분째`;
 }
 
 function Body({ t, p, z, focused }) {

@@ -121,6 +121,17 @@ contextBridge.exposeInMainWorld('desk', {
     ipcRenderer.on('desk:panel-shown', h);
     return () => ipcRenderer.off('desk:panel-shown', h);
   },
+  /** The agent island: what it wants to show and how big it is ({ want, open, w, h }). */
+  island(state) {
+    const n = (v) => (Number.isFinite(v) ? Math.round(v) : 0);
+    ipcRenderer.send('desk:island', { want: !!state?.want, open: !!state?.open, w: n(state?.w), h: n(state?.h) });
+  },
+  /** The island lost focus (a click somewhere else): it folds back. */
+  onIslandBlur(fn) {
+    const h = () => fn();
+    ipcRenderer.on('desk:island-blur', h);
+    return () => ipcRenderer.off('desk:island-blur', h);
+  },
   /** Open a task in the main window (from the panel). */
   open(taskId, view) {
     ipcRenderer.send('desk:open', { taskId: String(taskId), view: view ? String(view) : undefined });
@@ -134,7 +145,8 @@ contextBridge.exposeInMainWorld('desk', {
   shortcut(action, accel) {
     return ipcRenderer.invoke('desk:shortcut', String(action), accel == null ? undefined : String(accel));
   },
-  isPanel: location.pathname === '/panel.html',
+  isPanel: location.pathname === '/panel.html' || location.pathname === '/island.html',
+  isIsland: location.pathname === '/island.html',
   /** The theme's title bar colors for its scheme, so the window and its title bar area match. */
   setChrome({ scheme, bg, fg }) {
     ipcRenderer.send('desk:chrome', { scheme: String(scheme), bg: String(bg), fg: String(fg) });

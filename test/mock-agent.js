@@ -664,15 +664,29 @@ process.stdin.on('data', (d) => {
     } else finish(pendingAfterMenu);
     return;
   }
-  // Bracketed paste arrives as one block (shown in the input, not submitted), like the real CLIs.
-  const paste = s.match(/\x1b\[200~([\s\S]*?)\x1b\[201~/);
-  if (paste) {
-    const t = paste[1].replace(/\r/g, ' ');
+  // Bracketed paste arrives as one block (shown in the input, not submitted), like the real CLIs,
+  // even when a long one comes in several chunks.
+  if (pasting || s.includes('\x1b[200~')) {
+    const start = s.indexOf('\x1b[200~');
+    if (!pasting) {
+      typed(s.slice(0, start));
+      s = s.slice(start + 6);
+      pasting = true;
+    }
+    const end = s.indexOf('\x1b[201~');
+    const part = end < 0 ? s : s.slice(0, end);
+    const t = part.replace(/\r/g, ' ');
     buf += t;
     W(t);
-    s = s.replace(paste[0], '');
+    if (end < 0) return;
+    pasting = false;
+    s = s.slice(end + 6);
   }
-  s = s.replace(/\x1b\[20[01]~/g, '');
+  typed(s);
+});
+
+let pasting = false;
+function typed(s) {
   for (const ch of s) {
     if (ch === '\r' || ch === '\n') {
       const line = buf.trim();
@@ -713,4 +727,4 @@ process.stdin.on('data', (d) => {
       W(ch);
     }
   }
-});
+}

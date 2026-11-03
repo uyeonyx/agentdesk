@@ -137,3 +137,17 @@ export function grouped(tasks) {
   for (const k of ['working', 'stopped', 'done']) out[k].sort((a, b) => b.updatedAt - a.updatedAt);
   return out;
 }
+
+/** When the task got into its current state: the last change in its activity strip. */
+export const stateSince = (t) => {
+  const s = t.strip?.s?.at(-1);
+  return s ? t.strip.from + s[0] * 1000 : t.updatedAt;
+};
+
+/** How long something has been waiting, in words. */
+export function waited(ms) {
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return '방금';
+  if (m < 60) return `${m}분째`;
+  return `${Math.floor(m / 60)}시간 ${m % 60}분째`;
+}
