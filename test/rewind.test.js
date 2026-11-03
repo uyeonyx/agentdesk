@@ -91,3 +91,27 @@ test('fork: Claude starts from the cut copy with its own id fixed up front', asy
   const r = AGENTS.claude.args({ resume: true, sessionId: '11111111-1111-4111-8111-111111111111' });
   assert.ok(!r.some((x) => x.startsWith('--session-id')));
 });
+
+test('fork: a rewound part stays out of the copy, and the chain is hooked back together', async () => {
+  const { withoutCuts } = await import('../server/tasks.js');
+  const t = (s) => `2026-11-03T01:00:${String(s).padStart(2, '0')}Z`;
+  const L = (o) => JSON.stringify(o);
+  const lines = [
+    L({ type: 'permission-mode', permissionMode: 'acceptEdits' }),
+    L({ type: 'user', uuid: 'u1', parentUuid: null, timestamp: t(1), message: { content: 'one' } }),
+    L({ type: 'assistant', uuid: 'a1', parentUuid: 'u1', timestamp: t(2) }),
+    L({ type: 'user', uuid: 'u2', parentUuid: 'a1', timestamp: t(10), message: { content: 'two' } }),
+    L({ type: 'file-history-snapshot', messageId: 'x' }),
+    L({ type: 'assistant', uuid: 'a2', parentUuid: 'u2', timestamp: t(12) }),
+    // Sent after the rewind: Claude Code still hangs it on the rewound turn.
+    L({ type: 'user', uuid: 'u3', parentUuid: 'a2', timestamp: t(40), message: { content: 'three' } }),
+    L({ type: 'assistant', uuid: 'a3', parentUuid: 'u3', timestamp: t(41) }),
+  ];
+  const cut = { from: Date.parse(t(9)), to: Date.parse(t(20)), fromUuid: 'u2' };
+  const out = withoutCuts(lines, [cut]).map((l) => JSON.parse(l));
+  assert.deepEqual(out.map((e) => e.uuid || e.type), ['permission-mode', 'u1', 'a1', 'u3', 'a3']);
+  assert.equal(out.find((e) => e.uuid === 'u3').parentUuid, 'a1');
+  // By time alone (no line found at the rewind) it comes out the same.
+  assert.deepEqual(withoutCuts(lines, [{ from: cut.from, to: cut.to }]).map((l) => JSON.parse(l).uuid || 'meta'), ['meta', 'u1', 'a1', 'u3', 'a3']);
+  assert.equal(withoutCuts(lines, []), lines);
+});

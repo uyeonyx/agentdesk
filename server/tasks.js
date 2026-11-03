@@ -883,7 +883,7 @@ export class Tasks {
       return { model: family, applied: 'start' };
     }
     this.idleFor(task, '모델을 바꿀');
-    return this.serial(r, async () => {
+    return this.serial(r, () => this.withRoom(task, async () => {
       await this.command(r, '/model');
       const rows = modelMenuFromLines(this.screenLines(r));
       const to = rows?.find((x) => x.label.toLowerCase().startsWith(family.toLowerCase()));
@@ -909,7 +909,7 @@ export class Tasks {
       this.store.save();
       this.changed();
       return { model: to.label, applied: 'now' };
-    });
+    }));
   }
 
   /** Effort for this session only: the /effort slider, moved to the level, then `s`. */
@@ -926,7 +926,7 @@ export class Tasks {
       return { effort: level, applied: 'start' };
     }
     this.idleFor(task, '노력 수준을 바꿀');
-    return this.serial(r, async () => {
+    return this.serial(r, () => this.withRoom(task, async () => {
       await this.command(r, '/effort');
       const cur = effortSliderFromLines(this.screenLines(r));
       if (!cur) {
@@ -950,7 +950,7 @@ export class Tasks {
       this.store.save();
       this.changed();
       return { effort: level, applied: 'now' };
-    });
+    }));
   }
 
   /** Summarize the conversation to free the context (/compact). The code stays as it is. */
@@ -968,6 +968,35 @@ export class Tasks {
       r.proc.write('\r');
       return { ok: true };
     });
+  }
+
+  /**
+   * Run `fn` with the agent's terminal at least ROWS tall. The raw terminal drawer shrinks it to its
+   * own size, and Claude Code's menus (the /rewind confirm, the model picker) then scroll their
+   * options out of view; it goes back to the drawer's size afterwards.
+   */
+  async withRoom(task, fn) {
+    const keep = { cols: task.cols || COLS, rows: task.rows || ROWS };
+    const small = keep.rows < ROWS;
+    if (small) {
+      this.resize(task.id, keep.cols, ROWS);
+      await delay(450);
+    }
+    try {
+      return await fn();
+    } finally {
+      if (small) this.resize(task.id, keep.cols, keep.rows);
+    }
+  }
+
+  /** Close a CLI menu. Never two quick Escs: on an empty prompt that opens /rewind. */
+  async escape(r, stillOpen) {
+    for (let i = 0; i < 3; i++) {
+      r.proc.write('\x1b');
+      await delay(800);
+      await new Promise((res) => r.term.write('', res));
+      if (!stillOpen(this.screenLines(r))) return;
+    }
   }
 
   /** Poll the screen until `test` returns something (not null/false), or give up with null. */
@@ -999,10 +1028,12 @@ export class Tasks {
     if (!r) throw httpError(409, '세션이 멈춰 있어요. 먼저 재개하세요.');
     if (this.menuOf(r)) throw httpError(409, '화면에 질문이 떠 있어요 · 먼저 답해 주세요');
     await this.checkSnapshots(task, msg);
-    return this.serial(r, async () => {
+    if (this.promptText(r)) throw httpError(409, 'Claude Code 입력창에 쓰다 만 글이 있어요 · 원본 터미널에서 지우고 다시 해 주세요');
+    const menuUp = (l) => rewindCursorFromLines(l) !== null || !!rewindChoicesFromLines(l);
+    return this.serial(r, () => this.withRoom(task, async () => {
       if (['working', 'starting'].includes(task.state)) {
         r.proc.write('\x1b');
-        await delay(600);
+        await delay(900);
       }
       // The same words sent again later sit below it in the list: skip that many matches.
       let later = task.messages.slice(idx + 1).filter((m) => !m.undone && m.source !== 'answer' && sameMessage(firstLine(m.text), msg.text)).length;
@@ -1017,7 +1048,7 @@ export class Tasks {
       if ((await this.waitScreen(r, listed, 2500)) == null) {
         r.proc.write('\r');
         if ((await this.waitScreen(r, listed, 3000)) == null) {
-          r.proc.write('\x1b');
+          await this.escape(r, menuUp);
           throw httpError(409, 'Claude Code의 되감기 화면을 열지 못했어요 · 원본 터미널에서 /rewind로 해 보세요');
         }
       }
@@ -1044,7 +1075,7 @@ export class Tasks {
         await delay(70);
       }
       if (!found) {
-        r.proc.write('\x1b');
+        await this.escape(r, menuUp);
         throw httpError(409, '되감을 지시를 Claude Code 목록에서 찾지 못했어요 · 원본 터미널에서 /rewind로 해 보세요');
       }
       r.proc.write('\r');
@@ -1055,9 +1086,7 @@ export class Tasks {
       const key = cliCode && choices?.['restore code and conversation'] ? 'restore code and conversation' : 'restore conversation';
       const digit = choices?.[key];
       if (!digit) {
-        r.proc.write('\x1b');
-        await delay(200);
-        r.proc.write('\x1b');
+        await this.escape(r, menuUp);
         throw httpError(409, '되감기 선택지를 읽지 못했어요 · 원본 터미널에서 /rewind로 해 보세요');
       }
       r.proc.write(digit);
@@ -1077,13 +1106,22 @@ export class Tasks {
         m.undone = true;
         m.rewound = true;
       }
-      task.cuts = [...(task.cuts || []), { from: msg.at - 1500, to: Date.now() }].slice(-20);
+      // Where the dropped part starts in the transcript (Claude Code keeps those lines), so a later
+      // fork can leave it out too.
+      let fromUuid;
+      try {
+        const src = this.transcriptOf(task);
+        const lines = src ? fs.readFileSync(src, 'utf8').split('\n') : [];
+        const at = userLineOf(lines, msg);
+        if (at >= 0) fromUuid = JSON.parse(lines[at]).uuid;
+      } catch {}
+      task.cuts = [...(task.cuts || []), { from: msg.at - 1500, to: Date.now(), ...(fromUuid ? { fromUuid } : {}) }].slice(-20);
       await this.refreshChanges(task);
       this.setState(task, 'needs_input', '되감았어요 · 이어서 지시하세요');
       this.store.save();
       this.changed();
       return { ...this.view(task), undoneText: msg.text };
-    });
+    }));
   }
 
   /** In a person's own checkout, refuse to reset files if the branch or commit moved since. */
@@ -1143,7 +1181,7 @@ export class Tasks {
     }
     const tmpId = randomUUID();
     const tmpFile = path.join(path.dirname(src), `${tmpId}.jsonl`);
-    fs.writeFileSync(tmpFile, lines.slice(0, cut).join('\n') + '\n', { mode: 0o600 });
+    fs.writeFileSync(tmpFile, withoutCuts(lines.slice(0, cut), task.cuts).join('\n') + '\n', { mode: 0o600 });
     const now = Date.now();
     const nt = {
       id: nid,
@@ -2079,4 +2117,40 @@ export function userLineOf(lines, msg) {
     fallback = i;
   }
   return fallback;
+}
+
+/**
+ * A transcript without the parts that were rewound (Claude Code 2.1 keeps those lines): from the
+ * rewound message's own line (or, without it, from its time) to the moment of the rewind. A line
+ * whose parent was dropped is hooked onto the last line kept before the gap, so the chain holds.
+ */
+export function withoutCuts(lines, cuts = []) {
+  if (!cuts?.length) return lines;
+  const out = [];
+  const moved = new Map();
+  let lastKept = null;
+  let open = null; // the cut being skipped
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    let e;
+    try {
+      e = JSON.parse(line);
+    } catch {
+      out.push(line);
+      continue;
+    }
+    const at = Date.parse(e.timestamp || '') || 0;
+    if (!open) open = cuts.find((c) => (c.fromUuid ? e.uuid === c.fromUuid : at && at >= c.from && at <= c.to)) || null;
+    else if (at && at > open.to) open = cuts.find((c) => c !== open && (c.fromUuid ? e.uuid === c.fromUuid : at >= c.from && at <= c.to)) || null;
+    if (open && (at === 0 ? !e.uuid : at <= open.to)) {
+      if (e.uuid) moved.set(e.uuid, lastKept);
+      continue;
+    }
+    if (e.parentUuid && moved.has(e.parentUuid)) {
+      e.parentUuid = moved.get(e.parentUuid);
+      out.push(JSON.stringify(e));
+    } else out.push(line);
+    if (e.uuid && !e.isSidechain) lastKept = e.uuid;
+  }
+  return out;
 }
