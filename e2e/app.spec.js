@@ -467,6 +467,8 @@ test('adding a project: a picked repo goes straight in; a picked folder of repos
 });
 
 test('관제 new-session tile: project, start mode and model, then it runs in that mode', async () => {
+  // Its own project: after a failure Playwright starts a fresh app, with none from earlier tests.
+  await project('repo-new-tile');
   await page.getByTestId('view-overview').click();
   await navMode();
   await page.keyboard.press('n');

@@ -528,7 +528,7 @@ function NewTile({ cols }) {
                 .filter((x) => x.kind !== 'group' || x.members?.length)
                 .slice(0, 12)
                 .map((x) => (
-                  <button key={x.id} type="button" class={`npj ${x.id === d.projectId ? 'on' : ''}`} style={roomVars(x.color)} onClick={() => patch({ projectId: x.id })} data-tip={x.name}>
+                  <button key={x.id} type="button" class={`npj ${x.id === d.projectId ? 'on' : ''}`} style={roomVars(x.color)} onClick={() => patch({ projectId: x.id })} data-tip={x.name} aria-label={x.name} aria-pressed={x.id === d.projectId}>
                     <Glyph project={x} size={22} />
                     {x.id === d.projectId && <span>{x.name}</span>}
                   </button>

@@ -309,7 +309,8 @@ function work(text) {
     userLine(text);
     W(`\r\n\x1b[36m⏺\x1b[0m ${text.split('\n')[0].slice(0, 80)}\r\n`);
     setTimeout(() => {
-      const reply = /보낸 말|더 할 말이 없고/.test(text) ? '확인했어요. 그대로 두면 돼요.\n\n@상대: 끝' : '제 쪽은 README 끝에 한 줄을 붙였을 뿐이라 그쪽 변경과 같은 줄이 아니에요.\n\n@상대: 저는 README 끝에만 붙였어요. 그쪽도 같은 줄을 바꾸지 않으면 괜찮아요';
+      // The opening gets a line across; whatever comes over from the other session gets 끝.
+      const reply = !text.startsWith('[Agent Desk · 다른 세션과 협의]') ? '확인했어요. 그대로 두면 돼요.\n\n@상대: 끝' : '제 쪽은 README 끝에 한 줄을 붙였을 뿐이라 그쪽 변경과 같은 줄이 아니에요.\n\n@상대: 저는 README 끝에만 붙였어요. 그쪽도 같은 줄을 바꾸지 않으면 괜찮아요';
       replyLine(reply);
       W(`\r\x1b[2K\x1b[32m⏺\x1b[0m ${reply.split('\n')[0]}\r\n\r\n> `);
       tline({ type: 'system', subtype: 'turn_duration', durationMs: 300, isMeta: false });
@@ -637,8 +638,10 @@ if (process.env.MOCK_REMOTE_DIR) {
 
 let buf = '';
 process.stdin.setRawMode?.(true);
+// A long paste reaches us in chunks that can split a character; the decoder keeps it whole.
+process.stdin.setEncoding('utf8');
 process.stdin.on('data', (d) => {
-  let s = d.toString('utf8');
+  let s = String(d);
   if (s === '\x1b') {
     if (busy) {
       clearInterval(busy);
