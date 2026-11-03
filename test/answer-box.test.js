@@ -28,6 +28,7 @@ function cli({ question, options, boxAt, hint = false, at = 0, typed = '' }) {
       if (k === '\x1b[A') s.at = Math.max(0, s.at - 1);
       else if (k === '\x1b[B') s.at = Math.min(options.length - 1, s.at + 1);
       else if (k === '\r') s.picked = options[s.at];
+      else if (s.at === boxAt && /^\x7f+$/.test(k)) s.typed = s.typed.slice(0, Math.max(0, s.typed.length - k.length));
       else if (s.at === boxAt) s.typed += k; // in the box, anything is text
       else if (/^\d$/.test(k)) {
         const i = Number(k) - 1;
@@ -47,12 +48,19 @@ test('menu: the text box option is known by its label, and by its hint once some
   assert.equal(menuFromLines(['Do you want to proceed?', '❯ 1. Yes', '  2. No']).input, undefined);
 });
 
-test('plan: approving from the box moves up with the arrows and presses Enter, no digit typed in', async () => {
+test('plan: approving from the box clears stray digits, moves up with the arrows and presses Enter', async () => {
   const { s, io } = cli({ ...PLAN, at: 2, typed: '1' });
   const r = await drive(io, { kind: 'plan' }, { action: 'approve', option: '1' });
-  assert.deepEqual(r.steps, ['\x1b[A', '\x1b[A', '\r']);
+  assert.deepEqual(r.steps, ['\x7f\x7f\x7f', '\x1b[A', '\x1b[A', '\r']);
   assert.equal(s.picked, 'Yes, and use auto mode');
-  assert.equal(s.typed, '1', 'nothing more typed into the box');
+  assert.equal(s.typed, '', 'the stray "1" is not sent along with the approval');
+});
+
+test('plan: words typed into the box stay there (Claude Code sends them with the approval)', async () => {
+  const { s, io } = cli({ ...PLAN, at: 2, typed: '참고로 스피커폰으로 할 계획이야' });
+  await drive(io, { kind: 'plan' }, { action: 'approve', option: '1' });
+  assert.equal(s.picked, 'Yes, and use auto mode');
+  assert.equal(s.typed, '참고로 스피커폰으로 할 계획이야');
 });
 
 test('plan: with the highlight on an option, the digit still picks it (as before)', async () => {
@@ -66,7 +74,7 @@ test('permission read off the same screen: "yes" from the box is not typed into 
   const { s, io } = cli({ ...PLAN, at: 2, typed: '11' });
   await drive(io, { kind: 'permission' }, { action: 'yes' });
   assert.equal(s.picked, 'Yes, and use auto mode');
-  assert.equal(s.typed, '11');
+  assert.equal(s.typed, '');
 });
 
 test('question: a pick made while the highlight is in "Type something." with text in it', async () => {

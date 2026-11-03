@@ -67,7 +67,15 @@ export async function drive(io, prompt, body) {
       return false;
     }
     if (at === to) return false;
-    let cur = m;
+    // Claude Code sends what's left in the plan's box along with the approval. Digits there are
+    // only keys that went astray (this same bug, before): clear them first. Words someone typed in
+    // the terminal stay and go with it.
+    const inBox = m.options[at].label;
+    if (/^[\d\s]+$/.test(inBox)) {
+      press('\x7f'.repeat(inBox.length + 2));
+      await waitMenu((x) => x && !/^[\d\s]+$/.test(x.options.find((o) => o.key === box)?.label || ''), 1000);
+    }
+    let cur = (await waitMenu((x) => !!x, 500))?.m || m;
     for (let n = 0; n < 12; n++) {
       const i = cur.options.findIndex((o) => o.selected);
       if (i === to) {
