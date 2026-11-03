@@ -53,6 +53,8 @@ test('rewind confirm: which digit restores what', () => {
   assert.equal(plain['restore conversation'], '1');
   assert.equal(plain['restore code and conversation'], undefined);
   assert.equal(rewindChoicesFromLines(LIST), null);
+  // Heading drawn, options not yet: not ready.
+  assert.equal(rewindChoicesFromLines(['Confirm you want to restore to the point before you sent this message:', ' │ hi', '']), null);
 });
 
 test('rewind: a shown line matches the message it was cut from, not another', () => {

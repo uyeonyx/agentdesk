@@ -572,7 +572,8 @@ function rewindList() {
       const picked = prompts[at];
       W('\x1b[2J\x1b[H');
       W(` Rewind\r\n Confirm you want to restore to the point before you sent this message:\r\n │ ${picked.split('\n')[0]}\r\n This message and everything after it will be removed.\r\n`);
-      W(' ❯ 1. Restore code and conversation\r\n   2. Restore conversation\r\n   3. Restore code\r\n   4. Summarize from here\r\n   5. Never mind\r\n');
+      // The options come a moment after the heading, the way a slow terminal can draw them.
+      setTimeout(() => W(' ❯ 1. Restore code and conversation\r\n   2. Restore conversation\r\n   3. Restore code\r\n   4. Summarize from here\r\n   5. Never mind\r\n'), 400);
       form = (d) => {
         if (!/^[1-5]$/.test(d) && d !== '\x1b') return;
         form = null;
@@ -586,10 +587,12 @@ function rewindList() {
           W(picked);
         } else modeLine();
       };
+      form.esc = true;
       return;
     }
     if (form) draw();
   };
+  form.esc = true;
 }
 
 // --fork-session: the new session starts as a copy of the one it was resumed from.
@@ -642,6 +645,8 @@ process.stdin.setRawMode?.(true);
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (d) => {
   let s = String(d);
+  // Esc closes the rewind list and its confirm step (other forms here only take digits).
+  if (s === '\x1b' && form?.esc) return form(s);
   if (s === '\x1b') {
     if (busy) {
       clearInterval(busy);

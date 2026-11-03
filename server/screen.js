@@ -285,7 +285,10 @@ export function rewindCursorFromLines(lines) {
   return '';
 }
 
-/** The step after picking a message: which digit restores what. null when it isn't on screen. */
+/**
+ * The step after picking a message: which digit restores what. null when it isn't on screen, or
+ * while only its heading is drawn (the options can arrive a moment later).
+ */
 export function rewindChoicesFromLines(lines) {
   if (!lines.some((l) => /Confirm you want to restore/i.test(l))) return null;
   const out = {};
@@ -293,7 +296,7 @@ export function rewindChoicesFromLines(lines) {
     const m = l.match(/(\d)\.\s+(Restore code and conversation|Restore conversation|Restore code|Summarize from here|Summarize up to here|Never mind)\b/i);
     if (m) out[m[2].toLowerCase()] = m[1];
   }
-  return out;
+  return Object.keys(out).length ? out : null;
 }
 
 /** Does a line of the rewind list show this message? The list shows its first line, maybe cut short. */

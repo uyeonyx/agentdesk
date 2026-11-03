@@ -1080,7 +1080,11 @@ export class Tasks {
         throw httpError(409, '되감을 지시를 Claude Code 목록에서 찾지 못했어요 · 원본 터미널에서 /rewind로 해 보세요');
       }
       r.proc.write('\r');
-      const choices = await this.waitScreen(r, rewindChoicesFromLines, 3000);
+      // Every version offers "Restore conversation"; until it's drawn, the step isn't ready.
+      const choices = await this.waitScreen(r, (l) => {
+        const c = rewindChoicesFromLines(l);
+        return c?.['restore conversation'] ? c : null;
+      }, 4000);
       // Files come back from Desk's snapshot. Only without one (not git) the CLI puts them back,
       // and never in a fork: its checkpoints point at the original session's folder.
       const cliCode = !msg.snap && !task.forkOf;
