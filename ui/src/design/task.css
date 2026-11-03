@@ -919,6 +919,12 @@
 .cp-row textarea::placeholder {
   color: var(--text-3);
 }
+/* The composer's own frame shows focus; a second ring around the text inside it only doubles it. */
+.cp-row textarea:focus,
+.cp-row textarea:focus-visible {
+  box-shadow: none;
+  border-radius: 0;
+}
 .send {
   display: grid;
   place-items: center;
