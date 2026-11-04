@@ -121,3 +121,25 @@ test('Codex: both rollout formats become the same conversation', async () => {
   }
   delete process.env.MOCK_CODEX_FORMAT;
 });
+
+import { pendingMessages } from '../ui/src/core/turns.js';
+
+test('a message sent while the agent works shows at once, until its transcript has it', () => {
+  const now = 1_800_000_000_000;
+  const sent = [
+    { id: 'm1', text: '첫 지시', at: now - 60_000, source: 'start' },
+    { id: 'm2', text: '계속해 줘', at: now - 30_000, source: 'composer' },
+    { id: 'm3', text: '계속해 줘', at: now - 2_000, source: 'composer' },
+    { id: 'm4', text: '허락 · 다시 묻지 않기', at: now - 1_000, source: 'answer' },
+  ];
+  const entries = [
+    { id: 'u1', kind: 'user', text: '첫 지시', at: now - 59_000 },
+    { id: 'r1', kind: 'reply', text: '네' },
+    // The first "계속해 줘" reached the transcript; the second, the same words, not yet.
+    { id: 'u2', kind: 'user', text: '계속해  줘', at: now - 28_000 },
+  ];
+  assert.deepEqual(pendingMessages(entries, sent, now).map((m) => m.id), ['m3']);
+  assert.deepEqual(pendingMessages([...entries, { id: 'u3', kind: 'user', text: '계속해 줘', at: now - 500 }], sent, now), []);
+  // Words that went into the transcript before this message was sent are someone else's.
+  assert.deepEqual(pendingMessages([{ id: 'u0', kind: 'user', text: '계속해 줘', at: now - 40_000 }], [sent[1]], now).map((m) => m.id), ['m2']);
+});

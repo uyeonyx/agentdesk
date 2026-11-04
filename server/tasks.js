@@ -1632,11 +1632,17 @@ export class Tasks {
     // Typed text goes wherever the CLI's cursor is: into a choice menu it picks options or fills a
     // box there, and while the CLI is still starting up it's dropped. So: never into a menu, and
     // after a (re)start, only once the input box is there.
-    const ready = await this.inputReady(r);
-    if (ready === 'menu') throw httpError(409, '선택지가 떠 있어요 · 카드에서 먼저 답한 뒤 보내 주세요');
-    const snap = await this.snapshotAll(task, text.slice(0, 60));
-    const msg = { id: randomId('m'), text, at: Date.now(), snap, source };
+    // In the conversation at once (as "on its way"), before waiting on the CLI or the snapshot.
+    const msg = { id: randomId('m'), text, at: Date.now(), snap: null, source };
     task.messages.push(msg);
+    this.changed();
+    const ready = await this.inputReady(r);
+    if (ready === 'menu') {
+      task.messages = task.messages.filter((x) => x !== msg);
+      this.changed();
+      throw httpError(409, '선택지가 떠 있어요 · 카드에서 먼저 답한 뒤 보내 주세요');
+    }
+    msg.snap = await this.snapshotAll(task, text.slice(0, 60));
     await this.writeText(r, text);
     this.store.save();
     this.changed();

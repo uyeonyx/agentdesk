@@ -129,3 +129,25 @@ export function mergeBySeq(list, add) {
   }
   return out;
 }
+
+/**
+ * What I sent that the agent hasn't taken in yet. While it works, Claude Code holds a message until
+ * the current step is done and only then writes it to its transcript, so the conversation drawn
+ * from the transcript would show it late. Each sent message is matched, oldest first, to a user
+ * entry with the same words written no earlier than it was sent; the ones left are pending.
+ */
+export function pendingMessages(entries, messages, now = Date.now()) {
+  const key = (s) => String(s || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  const users = entries.filter((e) => e.kind === 'user');
+  const used = new Set();
+  const out = [];
+  for (const m of [...(messages || [])].sort((a, b) => a.at - b.at)) {
+    // Answers to cards aren't messages in the transcript; old ones are long settled.
+    if (!m.text || m.undone || m.source === 'answer' || now - m.at > 30 * 60_000) continue;
+    const k = key(m.text);
+    const hit = users.find((e) => !used.has(e.id) && (e.msgId === m.id || (key(e.text) === k && (e.at || 0) >= m.at - 5000)));
+    if (hit) used.add(hit.id);
+    else out.push(m);
+  }
+  return out;
+}

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { api } from '../../api.js';
 import { setView } from '../../store.js';
 import { modeOf, effortOf, modelName, ctxPct, tokens } from '../../core/session.js';
-import { Strip, stripSpan } from '../overview/Strip.jsx';
+import { Strip, spanWords } from '../overview/Strip.jsx';
 import { TalkThread } from '../talk/Clash.jsx';
 import { I, ago, useNow } from '../../ui/bits.jsx';
 
@@ -85,11 +85,11 @@ export function FocusSide({ task }) {
       </section>
       <section class="fs">
         <h3 class="lbl">
-          활동 <span>최근 {Math.round(stripSpan(task, now) / 60_000)}분</span>
+          활동 <span>{spanWords(task, now).head}</span>
         </h3>
         <Strip t={task} class="big" />
         <div class="axis">
-          <span>{Math.round(stripSpan(task, now) / 60_000)}분 전</span>
+          <span>{spanWords(task, now).from}</span>
           <span>지금</span>
         </div>
         <div class="legend">

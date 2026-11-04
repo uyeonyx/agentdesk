@@ -3,7 +3,7 @@
 import { memo } from 'preact/compat';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { useConversation } from '../../core/conversation.js';
-import { groupTurns, latestPlan, duration, applyCuts } from '../../core/turns.js';
+import { groupTurns, latestPlan, duration, applyCuts, pendingMessages } from '../../core/turns.js';
 import { useStore, set, get } from '../../store.js';
 import { isBlocked } from '../../core/status.js';
 import { openFileInTask, undoMessage, rewindMessage, forkFrom } from '../../actions.js';
@@ -30,6 +30,8 @@ export function Conversation({ task, project, dock }) {
   const [fresh, setFresh] = useState(0);
   const lastCount = useRef(0);
   const messages = task.messages || [];
+  // Sent but not taken in yet (it's busy): shown at once, marked as waiting, until the transcript has it.
+  const pending = useMemo(() => pendingMessages(top, messages), [top, messages]);
 
   // Opening a task: back to where I was, or to the start of its last reply (read from the top).
   useLayoutEffect(() => {
@@ -58,6 +60,13 @@ export function Conversation({ task, project, dock }) {
     if (stick.current) el.scrollTop = el.scrollHeight;
     else if (added > 0) setFresh((n) => n + added);
   }, [c.ver]);
+  // A message I just sent goes to the bottom, and so do I.
+  useLayoutEffect(() => {
+    const el = box.current;
+    if (!el || !pending.length) return;
+    el.scrollTop = el.scrollHeight;
+    stick.current = true;
+  }, [pending.length]);
 
   const onScroll = (e) => {
     const el = e.currentTarget;
@@ -94,6 +103,9 @@ export function Conversation({ task, project, dock }) {
           {c.loaded && !top.length && <ConvoEmpty task={task} />}
           {visible.map((t, i) => (
             <Turn key={t.id} turn={t} task={task} messages={messages} last={i === visible.length - 1} onFileRef={onFileRef} entries={c.list} ver={c.ver} />
+          ))}
+          {pending.map((m) => (
+            <PendingMsg key={m.id} m={m} task={task} />
           ))}
         </div>
       </div>
@@ -246,6 +258,21 @@ function UserMsg({ e, task, messages }) {
   );
 }
 
+/** A message on its way: the agent takes it in when its current step is done. */
+function PendingMsg({ m, task }) {
+  const busy = task.running && ['working', 'starting', 'waiting'].includes(task.state);
+  return (
+    <div class="umsg pending" data-kind="user" data-testid="pending-msg">
+      <div class="umsg-meta">
+        <span class="src wait">
+          <I n="clock" /> {busy ? '지금 하는 일이 끝나면 전해요' : '전하는 중'}
+        </span>
+      </div>
+      <div class="umsg-text selectable">{m.text}</div>
+    </div>
+  );
+}
+
 function Reply({ e, onFileRef }) {
   return (
     <div class="reply" data-kind="reply">
@@ -260,7 +287,9 @@ function Thinking({ e }) {
   return (
     <div class={`thinking ${open ? 'open' : ''}`}>
       <button class="th-h" onClick={() => setOpen(!open)} aria-expanded={open}>
-        <I n="brain" /> 생각 <span class="first">{first}</span>
+        <I n="brain" />
+        <span class="th-l">생각</span>
+        {!open && <span class="first">{first}</span>}
         <I n="chevron-down" class="chev" />
       </button>
       {open && <Markdown md={e.md || e.text || ''} compact />}

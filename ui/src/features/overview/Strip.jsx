@@ -1,15 +1,27 @@
 // A session's recent activity on one thin line: what kind of tool ran when (gray reads, blue
 // edits, magenta commands), and striped amber while it waited on me. The span follows the
-// session's age (5, 10, 15 or 30 minutes), so a new session fills the line instead of a sliver.
+// session's age (its whole life, then 5, 10, 15 or 30 minutes), so a new session fills the line
+// instead of a sliver.
 import { useNow } from '../../ui/bits.jsx';
 
 const KIND = { r: 'read', e: 'edit', c: 'cmd', w: 'web', a: 'agent', t: 'read' };
 const SPANS = [5, 10, 15, 30].map((m) => m * 60_000);
 
-/** How far back the strip reaches for this session, in ms. */
+/**
+ * How far back the strip reaches for this session, in ms: its whole life while it's younger than
+ * five minutes (never less than one), then 5, 10, 15 or 30 minutes.
+ */
 export function stripSpan(t, now = Date.now()) {
   const age = now - (t.createdAt || t.strip?.from || now);
+  if (age < SPANS[0] * 0.92) return Math.max(60_000, Math.ceil((age * 1.08) / 10_000) * 10_000);
   return SPANS.find((w) => age <= w * 0.92) || SPANS.at(-1);
+}
+
+/** The strip's reach in words: "시작부터" while it covers the whole session, else "최근 N분". */
+export function spanWords(t, now = Date.now()) {
+  const span = stripSpan(t, now);
+  const age = now - (t.createdAt || t.strip?.from || now);
+  return span >= age ? { head: '시작부터', from: '시작' } : { head: `최근 ${Math.round(span / 60_000)}분`, from: `${Math.round(span / 60_000)}분 전` };
 }
 
 export function Strip({ t, class: cls = '' }) {

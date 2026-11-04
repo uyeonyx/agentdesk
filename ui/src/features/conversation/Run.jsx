@@ -20,20 +20,25 @@ export function Run({ tools, task, live, waiting }) {
   const now = useNow();
   const running = live && sum.running;
   const cats = [...new Set(tools.filter((t) => t.kind !== 'todo').map((t) => t.cat || 'tool'))].slice(0, 4);
-  // A run of only to-do updates still gets its own mark.
+  // A run of only to-do updates still gets its own mark, and says where the list stands.
   if (!cats.length) cats.push(tools.some((t) => t.kind === 'todo') ? 'todo' : 'tool');
+  const todoOnly = tools.every((t) => t.kind === 'todo');
+  const lastTodo = todoOnly ? tools.at(-1)?.detail?.items || [] : [];
   return (
     <div class={`run ${isOpen ? 'open' : ''} ${sum.fail ? 'failed' : ''} ${running ? 'live' : ''}`} data-kind="run">
-      <button class="run-h" onClick={() => setOpen(!isOpen)} aria-expanded={isOpen}>
+      <button class="run-h" onClick={() => !todoOnly && setOpen(!isOpen)} aria-expanded={todoOnly ? undefined : isOpen}>
         <span class="run-icons" data-cat={cats[0] || 'tool'}>
           {cats.map((c) => (
             <I key={c} n={CAT_ICON[c] || 'tool'} />
           ))}
         </span>
-        <span class="run-what">{sum.parts.join(' · ') || '할 일 갱신'}</span>
+        <span class="run-what">
+          {sum.parts.join(' · ') || (lastTodo.length ? `할 일 ${lastTodo.filter((x) => x.status === 'done').length}/${lastTodo.length}` : '할 일 갱신')}
+        </span>
         {sum.fail > 0 && <span class="run-fail">실패 {sum.fail}</span>}
-        {(running ? now - running.at : sum.ms) > 0 && <span class="run-ms num">{duration(running ? now - running.at : sum.ms)}</span>}
-        <I n="chevron-down" class="chev" />
+        {/* Under a second says nothing worth reading. */}
+        {(running ? now - running.at : sum.ms) >= 1000 && <span class="run-ms num">{duration(running ? now - running.at : sum.ms)}</span>}
+        {!todoOnly && <I n="chevron-down" class="chev" />}
       </button>
       {sum.files.length > 0 && !isOpen && (
         <div class="run-files">
@@ -57,7 +62,7 @@ export function Run({ tools, task, live, waiting }) {
           </span>
         </div>
       )}
-      {isOpen && (
+      {isOpen && !todoOnly && (
         <div class="run-b">
           {tools.map((t) => (
             <ToolRow key={t.id} t={waiting && t.st === 'run' ? { ...t, st: 'wait' } : t} task={task} />
@@ -95,7 +100,7 @@ function ToolRow({ t, task }) {
       <button class="tool-h" onClick={() => expandable && setOpen(!open)} aria-expanded={expandable ? open : undefined} disabled={!expandable}>
         <I n={CAT_ICON[t.cat] || 'tool'} class="ci" />
         <span class="tt">{t.title || t.tool}</span>
-        {t.ms ? <span class="tm num">{duration(t.ms)}</span> : null}
+        {t.ms >= 1000 ? <span class="tm num">{duration(t.ms)}</span> : null}
         <span class="ts" data-tip={st.label || undefined}>{t.st === 'run' ? <Spinner /> : st.icon ? <I n={st.icon} /> : null}</span>
       </button>
       {open && (
@@ -214,7 +219,7 @@ export function Subagent({ e, task, entries, onFileRef }) {
           <span class="sa-ty">{d.type || 'agent'}</span>
         </span>
         {tools > 0 && <span class="sa-n num">도구 {tools}</span>}
-        <span class="num sa-ms">{duration(running ? now - e.at : e.ms)}</span>
+        {(running ? now - e.at : e.ms) >= 1000 && <span class="num sa-ms">{duration(running ? now - e.at : e.ms)}</span>}
         <I n="chevron-down" class="chev" />
       </button>
       {isOpen && (

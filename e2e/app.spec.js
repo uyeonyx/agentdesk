@@ -511,6 +511,20 @@ test('general: a session started with no project is anchored to one later and go
   await call('POST', `/api/tasks/${made.id}/discard`);
 });
 
+test('a message sent while the agent works is in the conversation at once', async () => {
+  const p = await project('repo-queue');
+  const t = await start(p.id, 'slow subagent plan test 오래 걸리는 일');
+  await until(t.id, (x) => x?.state === 'working');
+  await toList();
+  await row(t.id).click();
+  const box = page.getByLabel('에이전트에게 보낼 말');
+  await box.fill('just answer: 끝나면 이것도 해 줘');
+  await box.press('Enter');
+  // Shown right away (on its way, or already taken in), not when the agent gets to it.
+  await expect(page.getByTestId('conversation')).toContainText('끝나면 이것도 해 줘', { timeout: 1500 });
+  await call('POST', `/api/tasks/${t.id}/discard`);
+});
+
 test('focus: the composer bar changes the permission mode, mid-session, with Shift+Tab or the chip', async () => {
   const p = await project('repo-mode');
   const t = await start(p.id, 'just answer: 모드');
